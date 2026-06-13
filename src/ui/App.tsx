@@ -9,6 +9,7 @@ import HUD from "./HUD.tsx";
 import SystemPanel from "./SystemPanel.tsx";
 import DebugPanel from "./DebugPanel.tsx";
 import Minimap from "./Minimap.tsx";
+import Scanner from "./Scanner.tsx";
 
 interface AppProps {
   world: World;
@@ -22,6 +23,7 @@ export default function App({ world, bus, speedState }: AppProps) {
       <HUD world={world} bus={bus} speedState={speedState} />
       <SystemPanel world={world} bus={bus} />
       <Minimap world={world} bus={bus} />
+      <Scanner world={world} bus={bus} />
       <DebugPanel world={world} bus={bus} speedState={speedState} />
     </>
   );
