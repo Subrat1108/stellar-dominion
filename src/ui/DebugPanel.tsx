@@ -31,6 +31,16 @@ export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) 
 
   const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
   const distStar = Math.hypot(pos.x, pos.y, pos.z); // star sits at sim origin
+
+  // Nearest body to the ship — a simple proximity readout for approach feel.
+  // The star carries no Transform; it sits at the sim origin (0,0,0).
+  let nearestName = "—";
+  let nearestDist = Infinity;
+  for (const [entity, body] of world.components.celestialBody) {
+    const bp = world.components.transform.get(entity)?.position ?? { x: 0, y: 0, z: 0 };
+    const d = Math.hypot(pos.x - bp.x, pos.y - bp.y, pos.z - bp.z);
+    if (d < nearestDist) { nearestDist = d; nearestName = body.name; }
+  }
   const heading = ((ctrl.heading * DEG) % 360 + 360) % 360;
   const pitch = ctrl.pitch * DEG;
 
@@ -56,6 +66,7 @@ export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) 
     ["HEADING", `${f(heading, 1)}°`],
     ["PITCH", `${f(pitch, 1)}°`],
     ["DIST→STAR", f(distStar)],
+    ["NEAREST", `${nearestName} ${f(nearestDist, 1)}`],
     ["AUTOPILOT", ctrl.autopilotActive ? "ON" : "off"],
   ];
 
