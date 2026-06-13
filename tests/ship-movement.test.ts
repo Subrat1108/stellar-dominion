@@ -51,24 +51,36 @@ describe("ship movement system", () => {
     expect(Math.abs(pos.y)).toBeLessThan(0.001); // level pitch
   });
 
-  it("right yaw rotates heading (heading increases)", () => {
+  it("right yaw (yaw=+1) decreases heading (steer right → world -X)", () => {
     const world = createStartingSystem();
     const h0 = world.components.shipControl.get(world.shipId)!.heading;
 
     step(world, mk({ yaw: 1 }));
 
     const h1 = world.components.shipControl.get(world.shipId)!.heading;
-    expect(h1).toBeGreaterThan(h0);
-    expect(h1 - h0).toBeCloseTo((Math.PI / 2) * FIXED_DT, 5);
+    expect(h1).toBeLessThan(h0);
+    expect(h0 - h1).toBeCloseTo((Math.PI / 2) * FIXED_DT, 5);
   });
 
-  it("left yaw rotates heading the other way (heading decreases)", () => {
+  it("left yaw (yaw=-1) increases heading the other way", () => {
     const world = createStartingSystem();
     const h0 = world.components.shipControl.get(world.shipId)!.heading;
 
     step(world, mk({ yaw: -1 }));
 
-    expect(world.components.shipControl.get(world.shipId)!.heading).toBeLessThan(h0);
+    expect(world.components.shipControl.get(world.shipId)!.heading).toBeGreaterThan(h0);
+  });
+
+  it("steering right then thrusting moves the ship to screen-right (world -X)", () => {
+    // Convention: yaw>0 = steer right. In the flight camera screen-right maps to
+    // world -X, so after a right turn + forward thrust the ship should gain -X.
+    const world = createStartingSystem();
+    const x0 = world.components.transform.get(world.shipId)!.position.x;
+
+    for (let i = 0; i < 20; i++) step(world, mk({ yaw: 1 }));   // bank right
+    for (let i = 0; i < 60; i++) step(world, mk({ thrust: 1 })); // drive forward
+
+    expect(world.components.transform.get(world.shipId)!.position.x).toBeLessThan(x0);
   });
 
   it("pitch up raises the nose and forward thrust then gains altitude (+Y)", () => {

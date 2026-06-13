@@ -59,7 +59,9 @@ export function shipMovementSystem(world: World, input: Input): void {
         while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
         const pitchDiff = targetPitch - ctrl.pitch;
 
-        yaw   = Math.sign(yawDiff)   * Math.min(1, Math.abs(yawDiff)   / 0.2);
+        // yaw is negated below when applied to heading (yaw>0 = steer right),
+        // so to drive heading toward targetHeading we negate the sign here too.
+        yaw   = -Math.sign(yawDiff)  * Math.min(1, Math.abs(yawDiff)   / 0.2);
         pitch = Math.sign(pitchDiff) * Math.min(1, Math.abs(pitchDiff) / 0.2);
 
         const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
@@ -75,8 +77,11 @@ export function shipMovementSystem(world: World, input: Input): void {
     }
   }
 
-  // Rotate nose.
-  ctrl.heading += yaw * TURN_RATE * FIXED_DT;
+  // Rotate nose. yaw > 0 = steer right (pilot's right). In the flight camera
+  // (behind the ship, looking down +nose) screen-right maps to world -X, which
+  // corresponds to a DECREASING heading — hence the minus sign. See the
+  // turn-direction test in tests/ship-movement.test.ts.
+  ctrl.heading -= yaw * TURN_RATE * FIXED_DT;
   ctrl.pitch    = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, ctrl.pitch + pitch * TURN_RATE * FIXED_DT));
 
   // Apply thrust along the nose, then drag.
