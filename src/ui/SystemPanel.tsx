@@ -36,6 +36,15 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
     ...world.components.celestialBody.entries(),
   ];
 
+  const shipPos = world.components.transform.get(world.shipId)?.position
+    ?? { x: 0, y: 0, z: 0 };
+
+  function distFromShip(entityId: number): number {
+    const bp = world.components.transform.get(entityId)?.position
+      ?? { x: 0, y: 0, z: 0 };
+    return Math.hypot(shipPos.x - bp.x, shipPos.y - bp.y, shipPos.z - bp.z);
+  }
+
   const selected = selectedId !== null
     ? world.components.celestialBody.get(selectedId) ?? null
     : null;
@@ -84,6 +93,7 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
           <BodyRow
             key={id}
             body={body}
+            distFromShip={distFromShip(id)}
             selected={selectedId === id}
             onClick={() => setSelectedId(selectedId === id ? null : id)}
           />
@@ -102,6 +112,7 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
           <BodyInspector
             body={selected}
             entityId={selectedId}
+            distFromShip={distFromShip(selectedId)}
             onSetCourse={handleSetCourse}
           />
         ) : (
@@ -119,10 +130,12 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
 
 function BodyRow({
   body,
+  distFromShip,
   selected,
   onClick,
 }: {
   body: CelestialBody;
+  distFromShip: number;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -150,6 +163,9 @@ function BodyRow({
         {KIND_ICON[body.kind] ?? "·"}
       </span>
       <span style={{ flex: 1 }}>{body.name}</span>
+      <span style={{ color: "#45475a", fontSize: 10, minWidth: 40, textAlign: "right" }}>
+        {distFromShip.toFixed(0)}u
+      </span>
       {hab !== undefined && (
         <HabBadge score={hab} />
       )}
@@ -181,10 +197,12 @@ function HabBadge({ score }: { score: number }) {
 function BodyInspector({
   body,
   entityId,
+  distFromShip,
   onSetCourse,
 }: {
   body: CelestialBody;
   entityId: number;
+  distFromShip: number;
   onSetCourse: (id: number) => void;
 }) {
   return (
@@ -239,6 +257,7 @@ function BodyInspector({
       {/* Star stats */}
       {body.kind === "star" && (
         <>
+          <Row label="Distance from ship" value={`${distFromShip.toFixed(1)} u`} valueColor="#89dceb" />
           <Row label="Luminosity" value={`${body.luminositySol?.toFixed(3) ?? "?"} L☉`} />
           <Row label="Temperature" value={`${body.tempK?.toLocaleString() ?? "?"} K`} />
           <Row
@@ -258,6 +277,11 @@ function BodyInspector({
           <Row
             label="Orbital distance"
             value={`${body.orbitalDistanceAu?.toFixed(2) ?? "?"} AU`}
+          />
+          <Row
+            label="Distance from ship"
+            value={`${distFromShip.toFixed(1)} u`}
+            valueColor="#89dceb"
           />
           <Row
             label="Mass"
