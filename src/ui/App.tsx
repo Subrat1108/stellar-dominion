@@ -4,18 +4,20 @@
 
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
+import type { SpeedMultiplier } from "../app/speed-state.ts";
 import HUD from "./HUD.tsx";
 import SystemPanel from "./SystemPanel.tsx";
 
 interface AppProps {
   world: World;
   bus: GameBus;
+  speedState: { value: SpeedMultiplier };
 }
 
-export default function App({ world, bus }: AppProps) {
+export default function App({ world, bus, speedState }: AppProps) {
   return (
     <>
-      <HUD world={world} bus={bus} />
+      <HUD world={world} bus={bus} speedState={speedState} />
       <SystemPanel world={world} bus={bus} />
     </>
   );

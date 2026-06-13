@@ -1,17 +1,22 @@
-// HUD — top strip showing the survival clock, crew status, and materials.
+// HUD — top strip showing the survival clock, crew status, materials, and speed.
 //
 // Reads live from the world ref each render (triggered by useGameTick).
 // Deliberately minimal: dark, monospace, no external CSS framework.
 
+import { useState } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
+import type { SpeedMultiplier } from "../app/speed-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { lifeSupportFraction, ticksRemaining } from "../sim/systems/life-support.ts";
 import { FIXED_DT } from "../sim/loop.ts";
 
+const SPEEDS: SpeedMultiplier[] = [1, 10, 100, 1000];
+
 interface HUDProps {
   world: World;
   bus: GameBus;
+  speedState: { value: SpeedMultiplier };
 }
 
 /** Format a tick count as MM:SS of real time at 60 ticks/sec. */
@@ -51,8 +56,9 @@ function LifeSupportBar({ fraction }: { fraction: number }) {
   );
 }
 
-export default function HUD({ world, bus }: HUDProps) {
+export default function HUD({ world, bus, speedState }: HUDProps) {
   useGameTick(bus, 6);
+  const [speed, setSpeed] = useState<SpeedMultiplier>(speedState.value);
 
   const ls = world.components.lifeSupport.get(world.shipId);
   const crew = world.components.crew.get(world.shipId);
@@ -122,17 +128,38 @@ export default function HUD({ world, bus }: HUDProps) {
         </div>
       )}
 
-      {/* System label — right-aligned */}
-      <span
+      {/* Speed multiplier selector — right-aligned */}
+      <div
         style={{
           marginLeft: "auto",
-          color: "#585b70",
-          fontSize: 11,
-          letterSpacing: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
         }}
       >
-        τ CETI SYSTEM · drag to look · scroll to zoom
-      </span>
+        <span style={{ color: "#585b70", fontSize: 11, marginRight: 4 }}>SPEED</span>
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              speedState.value = s;
+              setSpeed(s);
+            }}
+            style={{
+              padding: "1px 7px",
+              fontSize: 11,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              background: speed === s ? "#313244" : "transparent",
+              color: speed === s ? "#cdd6f4" : "#585b70",
+              border: speed === s ? "1px solid #45475a" : "1px solid transparent",
+              borderRadius: 3,
+            }}
+          >
+            {s}×
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
