@@ -40,6 +40,14 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
     ? world.components.celestialBody.get(selectedId) ?? null
     : null;
 
+  function handleSetCourse(entityId: number) {
+    const ctrl = world.components.shipControl.get(world.shipId);
+    if (ctrl) {
+      ctrl.autopilotTargetId = entityId;
+      ctrl.autopilotActive = true;
+    }
+  }
+
   return (
     <div
       className="interactive"
@@ -90,8 +98,12 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
           borderTop: "1px solid #1e2030",
         }}
       >
-        {selected ? (
-          <BodyInspector body={selected} />
+        {selected && selectedId !== null ? (
+          <BodyInspector
+            body={selected}
+            entityId={selectedId}
+            onSetCourse={handleSetCourse}
+          />
         ) : (
           <div style={{ padding: 12, color: "#585b70", fontSize: 11 }}>
             Select a body to inspect.
@@ -166,7 +178,15 @@ function HabBadge({ score }: { score: number }) {
 // ---------------------------------------------------------------------------
 // Body inspector
 
-function BodyInspector({ body }: { body: CelestialBody }) {
+function BodyInspector({
+  body,
+  entityId,
+  onSetCourse,
+}: {
+  body: CelestialBody;
+  entityId: number;
+  onSetCourse: (id: number) => void;
+}) {
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Name + tag */}
@@ -187,6 +207,27 @@ function BodyInspector({ body }: { body: CelestialBody }) {
           </span>
         </div>
       </div>
+
+      {/* Set Course button — not shown for the star */}
+      {body.kind !== "star" && (
+        <button
+          onClick={() => onSetCourse(entityId)}
+          style={{
+            padding: "4px 10px",
+            fontSize: 11,
+            fontFamily: "inherit",
+            cursor: "pointer",
+            background: "#1e3a5f",
+            color: "#89b4fa",
+            border: "1px solid #2a4a7f",
+            borderRadius: 4,
+            letterSpacing: 0.5,
+            alignSelf: "flex-start",
+          }}
+        >
+          ▶ SET COURSE
+        </button>
+      )}
 
       {/* Description */}
       <p style={{ color: "#a6adc8", fontSize: 11, lineHeight: 1.55 }}>

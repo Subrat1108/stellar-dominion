@@ -60,6 +60,13 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
   useGameTick(bus, 6);
   const [speed, setSpeed] = useState<SpeedMultiplier>(speedState.value);
 
+  const ctrl = world.components.shipControl.get(world.shipId);
+  const autopilotActive = ctrl?.autopilotActive ?? false;
+
+  function cancelAutopilot() {
+    if (ctrl) ctrl.autopilotActive = false;
+  }
+
   const ls = world.components.lifeSupport.get(world.shipId);
   const crew = world.components.crew.get(world.shipId);
   const inv = world.components.inventory.get(world.shipId);
@@ -126,6 +133,25 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
           <MatChip label="FUEL" value={inv.fuel} />
           <MatChip label="FOOD" value={inv.food} />
         </div>
+      )}
+
+      {/* Autopilot cancel — shown only when active */}
+      {autopilotActive && (
+        <button
+          onClick={cancelAutopilot}
+          style={{
+            padding: "2px 9px",
+            fontSize: 11,
+            fontFamily: "inherit",
+            cursor: "pointer",
+            background: "#3a1e2f",
+            color: "#f38ba8",
+            border: "1px solid #6e3050",
+            borderRadius: 3,
+          }}
+        >
+          ✕ AUTOPILOT
+        </button>
       )}
 
       {/* Speed multiplier selector — right-aligned */}
