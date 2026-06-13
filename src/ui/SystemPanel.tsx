@@ -10,7 +10,12 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
+import { parkDistance } from "../sim/presentation.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
+
+// Landing is offered a little past the autopilot park point (matches the
+// LANDING_RANGE_FACTOR in commands/apply.ts).
+const LANDING_RANGE_FACTOR = 1.25;
 
 interface SystemPanelProps {
   world: World;
@@ -52,6 +57,10 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
 
   function handleSetCourse(entityId: number) {
     dispatch(world, { kind: "SetCourse", bodyId: entityId });
+  }
+
+  function handleLand(entityId: number) {
+    dispatch(world, { kind: "LandAtBody", bodyId: entityId });
   }
 
   return (
@@ -111,6 +120,7 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
             entityId={selectedId}
             distFromShip={distFromShip(selectedId)}
             onSetCourse={handleSetCourse}
+            onLand={handleLand}
           />
         ) : (
           <div style={{ padding: 12, color: "#585b70", fontSize: 11 }}>
@@ -196,12 +206,18 @@ function BodyInspector({
   entityId,
   distFromShip,
   onSetCourse,
+  onLand,
 }: {
   body: CelestialBody;
   entityId: number;
   distFromShip: number;
   onSetCourse: (id: number) => void;
+  onLand: (id: number) => void;
 }) {
+  // A rocky planet within landing range can be landed on; gas giants/star can't.
+  const canLand =
+    body.kind === "planet" &&
+    distFromShip <= parkDistance(body.renderRadius) * LANDING_RANGE_FACTOR;
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Name + tag */}
@@ -223,25 +239,46 @@ function BodyInspector({
         </div>
       </div>
 
-      {/* Set Course button — not shown for the star */}
+      {/* Set Course + Land actions — not shown for the star */}
       {body.kind !== "star" && (
-        <button
-          onClick={() => onSetCourse(entityId)}
-          style={{
-            padding: "4px 10px",
-            fontSize: 11,
-            fontFamily: "inherit",
-            cursor: "pointer",
-            background: "#1e3a5f",
-            color: "#89b4fa",
-            border: "1px solid #2a4a7f",
-            borderRadius: 4,
-            letterSpacing: 0.5,
-            alignSelf: "flex-start",
-          }}
-        >
-          ▶ SET COURSE
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => onSetCourse(entityId)}
+            style={{
+              padding: "4px 10px",
+              fontSize: 11,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              background: "#1e3a5f",
+              color: "#89b4fa",
+              border: "1px solid #2a4a7f",
+              borderRadius: 4,
+              letterSpacing: 0.5,
+            }}
+          >
+            ▶ SET COURSE
+          </button>
+          {body.kind === "planet" && (
+            <button
+              onClick={() => canLand && onLand(entityId)}
+              disabled={!canLand}
+              title={canLand ? "Land on the surface" : "Fly closer to land"}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontFamily: "inherit",
+                cursor: canLand ? "pointer" : "not-allowed",
+                background: canLand ? "#1e3a5f" : "transparent",
+                color: canLand ? "#a6e3a1" : "#45475a",
+                border: `1px solid ${canLand ? "#2f5f3a" : "#1e2030"}`,
+                borderRadius: 4,
+                letterSpacing: 0.5,
+              }}
+            >
+              ⬇ LAND
+            </button>
+          )}
+        </div>
       )}
 
       {/* Description */}

@@ -12,12 +12,19 @@ import { step, FIXED_DT } from "../sim/loop.ts";
 import { createRenderer } from "../render/scene.ts";
 import { GameBus } from "./game-bus.ts";
 import { speedState } from "./speed-state.ts";
+import { landingState } from "./landing-state.ts";
 import App from "../ui/App.tsx";
 import { getSimInput, consumeMapToggle, consumeViewCycle } from "./input.ts";
 
 const world = createStartingSystem();
 const bus = new GameBus();
 const renderer = createRenderer(world, document.body);
+
+// Keep the shared landing ref in sync with the sim's landing events.
+bus.onEvent((event) => {
+  if (event.kind === "Landed") landingState.landedBodyId = event.bodyId;
+  else if (event.kind === "TookOff") landingState.landedBodyId = null;
+});
 
 // Mount the React UI overlay.
 const uiEl = document.getElementById("ui");
