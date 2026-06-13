@@ -107,27 +107,31 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
   return {
     sync(w: World) {
-      // Update planet/star mesh positions.
+      // Floating origin: keep ship near world (0,0,0) each frame.
+      // All mesh positions are expressed relative to the ship's sim position.
+      // The sim retains absolute coordinates; this is renderer-only (docs/08).
+      const shipT    = w.components.transform.get(w.shipId);
+      const shipCtrl = w.components.shipControl.get(w.shipId);
+      const originX  = shipT?.position.x ?? 0;
+      const originZ  = shipT?.position.z ?? 0;
+
+      // Update planet/star mesh positions relative to ship origin.
       for (const [entity, mesh] of bodyMeshes) {
         const t = w.components.transform.get(entity);
-        if (t) mesh.position.set(t.position.x, t.position.y, t.position.z);
+        if (t) mesh.position.set(t.position.x - originX, t.position.y, t.position.z - originZ);
       }
 
-      // Update ship mesh position + heading rotation.
-      const shipT   = w.components.transform.get(w.shipId);
-      const shipCtrl = w.components.shipControl.get(w.shipId);
-
-      if (shipT) {
-        _shipPos.set(shipT.position.x, shipT.position.y, shipT.position.z);
-        shipMesh.position.copy(_shipPos);
-      }
-
+      // Ship mesh always at render origin; only its rotation changes.
+      shipMesh.position.set(0, 0, 0);
       if (shipCtrl) {
         shipMesh.rotation.y = -shipCtrl.heading;
       }
 
+      // Floating origin: _shipPos is (0,0,0) in render space.
+      _shipPos.set(0, 0, 0);
+
       // Position camera in flight mode.
-      if (cameraMode === "flight" && shipT && shipCtrl) {
+      if (cameraMode === "flight" && shipCtrl) {
         const h = shipCtrl.heading;
         _forward.set(Math.sin(h), 0, Math.cos(h));
         _backward.set(-Math.sin(h), 0, -Math.cos(h));
@@ -143,7 +147,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
           .applyQuaternion(_qLook)
           .add(_shipPos);
 
-        _lookAt.copy(_shipPos).addScaledVector(_forward, LOOK_AHEAD).setY(_shipPos.y + 0.3);
+        _lookAt.copy(_shipPos).addScaledVector(_forward, LOOK_AHEAD).setY(0.3);
 
         camera.position.copy(_camPos);
         camera.up.copy(_up);
