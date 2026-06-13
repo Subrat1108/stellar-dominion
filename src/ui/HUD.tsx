@@ -163,7 +163,7 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
           gap: 4,
         }}
       >
-        <span style={{ color: "#585b70", fontSize: 11, marginRight: 4 }}>SPEED</span>
+        <span style={{ color: "#585b70", fontSize: 11, marginRight: 4 }}>THROTTLE</span>
         {SPEEDS.map((s) => (
           <button
             key={s}

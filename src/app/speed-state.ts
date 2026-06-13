@@ -1,7 +1,8 @@
-// Shared mutable speed multiplier — controls how many sim ticks advance per
-// real-time frame. 1× = realtime; 1000× = 1000 sim ticks per frame step.
-// This is the "configurable travel speed = time compression" lever (docs/08).
-// The object is mutated directly by the HUD; the frame loop reads it each frame.
+// Shared mutable throttle multiplier — scales the ship's acceleration and max
+// speed (passed to the sim as Input.throttle). 1× = base thrust; 1000× = fast
+// in-system cruising. The sim still ticks in real time; this is NOT time
+// compression (that lever is deferred — see docs/08 / Session 6).
+// The object is mutated by the HUD; the frame loop reads it each frame.
 
 export type SpeedMultiplier = 1 | 10 | 100 | 1000;
 

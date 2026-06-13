@@ -1,9 +1,9 @@
 // App wiring: build the world, run the fixed-tick sim, render Three.js, mount React.
 //
-// The sim advances on a fixed-dt accumulator (frame-rate independent).
-// speedState.value ticks are fired per accumulator drain, giving 1×–1000× time
-// compression without changing the sim's fixed dt (docs/08).
-// After the last tick per frame the GameBus emits; React re-renders as needed.
+// The sim advances on a fixed-dt accumulator (frame-rate independent) at exactly
+// one tick per slot — real-time. The speed lever is a *throttle*: it scales the
+// ship's acceleration / max speed via Input.throttle (NOT sim time compression).
+// After ticking, the GameBus emits; React re-renders as needed.
 
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -13,7 +13,7 @@ import { createRenderer } from "../render/scene.ts";
 import { GameBus } from "./game-bus.ts";
 import { speedState } from "./speed-state.ts";
 import App from "../ui/App.tsx";
-import { getSimInput, consumeMapToggle } from "./input.ts";
+import { getSimInput, consumeMapToggle, consumeViewCycle } from "./input.ts";
 
 const world = createStartingSystem();
 const bus = new GameBus();
@@ -26,28 +26,29 @@ if (uiEl) {
 }
 
 // Fixed-timestep accumulator: catch the sim up to wall-clock in whole ticks.
-// Each slot fires speedState.value ticks for configurable time compression.
 let last = performance.now();
 let accumulator = 0;
 const STEP_MS = FIXED_DT * 1000;
-const MAX_SLOTS_PER_FRAME = 240; // spiral-of-death guard on accumulator slots
+const MAX_STEPS_PER_FRAME = 240; // spiral-of-death guard
 
 function frame(now: number): void {
   accumulator += now - last;
   last = now;
 
-  // Toggle camera mode when 'M' pressed.
-  if (consumeMapToggle()) renderer.toggleCameraMode();
+  // Camera controls.
+  if (consumeViewCycle()) renderer.cycleView();
+  if (consumeMapToggle()) renderer.toggleMap();
 
+  // Throttle (speed lever) scales ship acceleration via the input.
   const input = getSimInput();
-  let slots = 0;
-  while (accumulator >= STEP_MS && slots < MAX_SLOTS_PER_FRAME) {
-    for (let i = 0; i < speedState.value; i++) {
-      step(world, input);
-    }
+  input.throttle = speedState.value;
+
+  let steps = 0;
+  while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
+    step(world, input);
     bus.emitTick(world.tick);
     accumulator -= STEP_MS;
-    slots++;
+    steps++;
   }
 
   renderer.sync(world);

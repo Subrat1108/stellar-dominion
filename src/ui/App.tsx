@@ -7,6 +7,7 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { SpeedMultiplier } from "../app/speed-state.ts";
 import HUD from "./HUD.tsx";
 import SystemPanel from "./SystemPanel.tsx";
+import DebugPanel from "./DebugPanel.tsx";
 
 interface AppProps {
   world: World;
@@ -19,6 +20,7 @@ export default function App({ world, bus, speedState }: AppProps) {
     <>
       <HUD world={world} bus={bus} speedState={speedState} />
       <SystemPanel world={world} bus={bus} />
+      <DebugPanel world={world} bus={bus} speedState={speedState} />
     </>
   );
 }
