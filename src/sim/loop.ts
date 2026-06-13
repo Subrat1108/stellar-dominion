@@ -9,6 +9,8 @@ import type { World } from "./ecs/world.ts";
 import { orbitalSystem } from "./systems/orbital.ts";
 import { lifeSupportSystem } from "./systems/life-support.ts";
 import { shipMovementSystem } from "./systems/ship-movement.ts";
+import { applyCommand } from "./commands/apply.ts";
+import type { GameEvent } from "./commands/types.ts";
 import { FIXED_DT } from "./constants.ts";
 export { FIXED_DT };
 
@@ -33,15 +35,40 @@ export const ZERO_INPUT: Input = {
   throttle: 1,
 };
 
-/** Advance the world by exactly one fixed tick. */
-export function step(world: World, input: Input = ZERO_INPUT): void {
+/**
+ * Advance the world by exactly one fixed tick, returning any GameEvents emitted
+ * by commands processed this tick (empty if none). Tick order is fixed and
+ * deterministic: increment tick → drain the command queue → run systems. Draining
+ * commands BEFORE the systems means a command takes effect the same tick (e.g.
+ * LandAtBody freezes flight before shipMovementSystem runs).
+ */
+export function step(world: World, input: Input = ZERO_INPUT): GameEvent[] {
   world.tick += 1;
   world.time = world.tick * FIXED_DT;
+
+  // Discrete player commands: validated + applied in FIFO order. The queue is
+  // captured and cleared first so commands enqueued during application (none
+  // today) defer to the next tick rather than processing mid-drain.
+  const events: GameEvent[] = [];
+  if (world.commandQueue.length > 0) {
+    const pending = world.commandQueue;
+    world.commandQueue = [];
+    for (const cmd of pending) {
+      const result = applyCommand(world, cmd);
+      if (result.ok) {
+        events.push(...result.events);
+      } else {
+        events.push({ kind: "CommandRejected", command: cmd, reason: result.reason, tick: world.tick });
+      }
+    }
+  }
 
   // Systems run in a fixed, deterministic order every tick.
   orbitalSystem(world);
   shipMovementSystem(world, input);
   lifeSupportSystem(world);
+
+  return events;
 }
 
 /** Advance the world by `count` ticks, feeding one input per tick if provided. */

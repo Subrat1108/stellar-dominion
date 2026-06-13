@@ -9,6 +9,7 @@ import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
+import { dispatch } from "../app/command-bus.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
 
 interface SystemPanelProps {
@@ -50,11 +51,7 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
     : null;
 
   function handleSetCourse(entityId: number) {
-    const ctrl = world.components.shipControl.get(world.shipId);
-    if (ctrl) {
-      ctrl.autopilotTargetId = entityId;
-      ctrl.autopilotActive = true;
-    }
+    dispatch(world, { kind: "SetCourse", bodyId: entityId });
   }
 
   return (

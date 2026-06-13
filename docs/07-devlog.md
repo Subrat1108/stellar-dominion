@@ -14,6 +14,9 @@ Entry template:
 
 ---
 
+> **Resume point (Session 10, in progress):** Phase 2A — command/event layer + landing transition.
+> Done: decisions logged (09). In progress: building `src/sim/commands/` (types + apply), command queue on World, `step()` drain + event return, gravity physics. Next exact step: write `src/sim/commands/types.ts` then `apply.ts`. Two commits planned: (1) command layer, (2) landing transition + placeholder surface view.
+
 ## Session 9 — Phase 1B approach feel & navigation UX
 - **Goal:** Make planets read as real worlds on approach, improve autopilot arrival, replace the world-fixed minimap with a ship-centric compass, add a cockpit scanner, and add distance-from-ship to the system panel. Determinism + tests stay green.
 - **Did:**

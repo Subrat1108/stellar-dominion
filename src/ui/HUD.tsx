@@ -8,6 +8,7 @@ import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import type { SpeedMultiplier } from "../app/speed-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
+import { dispatch } from "../app/command-bus.ts";
 import { lifeSupportFraction, ticksRemaining } from "../sim/systems/life-support.ts";
 import { FIXED_DT } from "../sim/loop.ts";
 
@@ -64,7 +65,7 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
   const autopilotActive = ctrl?.autopilotActive ?? false;
 
   function cancelAutopilot() {
-    if (ctrl) ctrl.autopilotActive = false;
+    dispatch(world, { kind: "CancelCourse" });
   }
 
   const ls = world.components.lifeSupport.get(world.shipId);

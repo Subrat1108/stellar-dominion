@@ -8,7 +8,7 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
-import { STAR_RENDER_RADIUS } from "../presentation.ts";
+import { STAR_RENDER_RADIUS, parkDistance } from "../presentation.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
 // Kept a small multiple of maxSpeed (0.01 u/s at 1×) so there's a visible
@@ -37,6 +37,13 @@ export function shipMovementSystem(world: World, input: Input): void {
 
   if (!vel || !ctrl || !pos) return;
 
+  // Landed: the ship sits on a body's surface — flight is disabled until TakeOff
+  // (a command) clears landedBodyId. Zero residual velocity so it stays put.
+  if (ctrl.landedBodyId !== undefined) {
+    vel.vx = 0; vel.vy = 0; vel.vz = 0;
+    return;
+  }
+
   let { thrust, yaw, pitch } = input;
   const throttle = input.throttle > 0 ? input.throttle : 1;
 
@@ -59,7 +66,7 @@ export function shipMovementSystem(world: World, input: Input): void {
       // facing the body with it filling much of the view.
       const targetBody = world.components.celestialBody.get(ctrl.autopilotTargetId);
       const bodyR = targetBody?.renderRadius ?? 6;
-      const parkDist = Math.max(bodyR * 1.5, bodyR + 3);
+      const parkDist = parkDistance(bodyR);
 
       if (dist > parkDist) {
         const targetHeading = Math.atan2(dx, dz);

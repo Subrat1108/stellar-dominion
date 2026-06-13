@@ -153,6 +153,11 @@ export interface ShipControl {
   /** If set and autopilotActive, the ship steers toward this entity. */
   autopilotTargetId?: number;
   autopilotActive: boolean;
+  /**
+   * If set, the ship is landed on this body's surface; flight is disabled until
+   * a TakeOff command clears it. Set/cleared only by the command layer.
+   */
+  landedBodyId?: number;
 }
 
 // ---------------------------------------------------------------------------

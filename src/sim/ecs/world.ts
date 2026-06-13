@@ -24,6 +24,7 @@ import {
   type ShipControl,
 } from "./components.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
+import type { Command } from "../commands/types.ts";
 
 export interface World {
   /** Monotonic simulation tick counter (whole ticks since start). */
@@ -37,6 +38,12 @@ export interface World {
   components: Components;
   /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
   shipId: number;
+  /**
+   * Pending discrete player commands, drained FIFO at the start of each tick
+   * (loop.ts). Transient — not serialised (normally empty at save time); the
+   * resulting state lives in components, which are saved.
+   */
+  commandQueue: Command[];
 }
 
 export interface WorldInit {
@@ -51,12 +58,18 @@ export function createWorld(init: WorldInit): World {
     rng: makeRng(init.seed),
     components: createComponents(),
     shipId: 0,
+    commandQueue: [],
   };
 }
 
 /** Allocate a fresh entity id. */
 export function createEntity(world: World): number {
   return world.nextId++;
+}
+
+/** Queue a discrete player command for application on the next tick. */
+export function enqueueCommand(world: World, command: Command): void {
+  world.commandQueue.push(command);
 }
 
 // --- Serialisation -----------------------------------------------------------

@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
+import { dispatch } from "../app/command-bus.ts";
 
 interface MinimapProps {
   world: World;
@@ -78,11 +79,7 @@ export default function Minimap({ world, bus }: MinimapProps) {
   }
 
   function setCourse(entityId: number) {
-    const ctrl = world.components.shipControl.get(world.shipId);
-    if (ctrl) {
-      ctrl.autopilotTargetId = entityId;
-      ctrl.autopilotActive = true;
-    }
+    dispatch(world, { kind: "SetCourse", bodyId: entityId });
   }
 
   const bodies = [...world.components.celestialBody.entries()];

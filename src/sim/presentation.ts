@@ -53,6 +53,15 @@ export function gasGiantRenderRadius(radiusM: number): number {
   return (radiusM / R_EARTH) * GAS_GIANT_SCALE;
 }
 
+// --- Approach / parking ------------------------------------------------------
+// Distance (scene units, from a body's centre) at which the autopilot parks and
+// at which landing becomes available: far enough to clear the surface, close
+// enough that the body fills the view. Shared by the autopilot (ship-movement)
+// and landing validation (commands/apply) so "parked" means one thing.
+export function parkDistance(renderRadius: number): number {
+  return Math.max(renderRadius * 1.5, renderRadius + 3);
+}
+
 // --- Ship --------------------------------------------------------------------
 // The player's craft — deliberately tiny next to a planet (≈ 1/6 of a planet's
 // diameter). The chase/cockpit camera offsets in the renderer are tuned to this

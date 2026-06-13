@@ -45,7 +45,8 @@ function frame(now: number): void {
 
   let steps = 0;
   while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
-    step(world, input);
+    const events = step(world, input);
+    for (const event of events) bus.emitEvent(event);
     bus.emitTick(world.tick);
     accumulator -= STEP_MS;
     steps++;
