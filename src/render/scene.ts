@@ -37,7 +37,7 @@ export interface Renderer {
 const CHASE_DIST   = 1.7;  // scene units behind ship (≈ 5 ship-lengths)
 const CHASE_HEIGHT = 0.7;  // scene units above ship
 const COCKPIT_FWD  = 0.22; // camera sits just ahead of the cone tip
-const MAP_MARKER_SCALE = 6; // enlarge the ship in map view so it reads as a marker
+const MAP_MARKER_SCALE = 40; // enlarge the ship in map view so it reads as a marker
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z
 
 export function createRenderer(world: World, canvasParent: HTMLElement): Renderer {
@@ -48,7 +48,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     60,
     window.innerWidth / window.innerHeight,
     0.05,
-    4000,
+    12000, // far plane clears the ~700 u system + the distant starfield
   );
 
   const webgl = new THREE.WebGLRenderer({ antialias: true });
@@ -59,7 +59,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const controls = new OrbitControls(camera, webgl.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxDistance = 600;
+  controls.maxDistance = 6000;
   controls.enabled = false; // only in map view
 
   // --- Mouse-look for chase view (right-click drag) ---
@@ -121,7 +121,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     mouseLook.yaw = 0;
     mouseLook.pitch = 0;
     if (v === "map") {
-      camera.position.set(0, 60, 90);
+      camera.position.set(0, 600, 900); // pulled back to frame the whole system
       controls.target.set(0, 0, 0);
       controls.update();
     }
@@ -268,7 +268,9 @@ function makeStarfield(world: World): THREE.Points {
   const count = 1400;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    const r = 450 + world.rng.range(0, 400);
+    // Far enough out that the ship never reaches the starfield shell while
+    // crossing the ~700 u system (it lives in worldRoot, at fixed world coords).
+    const r = 4000 + world.rng.range(0, 2000);
     const theta = world.rng.range(0, Math.PI * 2);
     const phi = Math.acos(world.rng.range(-1, 1));
     positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);

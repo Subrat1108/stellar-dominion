@@ -17,8 +17,12 @@ const R_EARTH = 6.371e6; // m — used only to normalise physical radii to "Eart
 // A planet at `au` sits `STAR_CLEARANCE + au * AU_TO_SCENE` scene units from the
 // star at the origin. STAR_CLEARANCE keeps the innermost planet clear of the
 // star's halo; AU_TO_SCENE sets how spread-out the system feels.
-export const AU_TO_SCENE = 12;
-export const STAR_CLEARANCE = 8;
+// AU_TO_SCENE is large so the system spreads out in roughly real-AU proportions:
+// at 200, Ferrum (0.20 AU) sits ~44 u out and Titan's Eye (3.50 AU) ~704 u out,
+// while planet render radii stay ~1 u — so a planet reads as a point that grows
+// on approach. STAR_CLEARANCE is small to keep the inner-system spacing honest.
+export const AU_TO_SCENE = 200;
+export const STAR_CLEARANCE = 4;
 
 export function sceneDistance(au: number): number {
   return STAR_CLEARANCE + au * AU_TO_SCENE;
@@ -29,7 +33,7 @@ export function sceneDistance(au: number): number {
 // far too wide to render legibly in one view. We use a compressed mapping:
 // rocky planets scale ~linearly in Earth-radii; the gas giant and the star are
 // compressed so they still dominate without filling the screen.
-export const STAR_RENDER_RADIUS = 4.5;
+export const STAR_RENDER_RADIUS = 10; // reads as a star from across the ~700 u system
 const PLANET_RADIUS_SCALE = 1.0; // 1 Earth-radius ≈ 1 scene unit
 const PLANET_RADIUS_MIN = 0.7;   // floor so small worlds stay visible
 const GAS_GIANT_SCALE = 0.26;    // heavy compression for Saturn/Jupiter class

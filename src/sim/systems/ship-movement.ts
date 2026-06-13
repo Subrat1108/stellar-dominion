@@ -10,7 +10,10 @@ import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
-const BASE_ACCEL    = 4;                 // scene units / sim-sec² at throttle 1×
+// Kept a small multiple of maxSpeed (0.01 u/s at 1×) so there's a visible
+// acceleration ramp instead of the ship snapping to the speed cap in one tick.
+// Scales with throttle alongside maxSpeed, so the ramp feel is constant.
+const BASE_ACCEL    = 0.03;              // scene units / sim-sec² at throttle 1×
 const DRAG          = 0.98;              // velocity multiplied each tick
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
 

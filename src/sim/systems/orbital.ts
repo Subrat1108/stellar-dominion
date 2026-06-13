@@ -16,7 +16,12 @@
 import type { World } from "../ecs/world.ts";
 import { positionAt } from "../math/kepler.ts";
 
-export const ORBITAL_TIME_RATE = 0.003;
+// Halved from 0.003 when the system was spread out to real-AU proportions
+// (AU_TO_SCENE 12 → 200): the larger orbital radii turn the same angular rate
+// into more linear drift, so we slow the clock to keep planets near-stationary
+// during a flight. Over a ~60 s cruise even the innermost planet moves only a
+// few degrees.
+export const ORBITAL_TIME_RATE = 0.0015;
 
 export function orbitalSystem(world: World): void {
   const { orbit, transform } = world.components;

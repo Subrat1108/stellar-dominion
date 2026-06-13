@@ -7,11 +7,10 @@
 //
 // Orbital speed scaling:
 //   All mean-motion values (rad / sim-second) are derived from Mira's reference
-//   period using Kepler's third law: n ∝ a^(-3/2). Mira's n is tuned so its
-//   visual orbit takes ~79 real seconds at 60 fps, giving pleasing relative
-//   motion without being too fast or too slow. Scene-unit semi-major axes are
-//   a rough linear mapping from AU: sceneR ≈ realAU * 10 + 4, floored to
-//   keep inner planets clear of the star mesh.
+//   period using Kepler's third law: n ∝ a^(-3/2), giving pleasing relative
+//   motion. The global clock is then slowed by ORBITAL_TIME_RATE so planets are
+//   nearly stationary during a flight. Scene-unit semi-major axes come from
+//   sceneDistance() in presentation.ts (AU * AU_TO_SCENE + STAR_CLEARANCE).
 
 import { createWorld, createEntity, type World } from "./ecs/world.ts";
 import type { CelestialBody } from "./ecs/components.ts";
@@ -130,17 +129,20 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
     depletionRatePerTick: 1,
   });
 
-  // Ship starts stationary in open space in the inner system, clear of the star
-  // halo (sceneDistance(0) = STAR_CLEARANCE) and roughly between the inner orbits.
+  // Ship starts stationary in the inner system, just outside Ferrum's orbit
+  // (~44 u) so there's somewhere to fly to in every direction.
   world.components.transform.set(shipId, {
-    position: { x: 0, y: 0, z: 11 },
+    position: { x: 0, y: 0, z: 60 },
   });
 
+  // Base max speed is small because the system is now large (Titan's Eye ~704 u).
+  // The throttle lever scales it: 1× = 0.01 u/s (fine docking near a ~1 u planet),
+  // 1000× = 10 u/s (Titan's Eye reachable from start in ~1 min). See presentation.ts.
   world.components.shipVelocity.set(shipId, {
     vx: 0,
     vy: 0,
     vz: 0,
-    maxSpeed: 10, // scene units / sim-sec
+    maxSpeed: 0.01, // scene units / sim-sec at throttle 1×
   });
 
   world.components.shipControl.set(shipId, {
