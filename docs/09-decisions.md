@@ -6,6 +6,11 @@ Append here whenever an architectural or design choice is made; see `CLAUDE.md` 
 ---
 
 | Date | Decision | Rationale |
+| 2026-06-13 | XZ-plane movement only (yaw, no pitch) for Phase 1B | Matches the orbital plane; full 6-DOF adds complexity without payoff at this stage. |
+| 2026-06-13 | Drag = 0.98/tick on ship velocity | Natural deceleration without a dedicated brake key; small non-Newtonian feel is an acceptable trade for playability. |
+| 2026-06-13 | Floating origin is renderer-only; sim keeps absolute coordinates | Keeps serialization/saves simple; float-jitter only matters in the render layer. |
+| 2026-06-13 | speedState is a plain mutable object, not React state | The frame loop mutates it synchronously; React only needs to read it on button click — React state would add unnecessary overhead. |
+| 2026-06-13 | FIXED_DT extracted to src/sim/constants.ts | ship-movement.ts needs it but can't import from loop.ts (which imports the system) without a circular dep; shared constants file breaks the cycle. |
 |---|---|---|
 | 2026-06-13 | React added in Phase 1A (not deferred to 1B) | Body inspector + HUD are natural companions to the system-data work; the UI is minimal enough to not add risk. |
 | 2026-06-13 | Tau Ceti (τ Ceti / HD 10700) chosen as the first star system | Real G8V star 11.9 ly away, well-characterised by HYG/HIPPARCOS, with 5 known radial-velocity candidate planets including a habitable-zone target (Mira). |

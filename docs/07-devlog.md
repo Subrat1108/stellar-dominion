@@ -14,6 +14,24 @@ Entry template:
 
 ---
 
+## Session 5 — Phase 1B: cockpit camera + in-system cruising
+- **Goal:** Phase 1B per `docs/05` — chase/cockpit camera, keyboard steering, configurable speed (time compression), floating origin, autopilot stub.
+- **Did:**
+  - **Ship movement sim** (`src/sim/systems/ship-movement.ts`, new): `ShipVelocity` and `ShipControl` ECS components; `shipMovementSystem` applies thrust/yaw input, rotates heading, integrates velocity into position each tick. Velocity capped at `maxSpeed`. Drag (`0.98/tick`) provides natural deceleration. Deterministic: same inputs → same state. 9 new tests, 38 total passing.
+  - **FIXED_DT extracted** to `src/sim/constants.ts` so both `loop.ts` and `ship-movement.ts` can import it without circular deps. `loop.ts` re-exports it for backward compatibility.
+  - **Input layer** (`src/app/input.ts`): `keydown/keyup` listeners capture WASD/arrow state; `getSimInput()` builds `Input{thrust, yaw}` each frame; `consumeMapToggle()` fires once per M press.
+  - **Speed multiplier** (`src/app/speed-state.ts`): shared mutable `{ value: 1|10|100|1000 }`. Main loop fires `speedState.value` sim ticks per accumulator slot. Life support depletes faster at higher speed — correct, intentional (docs/08). HUD gains 4 speed buttons.
+  - **Chase camera** (`src/render/scene.ts`): two modes — `'flight'` (camera at CHASE_DIST=5 behind, CHASE_HEIGHT=2 above ship, aimed ahead) and `'map'` (OrbitControls free-look). M key toggles. Right-click drag gives mouse-look offset in flight mode. Ship mesh added (low-poly cone, pointing +Z).
+  - **Floating origin**: `sync()` subtracts ship sim position from every mesh position each frame; ship always renders at `(0,0,0)`. Sim retains absolute coordinates (docs/08 pattern). Prevents float-precision jitter at large distances.
+  - **Autopilot stub**: when `ShipControl.autopilotActive = true` and a `autopilotTargetId` is set, the system steers heading toward the target and throttles appropriately; manual input immediately overrides and clears autopilot. SystemPanel "SET COURSE" button activates it; HUD "CANCEL AUTOPILOT" button dismisses it.
+- **Decisions:**
+  - XZ-plane-only movement (yaw, no pitch) for Phase 1B — matches the orbital plane, simpler math, sufficient for cruising. Full 6-DOF deferred to a later phase.
+  - DRAG=0.98/tick for natural deceleration without requiring a separate brake input — improves playability at the cost of minor non-Newtonian feel.
+  - Floating origin is renderer-only; sim coordinates remain absolute — keeps serialization/saves simple.
+  - `speedState` is a plain mutable object, not React state — the frame loop mutates it; React reads it on button click via local state.
+- **Next:** Phase 1C or 2 — land on a body (transition to a placeholder surface/colony view); or begin Phase 2 (first colony) directly per docs/05.
+- **Open questions:** sim↔UI plumbing is still direct world-ref mutation (flagged in Session 4); becomes pressing when Phase 2 introduces more player actions. Consider a command queue or event system.
+
 ---
 
 ## Session 4 — Phase 1A: Tau Ceti system, stranded ship, first React UI

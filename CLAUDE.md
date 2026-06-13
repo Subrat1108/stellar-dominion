@@ -73,7 +73,7 @@ Long jobs can run out of context before finishing. Keep every task resumable fro
 
 ## Current status
 
-- **Phase:** 1A — **complete**. Tau Ceti system live (star real, 5 planets derived from candidate signals, tagged per docs/04). Stranded ship (ISS Prometheus) entity: 5 crew with skills, materials inventory, life-support depletion clock. React UI: HUD (life-support bar + crew + materials) + system panel (body list + inspector with habitability score). 29/29 tests passing.
-- **Confirmed:** Tau Ceti as the first star system; Mira (0.65 AU) as the Civ-like "early goal"; React added in Phase 1A alongside the system data. `CelestialBody` replaces old `Body` component.
-- **Next action:** Phase 1B — cockpit/chase camera, basic in-system cruising, configurable speed (= sim time compression lever from docs/08).
-- **Last updated:** Session 4.
+- **Phase:** 1B — **complete**. Chase/cockpit camera follows ship (M toggles to system map view). WASD/arrow keys steer; ship thrusts in heading direction. Speed multiplier (1×/10×/100×/1000×) on HUD advances sim ticks per real frame — life support depletes faster at higher speed (intentional). Floating origin keeps ship at render (0,0,0). Autopilot stub: "SET COURSE" in SystemPanel → ship steers to target; manual input overrides; "CANCEL AUTOPILOT" on HUD. 38/38 tests passing.
+- **Confirmed:** XZ-plane movement (yaw only) for Phase 1B; drag=0.98/tick for natural deceleration; floating origin is renderer-only; `FIXED_DT` lives in `src/sim/constants.ts`.
+- **Next action:** Phase 2 — first colony: land on a body, found a dome, start resource flows.
+- **Last updated:** Session 5.
