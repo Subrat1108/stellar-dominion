@@ -14,8 +14,19 @@ Entry template:
 
 ---
 
-> **Resume point (Session 10, in progress):** Phase 2A — command/event layer + landing transition.
-> Done: decisions logged (09). In progress: building `src/sim/commands/` (types + apply), command queue on World, `step()` drain + event return, gravity physics. Next exact step: write `src/sim/commands/types.ts` then `apply.ts`. Two commits planned: (1) command layer, (2) landing transition + placeholder surface view.
+## Session 10 — Phase 2A: command/event layer + landing transition
+- **Goal:** Build the deferred sim↔UI command/event layer at the start of Phase 2 (architecture, not colony economy — that's 2B), plus a placeholder landing transition + surface view. Determinism + tests stay green.
+- **Did:**
+  - **Command/event layer** (`src/sim/commands/{types,apply}.ts`): typed `Command` (SetCourse, CancelCourse, LandAtBody, TakeOff, FoundColony[stub]) distinct from the per-tick flight `Input`. `applyCommand(world, cmd)` validates then mutates deterministically (no `Math.random`/`Date`); returns `CommandResult` carrying typed `GameEvent`s. Headless/testable.
+  - **Tick wiring:** `World.commandQueue` (transient, not serialised) + `enqueueCommand`. `step()` now drains the queue **after `tick++`, before the systems**, and returns `GameEvent[]`; `main.ts` emits them on `GameBus`. New `GameBus` event channel (`emitEvent`/`onEvent`). UI dispatches via `src/app/command-bus.ts` → `dispatch(world, cmd)`.
+  - **Routing existing actions:** SET COURSE (SystemPanel + Minimap) and cancel-autopilot (HUD) now go through `dispatch` as `SetCourse`/`CancelCourse`; continuous flight input untouched.
+  - **Landing:** `ShipControl.landedBodyId` freezes flight in `shipMovementSystem` when set. `parkDistance(renderRadius)` extracted to `presentation.ts`, shared by autopilot + landing validation. SystemPanel gains a range-gated **LAND** button (rocky planets only) → `LandAtBody`.
+  - **Surface view** (`src/ui/SurfaceView.tsx`): eased fade+zoom overlay (not seamless descent, docs/08) on the `Landed` event; shows name/type/**surface gravity (g)**/temp/habitability; "Found colony here" → `FoundColony` (inert until 2B) and "Take off" → `TakeOff`. `landing-state.ts` ref synced by `main.ts`; `useLandingState()` mirrors to React.
+  - **Gravity-as-a-stat:** `src/sim/math/physics.ts` — `surfaceGravity`/`surfaceGravityG` (G·M/r²), first consumed in the surface view.
+  - **Tests:** `tests/commands.test.ts` (13) — validation (reject land-on-star/gas-giant/too-far/takeoff-when-not-landed/found-without-landing/set-course-while-landed) + deterministic application (land freezes ship; identical queues → identical serialized world). 56/56 green; typecheck + build clean.
+- **Decisions:** (a) command/event layer built now at the start of Phase 2; (b) gravity is a gameplay stat, not a flight force — flight stays arcade, Newtonian flight optional post-MVP. Both in `docs/09`.
+- **Next:** confirm the landing flow in-browser (approach → LAND enables in range → fade-in surface view → stats read right → take off), then Phase 2B — colony economy (mining → resource flows → production) behind the `FoundColony` command.
+- **Open questions:** surface view is a flat gradient placeholder — when does it earn a real surface render (likely alongside Phase 4 approach LOD)? Should `FoundColony` later create a Colony entity + component now or in 2B (currently pure stub)?
 
 ## Session 9 — Phase 1B approach feel & navigation UX
 - **Goal:** Make planets read as real worlds on approach, improve autopilot arrival, replace the world-fixed minimap with a ship-centric compass, add a cockpit scanner, and add distance-from-ship to the system panel. Determinism + tests stay green.
