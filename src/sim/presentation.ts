@@ -33,10 +33,17 @@ export function sceneDistance(au: number): number {
 // far too wide to render legibly in one view. We use a compressed mapping:
 // rocky planets scale ~linearly in Earth-radii; the gas giant and the star are
 // compressed so they still dominate without filling the screen.
-export const STAR_RENDER_RADIUS = 10; // reads as a star from across the ~700 u system
-const PLANET_RADIUS_SCALE = 1.0; // 1 Earth-radius ≈ 1 scene unit
-const PLANET_RADIUS_MIN = 0.7;   // floor so small worlds stay visible
-const GAS_GIANT_SCALE = 0.26;    // heavy compression for Saturn/Jupiter class
+// Scaled up substantially (Session 9) so a planet fills most of the view on
+// approach: at 6 u per Earth-radius, Mira ≈ 5.9 u and the autopilot parks at
+// ~9 u from centre, giving a ~66° apparent diameter in the 60° FOV.
+// Orbit gaps stay healthy — tightest pair (Ferrum/Caldor, 34 u apart) has ~22 u
+// clearance between surfaces. GAS_GIANT_SCALE raised proportionally so Titan's
+// Eye (9 R⊕ ≈ 13.5 u) stays bigger than any rocky planet. Star bumped to 12 to
+// remain visually dominant over the larger planets.
+export const STAR_RENDER_RADIUS = 12;
+const PLANET_RADIUS_SCALE = 6.0; // 1 Earth-radius ≈ 6 scene units
+const PLANET_RADIUS_MIN = 4.0;   // floor so small worlds stay visible
+const GAS_GIANT_SCALE = 1.5;     // Titan's Eye (9 R⊕) ≈ 13.5 u
 
 export function planetRenderRadius(radiusM: number): number {
   return Math.max(PLANET_RADIUS_MIN, (radiusM / R_EARTH) * PLANET_RADIUS_SCALE);
