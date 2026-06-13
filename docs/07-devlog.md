@@ -14,6 +14,22 @@ Entry template:
 
 ---
 
+## Session 9 — Phase 1B approach feel & navigation UX
+- **Goal:** Make planets read as real worlds on approach, improve autopilot arrival, replace the world-fixed minimap with a ship-centric compass, add a cockpit scanner, and add distance-from-ship to the system panel. Determinism + tests stay green.
+- **Did:**
+  - **Planet render scale 6×** (`src/sim/presentation.ts`): `PLANET_RADIUS_SCALE` 1.0→6.0, `PLANET_RADIUS_MIN` 0.7→4.0, `GAS_GIANT_SCALE` 0.26→1.5, `STAR_RENDER_RADIUS` 10→12. Earth-sized planet now ~6 u; autopilot parks at ~9 u giving ~66° apparent diameter at the park point. Orbit surface-clearances remain healthy (Ferrum/Caldor tightest at ~22 u).
+  - **Autopilot park at render radius** (`src/sim/systems/ship-movement.ts`): replaced hardcoded `dist > 2` with `dist > max(bodyR * 1.5, bodyR + 3)` reading `body.renderRadius` from the ECS. Ship arrives facing the body with it filling the view.
+  - **Soft surface stop** (`ship-movement.ts`): after each position integration, clamp position back to `renderRadius + 0.3` and zero inward velocity for any body the ship penetrates. Star handled via `STAR_RENDER_RADIUS` (no Transform component).
+  - **Compass minimap** (`src/ui/Minimap.tsx`, rewrite): ship fixed at centre, nose pointing up. Bodies projected into ship-relative space and rotated by −heading. Four zoom levels (20/80/300/800 u) via scroll wheel or ± buttons. Clipped blips pin to edge with dashed stroke. Click blip → autopilot course. Name labels shown when not clipped.
+  - **Cockpit scanner** (`src/ui/Scanner.tsx`, new; wired in `App.tsx`): visible in cockpit/chase views only; shows nearest body within 100 u: name, type, distance, surface temp, habitability label. Bottom-centre, pointer-events off so it doesn't intercept input.
+  - **Distance-from-ship in SystemPanel** (`src/ui/SystemPanel.tsx`): live distance column in the body list (each row); distance-from-ship row in the inspector for both stars and planets/gas-giants. Updates every 12 ticks.
+  - **Tests**: 43/43 green; typecheck + prod build clean.
+- **Decisions:** planet render scale 6×; autopilot park at 1.5×renderRadius; soft surface stop; compass minimap with 4 zoom levels; cockpit scanner 100 u range — all in `docs/09`.
+- **Next:** confirm approach feel in-browser (planet growth, autopilot arrival, scanner trigger, compass minimap zoom), then Phase 2 — first colony (land on a body, found a dome, resource flows).
+- **Open questions:** scanner range of 100 u may need tuning once planets are visually larger; also consider whether the scanner should show the *targeted* body rather than the *nearest* one.
+
+---
+
 ## Session 8 — Phase 1B polish: flight & navigation
 - **Goal:** Polish the flight/nav feel — fix inverted yaw, spread the system to real-AU scale, add a proximity readout + system minimap, keep the orbit model moon-ready. Determinism + tests stay green.
 - **Did:**
