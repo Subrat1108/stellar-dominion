@@ -16,6 +16,26 @@ Entry template:
 
 ---
 
+## Session 4 — Phase 1A: Tau Ceti system, stranded ship, first React UI
+- **Goal:** Phase 1A per `docs/05` — curate a real, physically-plausible system; add the stranded ship with survival clock; build the first React UI (system map + HUD).
+- **Did:**
+  - **Tau Ceti system** (`src/sim/data/tau-ceti.ts`): replaced the Phase 0 placeholder with 5 bodies around a real G8V star. Star tagged `real` (HYG/HIPPARCOS data); planets tagged `derived` (based on Feng et al. 2017 radial-velocity candidate signals). Each body carries full physical properties (mass, radius, gravity, surface temp, atmosphere, magnetosphere). Mira (0.65 AU) is the Civ-like "early goal in sight" — marginal/near-habitable.
+  - **Habitability scoring** (`src/sim/math/habitability.ts`): weighted formula (6 inputs, docs/04) computing a 0–1 score. Helpers: `habitabilityLabel`, `habitabilityColor`. Independently tested.
+  - **Richer ECS components** (`src/sim/ecs/components.ts`): replaced `Body` with `CelestialBody` (covers stars, planets, gas giants with optional fields); added `Crew`, `Inventory`, `LifeSupport`. `World` gains `shipId`.
+  - **Stranded ship** (`src/sim/world-setup.ts`): ISS Prometheus entity with 5 named crew members (skills: command/engineering/science/biology/piloting/medicine), 500 metals / 200 fuel / 300 food, 100 000-unit life-support depleting at 1/tick (~28 min real time at 60fps).
+  - **Life-support system** (`src/sim/systems/life-support.ts`): deterministic depletion per tick, clamped at 0.
+  - **React UI** (Phase 1 Decision: added now): HUD (life-support bar + countdown, crew health, materials) + System panel (body list, click-to-inspect with physical properties + habitability bar). `GameBus` event bridge; `useGameTick` throttled hook (10Hz UI refresh).
+  - **Tests: 29/29 pass.** Determinism proof extended to cover ship/life-support (7 tests). Habitability formula (8 tests). Life-support system (8 tests). Typecheck clean. Prod build clean.
+- **Decisions:**
+  - React added in Phase 1A (not Phase 1B) — the body inspector and HUD were natural companions to the system data work → `docs/09-decisions.md`.
+  - Tau Ceti chosen as the first system: real G8V host star, 5 derived planet candidates, Mira as the habitable-zone target → `docs/09-decisions.md`.
+  - `CelestialBody` replaces old `Body` — richer physical data needed for the UI and habitability model; single discriminated component is cleaner than splitting into star vs. planet types.
+  - Life support in arbitrary units (100 000) at 1/tick rate; time-compression multiplier added in Part B.
+- **Next:** Phase 1B — cockpit/chase camera, basic in-system cruising, configurable speed (= sim time compression).
+- **Open questions:** sim↔UI plumbing is currently direct world-ref; a more decoupled command/event layer may be needed in Phase 2 when player actions mutate state.
+
+---
+
 ## Session 3 — Phase 0 scaffold: deterministic tick + first 3D system
 - **Goal:** Execute Phase 0 (`docs/05`) — scaffold the repo, prove a deterministic tick, render one static 3D star system.
 - **Did:**

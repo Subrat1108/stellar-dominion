@@ -7,6 +7,10 @@ Append here whenever an architectural or design choice is made; see `CLAUDE.md` 
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-06-13 | React added in Phase 1A (not deferred to 1B) | Body inspector + HUD are natural companions to the system-data work; the UI is minimal enough to not add risk. |
+| 2026-06-13 | Tau Ceti (τ Ceti / HD 10700) chosen as the first star system | Real G8V star 11.9 ly away, well-characterised by HYG/HIPPARCOS, with 5 known radial-velocity candidate planets including a habitable-zone target (Mira). |
+| 2026-06-13 | `CelestialBody` component replaces old `Body` — single type covering stars, planets, gas giants | Rich physical data is needed by the habitability model and UI; a unified discriminated type is cleaner than splitting. |
+| 2026-06-13 | Life support stored as arbitrary units (100 000 / 1 per tick); time-compression multiplier deferred to Part B | Keeps the depletion rate simple and deterministic now; Part B wires it to the speed lever. |
 | 2026-06-13 | First system seeded/stylised (not real catalog data) until Phase 1 | Real star/planet import is Phase 1 work; Phase 0 only needs orbits that look plausible. |
 | 2026-06-13 | React deferred to Phase 1 | Phase 0 is a static scene with no UI panels, so adding React now would be pure overhead. |
 | 2026-06-13 | Hand-rolled ECS (not Miniplex/bitECS) | Phase 0 needs little, and full control over entity ids + iteration order keeps determinism fully under our control. |

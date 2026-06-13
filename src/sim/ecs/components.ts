@@ -1,48 +1,152 @@
 // Component type definitions for the ECS.
 //
 // Components are PLAIN DATA — no methods, no class instances, no references to
-// the renderer. This is what lets a save be "just the component state + RNG
-// seed + tick count" (docs/03) and what keeps the sim serialisable and
-// deterministic.
+// the renderer. This keeps a save as "just component state + RNG seed + tick"
+// (docs/03) and keeps the sim serialisable and deterministic.
 
 import type { OrbitalElements, Vec3 } from "../math/kepler.ts";
 
-/** What kind of celestial body an entity is (drives rendering + later sim). */
-export type BodyKind = "star" | "planet";
+// ---------------------------------------------------------------------------
+// Shared
+// ---------------------------------------------------------------------------
 
-/** Static description of a celestial body. */
-export interface Body {
-  kind: BodyKind;
-  name: string;
-  /** Display radius in scene units (not physically scaled in Phase 0). */
-  radius: number;
-  /** Hex colour for the renderer, e.g. 0xffcc66. */
-  color: number;
+export type DataTag = "real" | "derived" | "fictional";
+export type BodyKind = "star" | "planet" | "gas-giant";
+
+/** Atmosphere record — always present on planets, absent on stars. */
+export interface Atmosphere {
+  /** Pascals. Earth ≈ 101 325. */
+  pressurePa: number;
+  /** Human-readable composition string, e.g. "N₂ 78%, O₂ 21%". */
+  composition: string;
+  /** 0 = benign; 1 = instantly lethal. */
+  toxicity: number;
+  /** Whether liquid water is present on or just beneath the surface. */
+  hasLiquidWater: boolean;
 }
 
-/** Orbit around a parent entity. Absence = the body is stationary (the star). */
+// ---------------------------------------------------------------------------
+// Celestial bodies
+// ---------------------------------------------------------------------------
+
+/**
+ * Rich description of a star, planet, or gas giant.
+ * Optional fields are only present for the relevant kind; the UI/renderer
+ * should narrow on `kind` before accessing them.
+ */
+export interface CelestialBody {
+  kind: BodyKind;
+  name: string;
+  /** Scene-unit radius for the renderer (not physically scaled). */
+  renderRadius: number;
+  /** Hex colour used by the renderer, e.g. 0xffd493. */
+  color: number;
+  dataTag: DataTag;
+  description: string;
+
+  // Physical — all bodies
+  massKg: number;
+  radiusM: number;
+
+  // Star-only
+  spectralType?: string;
+  luminositySol?: number;
+  /** Surface temperature of the photosphere (K). */
+  tempK?: number;
+
+  // Planets and gas giants
+  orbitalDistanceAu?: number;
+
+  // Planets only (gas giants have no useful "surface")
+  surfaceTempK?: number;
+  gravityMs2?: number;
+  atmosphere?: Atmosphere;
+  /** Magnetosphere strength relative to Earth's: 0 = none, 1 = Earth-like. */
+  magnetosphere?: number;
+  /** 0–1 score computed once at setup from physical inputs (docs/04). */
+  habitability?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Orbital mechanics
+// ---------------------------------------------------------------------------
+
+/** Keplerian orbit around a parent entity. Absence = stationary (the star). */
 export interface Orbit {
-  /** Entity id of the focus this body orbits (e.g. the star). */
+  /** Entity id of the focus (e.g. the star). */
   parent: number;
   elements: OrbitalElements;
 }
 
-/** Current world-space position, written by the orbital system each tick. */
+/** World-space position — written by the orbital system every tick. */
 export interface Transform {
   position: Vec3;
 }
 
-/** The set of component stores held by the World, keyed by entity id. */
+// ---------------------------------------------------------------------------
+// Ship / crew
+// ---------------------------------------------------------------------------
+
+export interface CrewSkills {
+  engineering: number;
+  science: number;
+  command: number;
+  biology: number;
+  piloting: number;
+  medicine: number;
+}
+
+export interface CrewMember {
+  id: string;
+  name: string;
+  role: string;
+  skills: CrewSkills;
+  /** 0 = incapacitated; 1 = full health. */
+  health: number;
+}
+
+export interface Crew {
+  members: CrewMember[];
+}
+
+export interface Inventory {
+  /** Raw structural metal, in units. */
+  metals: number;
+  /** Propellant / reaction mass, in units. */
+  fuel: number;
+  /** Packaged food rations, in units. */
+  food: number;
+}
+
+export interface LifeSupport {
+  /** Current remaining life-support consumable (air/water/power). */
+  current: number;
+  /** Maximum capacity when fully stocked. */
+  capacity: number;
+  /** Units consumed per sim tick (deterministic; drives the survival clock). */
+  depletionRatePerTick: number;
+}
+
+// ---------------------------------------------------------------------------
+// ECS component registry
+// ---------------------------------------------------------------------------
+
 export interface Components {
-  body: Map<number, Body>;
+  celestialBody: Map<number, CelestialBody>;
   orbit: Map<number, Orbit>;
   transform: Map<number, Transform>;
+  crew: Map<number, Crew>;
+  inventory: Map<number, Inventory>;
+  lifeSupport: Map<number, LifeSupport>;
 }
 
 export function createComponents(): Components {
   return {
-    body: new Map(),
+    celestialBody: new Map(),
     orbit: new Map(),
     transform: new Map(),
+    crew: new Map(),
+    inventory: new Map(),
+    lifeSupport: new Map(),
   };
 }

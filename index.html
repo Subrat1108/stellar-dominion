@@ -7,11 +7,9 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="hud">
-      <strong>Stellar Dominion</strong> — Phase 0
-      <span id="tick"></span>
-      <div class="hint">drag to look · scroll to zoom · right-drag to pan</div>
-    </div>
+    <!-- React UI overlay (panels, HUD) -->
+    <div id="ui"></div>
+    <!-- Three.js canvas is appended to body by the renderer -->
     <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>

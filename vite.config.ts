@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-// Web-first build (see docs/03). The sim core under src/sim stays free of any
-// DOM/Three import so it can run headless in Vitest.
 export default defineConfig({
+  plugins: [react()],
   test: {
     globals: true,
     environment: "node",

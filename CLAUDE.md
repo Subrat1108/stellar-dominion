@@ -73,7 +73,7 @@ Long jobs can run out of context before finishing. Keep every task resumable fro
 
 ## Current status
 
-- **Phase:** 0 — Foundations: **complete**. Repo scaffolded (Vite + TS strict + Vitest), headless deterministic ECS + fixed tick (determinism test passing), and a first static 3D system renders (star + 2 planets on Kepler orbits, free-look camera). Moving into Phase 1.
-- **Confirmed:** title *Stellar Dominion*; stylised **3D** with an open-world cruising feel (see `docs/08`); Civ-like random start near a habitable planet; per-system difficulty levels. Phase 0 decisions: hand-rolled ECS; React deferred to Phase 1; first system seeded/stylised (real catalog data is Phase 1).
-- **Next action:** Phase 1 — curate one real, physically-plausible system; add the stranded ship (crew + materials + life-support that ticks down); system map with selectable bodies.
-- **Last updated:** Session 3.
+- **Phase:** 1A — **complete**. Tau Ceti system live (star real, 5 planets derived from candidate signals, tagged per docs/04). Stranded ship (ISS Prometheus) entity: 5 crew with skills, materials inventory, life-support depletion clock. React UI: HUD (life-support bar + crew + materials) + system panel (body list + inspector with habitability score). 29/29 tests passing.
+- **Confirmed:** Tau Ceti as the first star system; Mira (0.65 AU) as the Civ-like "early goal"; React added in Phase 1A alongside the system data. `CelestialBody` replaces old `Body` component.
+- **Next action:** Phase 1B — cockpit/chase camera, basic in-system cruising, configurable speed (= sim time compression lever from docs/08).
+- **Last updated:** Session 4.

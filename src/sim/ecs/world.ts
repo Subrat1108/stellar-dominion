@@ -11,7 +11,16 @@
 //   - Systems must iterate in a stable order. Insertion-ordered Maps give us
 //     that for free as long as we never rely on object key ordering elsewhere.
 
-import { createComponents, type Components } from "./components.ts";
+import {
+  createComponents,
+  type Components,
+  type CelestialBody,
+  type Orbit,
+  type Transform,
+  type Crew,
+  type Inventory,
+  type LifeSupport,
+} from "./components.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
 
 export interface World {
@@ -24,6 +33,8 @@ export interface World {
   /** The single seeded RNG for the whole sim. */
   rng: Rng;
   components: Components;
+  /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
+  shipId: number;
 }
 
 export interface WorldInit {
@@ -37,6 +48,7 @@ export function createWorld(init: WorldInit): World {
     nextId: 1,
     rng: makeRng(init.seed),
     components: createComponents(),
+    shipId: 0,
   };
 }
 
@@ -45,34 +57,44 @@ export function createEntity(world: World): number {
   return world.nextId++;
 }
 
-// --- Serialisation -------------------------------------------------------
+// --- Serialisation -----------------------------------------------------------
 //
 // A save is the entity/component state + RNG state + tick count (docs/03).
-// We hand-roll JSON conversion because Maps don't survive JSON.stringify and
-// because a stable, explicit shape is exactly what the determinism test diffs.
+// Maps are serialised to arrays of [id, value] pairs so JSON.stringify works
+// and the exact ordering is stable (insertion order).
 
 export interface SerializedWorld {
   tick: number;
   time: number;
   nextId: number;
+  shipId: number;
   rngState: number;
   components: {
-    body: [number, Components["body"] extends Map<number, infer V> ? V : never][];
-    orbit: [number, Components["orbit"] extends Map<number, infer V> ? V : never][];
-    transform: [number, Components["transform"] extends Map<number, infer V> ? V : never][];
+    celestialBody: [number, CelestialBody][];
+    orbit: [number, Orbit][];
+    transform: [number, Transform][];
+    crew: [number, Crew][];
+    inventory: [number, Inventory][];
+    lifeSupport: [number, LifeSupport][];
   };
 }
 
 export function serializeWorld(world: World): SerializedWorld {
+  const { celestialBody, orbit, transform, crew, inventory, lifeSupport } =
+    world.components;
   return {
     tick: world.tick,
     time: world.time,
     nextId: world.nextId,
+    shipId: world.shipId,
     rngState: world.rng.state,
     components: {
-      body: [...world.components.body.entries()],
-      orbit: [...world.components.orbit.entries()],
-      transform: [...world.components.transform.entries()],
+      celestialBody: [...celestialBody.entries()],
+      orbit: [...orbit.entries()],
+      transform: [...transform.entries()],
+      crew: [...crew.entries()],
+      inventory: [...inventory.entries()],
+      lifeSupport: [...lifeSupport.entries()],
     },
   };
 }

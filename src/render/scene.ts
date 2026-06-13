@@ -1,23 +1,20 @@
-// Three.js render layer for the Phase 0 static system view.
+// Three.js render layer — Phase 1 system view.
 //
-// Hard boundary (docs/03): the renderer READS sim state; it never mutates it and
-// the sim never imports anything from here. We build one mesh per body from the
-// World's Body components, then each frame copy Transform positions into meshes.
+// Hard boundary (docs/03): renderer READS sim state, never mutates it.
+// The sim never imports anything from here.
 //
-// Kept deliberately light for a MacBook Air integrated GPU: low-poly spheres,
-// a single point light, instanced star-field points, no post-processing.
+// Light for the MacBook Air: low-poly spheres, one point light, instanced
+// star-field points, no post-processing, pixel-ratio capped at 2.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { World } from "../sim/ecs/world.ts";
+import type { CelestialBody } from "../sim/ecs/components.ts";
 import { positionAt } from "../sim/math/kepler.ts";
 
 export interface Renderer {
-  /** Sync mesh positions from the world's current Transform state. */
   sync(world: World): void;
-  /** Draw one frame. */
   render(): void;
-  /** Handle a container resize. */
   resize(width: number, height: number): void;
 }
 
@@ -31,56 +28,35 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     0.1,
     2000,
   );
-  camera.position.set(0, 22, 34);
+  camera.position.set(0, 24, 38);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // cap for the Air
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  canvasParent.appendChild(renderer.domElement);
+  const webgl = new THREE.WebGLRenderer({ antialias: true });
+  webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  webgl.setSize(window.innerWidth, window.innerHeight);
+  canvasParent.appendChild(webgl.domElement);
 
-  // Free-look camera: orbit/zoom/pan. This is the Phase 0 control scheme
-  // (docs/08 "static 3D system scene; free-look camera"). Piloting comes later.
-  const controls = new OrbitControls(camera, renderer.domElement);
+  const controls = new OrbitControls(camera, webgl.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxDistance = 200;
+  controls.maxDistance = 300;
 
-  // Lighting: the star is the light source, plus a faint ambient fill so the
-  // night sides of planets aren't pure black.
-  scene.add(new THREE.AmbientLight(0x223044, 0.6));
-  const starLight = new THREE.PointLight(0xfff2d8, 2.2, 0, 0.0);
-  scene.add(starLight); // sits at origin where the star is
+  // The star's point light + faint ambient fill.
+  scene.add(new THREE.AmbientLight(0x223044, 0.7));
+  scene.add(new THREE.PointLight(0xfff2d8, 2.4, 0, 0.0));
 
-  // Cheap star-field backdrop (instanced points, no textures).
   scene.add(makeStarfield(world));
 
-  // One mesh per body, built from Body components.
+  // Build one mesh per celestial body.
   const meshes = new Map<number, THREE.Mesh>();
-  const { body, orbit } = world.components;
 
-  for (const [entity, b] of body) {
-    const geo = new THREE.SphereGeometry(b.radius, 24, 16);
-    const material =
-      b.kind === "star"
-        ? new THREE.MeshBasicMaterial({ color: b.color }) // self-lit
-        : new THREE.MeshStandardMaterial({ color: b.color, roughness: 0.9, metalness: 0.0 });
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.name = b.name;
+  for (const [entity, body] of world.components.celestialBody) {
+    const mesh = buildBodyMesh(body);
     scene.add(mesh);
     meshes.set(entity, mesh);
-
-    if (b.kind === "star") {
-      // A soft halo around the star so it reads as a light source.
-      const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(b.radius * 1.4, 24, 16),
-        new THREE.MeshBasicMaterial({ color: b.color, transparent: true, opacity: 0.12 }),
-      );
-      mesh.add(halo);
-    }
   }
 
-  // Static orbit guide-lines so the geometry is legible even when paused.
-  for (const [, orb] of orbit) {
+  // Static orbit guide-lines.
+  for (const [, orb] of world.components.orbit) {
     scene.add(makeOrbitLine(orb.elements));
   }
 
@@ -91,50 +67,82 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         if (t) {
           mesh.position.set(t.position.x, t.position.y, t.position.z);
         }
+        // No Transform = stationary at origin (the star).
       }
     },
     render() {
       controls.update();
-      renderer.render(scene, camera);
+      webgl.render(scene, camera);
     },
     resize(width: number, height: number) {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+      webgl.setSize(width, height);
     },
   };
 }
 
-/** Build a faint instanced star-field. Deterministic look via the world RNG. */
+function buildBodyMesh(body: CelestialBody): THREE.Mesh {
+  const geo = new THREE.SphereGeometry(body.renderRadius, 24, 16);
+
+  if (body.kind === "star") {
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ color: body.color }),
+    );
+    mesh.name = body.name;
+    // Soft halo so the star reads as a light source.
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(body.renderRadius * 1.45, 24, 16),
+      new THREE.MeshBasicMaterial({ color: body.color, transparent: true, opacity: 0.10 }),
+    );
+    mesh.add(halo);
+    return mesh;
+  }
+
+  // Gas giants get a slight emissive tint; planets are purely lit.
+  const mat =
+    body.kind === "gas-giant"
+      ? new THREE.MeshStandardMaterial({
+          color: body.color,
+          roughness: 0.7,
+          metalness: 0.0,
+          emissive: new THREE.Color(body.color).multiplyScalar(0.05),
+        })
+      : new THREE.MeshStandardMaterial({ color: body.color, roughness: 0.9, metalness: 0.0 });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = body.name;
+  return mesh;
+}
+
 function makeStarfield(world: World): THREE.Points {
-  const count = 1200;
+  const count = 1400;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    // Scatter on a large sphere shell around the system.
-    const r = 400 + world.rng.range(0, 400);
+    const r = 450 + world.rng.range(0, 400);
     const theta = world.rng.range(0, Math.PI * 2);
     const phi = Math.acos(world.rng.range(-1, 1));
-    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.cos(phi);
     positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.PointsMaterial({ color: 0x8893b0, size: 1.2, sizeAttenuation: false });
-  return new THREE.Points(geo, mat);
+  return new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({ color: 0x8893b0, size: 1.2, sizeAttenuation: false }),
+  );
 }
 
-/** A closed line tracing one orbit, sampled analytically from its elements. */
 function makeOrbitLine(elements: Parameters<typeof positionAt>[0]): THREE.LineLoop {
   const segments = 128;
-  const period = (Math.PI * 2) / elements.meanMotion; // one full revolution
+  const period = (Math.PI * 2) / elements.meanMotion;
   const points: THREE.Vector3[] = [];
   for (let i = 0; i < segments; i++) {
-    const t = (i / segments) * period;
-    const p = positionAt(elements, t);
+    const p = positionAt(elements, (i / segments) * period);
     points.push(new THREE.Vector3(p.x, p.y, p.z));
   }
   const geo = new THREE.BufferGeometry().setFromPoints(points);
-  const mat = new THREE.LineBasicMaterial({ color: 0x2a3550 });
-  return new THREE.LineLoop(geo, mat);
+  return new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color: 0x2a3550 }));
 }

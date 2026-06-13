@@ -12,28 +12,27 @@ body {
   background: #05060a;
   color: #cdd6f4;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
 }
 
 canvas {
   display: block;
-}
-
-#hud {
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+/* React UI root: full-screen overlay, pointer-events off by default so the
+   Three.js canvas receives mouse events for OrbitControls. */
+#ui {
+  position: fixed;
+  inset: 0;
   z-index: 10;
-  font-size: 13px;
-  line-height: 1.5;
   pointer-events: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-#hud .hint {
-  opacity: 0.55;
-  font-size: 11px;
-}
-
-#tick {
-  opacity: 0.75;
+/* Any interactive UI element opts back in. */
+.interactive {
+  pointer-events: auto;
 }
