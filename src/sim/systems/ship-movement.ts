@@ -8,6 +8,7 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
+import { STAR_RENDER_RADIUS } from "../presentation.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
 // Kept a small multiple of maxSpeed (0.01 u/s at 1×) so there's a visible
@@ -44,7 +45,8 @@ export function shipMovementSystem(world: World, input: Input): void {
     ctrl.autopilotActive = false;
   }
 
-  // Autopilot: steer the nose toward the target entity in 3D.
+  // Autopilot: steer the nose toward the target entity in 3D, parking at
+  // 1.5× the body's render radius so the planet dominates the view on arrival.
   if (ctrl.autopilotActive && ctrl.autopilotTargetId !== undefined) {
     const tgt = transform.get(ctrl.autopilotTargetId);
     if (tgt) {
@@ -53,7 +55,13 @@ export function shipMovementSystem(world: World, input: Input): void {
       const dz = tgt.position.z - pos.position.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      if (dist > 2) {
+      // Park at 1.5× render radius (min 3 u above surface) so the ship arrives
+      // facing the body with it filling much of the view.
+      const targetBody = world.components.celestialBody.get(ctrl.autopilotTargetId);
+      const bodyR = targetBody?.renderRadius ?? 6;
+      const parkDist = Math.max(bodyR * 1.5, bodyR + 3);
+
+      if (dist > parkDist) {
         const targetHeading = Math.atan2(dx, dz);
         const targetPitch   = Math.asin(Math.max(-1, Math.min(1, dy / dist)));
 
@@ -107,4 +115,33 @@ export function shipMovementSystem(world: World, input: Input): void {
   pos.position.x += vel.vx * FIXED_DT;
   pos.position.y += vel.vy * FIXED_DT;
   pos.position.z += vel.vz * FIXED_DT;
+
+  // Soft surface stop: push the ship back if it penetrates a body's surface.
+  // Planets have a Transform; the star sits at the world origin with no
+  // Transform, so it is checked explicitly via STAR_RENDER_RADIUS.
+  const SURFACE_MARGIN = 0.3; // scene units of clearance above the render radius
+  const bodies = world.components.celestialBody;
+  for (const [entity, body] of bodies) {
+    const bpos = transform.get(entity)?.position ?? { x: 0, y: 0, z: 0 };
+    const minR = (body.kind === "star" ? STAR_RENDER_RADIUS : body.renderRadius) + SURFACE_MARGIN;
+    const ex = pos.position.x - bpos.x;
+    const ey = pos.position.y - bpos.y;
+    const ez = pos.position.z - bpos.z;
+    const dist2 = ex * ex + ey * ey + ez * ez;
+    if (dist2 < minR * minR && dist2 > 0) {
+      const d = Math.sqrt(dist2);
+      const nx = ex / d, ny = ey / d, nz = ez / d;
+      // Clamp position to the surface shell.
+      pos.position.x = bpos.x + nx * minR;
+      pos.position.y = bpos.y + ny * minR;
+      pos.position.z = bpos.z + nz * minR;
+      // Zero out any velocity component directed toward the body.
+      const vDotN = vel.vx * nx + vel.vy * ny + vel.vz * nz;
+      if (vDotN < 0) {
+        vel.vx -= vDotN * nx;
+        vel.vy -= vDotN * ny;
+        vel.vz -= vDotN * nz;
+      }
+    }
+  }
 }
