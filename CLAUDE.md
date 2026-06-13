@@ -36,9 +36,17 @@ Design constraint: **grounded, not pure fantasy.** Star data, orbital mechanics,
 1. **Spec before code.** For any non-trivial feature, write or update the relevant `/docs` file first, then implement against it. This saves tokens and prevents drift.
 2. **Touch the minimum context.** Load only the docs relevant to the current task. Don't pull the whole `/docs` folder into context "just in case."
 3. **One vertical slice at a time.** Follow `docs/05-roadmap.md`. Don't build breadth before the current slice works end to end.
-4. **Log decisions.** Architectural or design decisions go in the relevant doc as a dated "Decision" note, and a one-line entry goes in `docs/07-devlog.md`.
+4. **Log decisions.** Architectural or design decisions go in `docs/09-decisions.md` (one line, dated, with rationale) and a one-line entry goes in `docs/07-devlog.md`.
 5. **Determinism is sacred.** The simulation must produce identical results from identical inputs (needed for saves, debugging, and possible future multiplayer). Keep randomness seeded.
 6. **Small commits, descriptive messages.** Git history is part of our memory.
+
+## Session logging protocol (mandatory)
+
+The planning room and future sessions only see what's pushed to the repo. End every session by: (1) appending a `## Session N` entry to `docs/07-devlog.md` (goal, did, decisions, next, open questions); (2) updating the **Current status** block in this file — it is the canonical state snapshot; (3) appending any decisions to `docs/09-decisions.md` with a one-sentence rationale; (4) committing and pushing to GitHub — pushing is what makes work visible to the planning room.
+
+## Long tasks & checkpointing (don't lose work to context limits)
+
+Long jobs can run out of context before finishing. Keep every task resumable from the repo alone: (1) plan as a checklist before starting, kept in an in-progress devlog entry; (2) commit after each working step (e.g. `wip(phase1): crew components`) — small checkpoint commits are breadcrumbs; never leave hours of work uncommitted; (3) maintain a **"Resume point"** line at the top of `docs/07-devlog.md` stating what's done and the exact next step, updated as you go; (4) if context runs low, finish the current step, update the resume point, commit and push, and tell me a fresh session is needed — don't push past the limit and lose the thread; (5) on completion, replace the in-progress notes with the normal Session entry.
 
 ## Division of AI labor (see `docs/06-ai-workflow-and-token-budget.md`)
 
@@ -59,6 +67,7 @@ Design constraint: **grounded, not pure fantasy.** Star data, orbital mechanics,
 | `docs/06-ai-workflow-and-token-budget.md` | Claude Code + Gemini workflow, token discipline, session protocol |
 | `docs/07-devlog.md` | Running log of what was done each session |
 | `docs/08-rendering-and-camera.md` | 3D open-world feel: camera scales, flight, landing, nav map, performance |
+| `docs/09-decisions.md` | Decision log: every architectural/design choice, dated, one-sentence rationale, newest first |
 
 ---
 
