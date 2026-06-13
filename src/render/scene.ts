@@ -21,6 +21,7 @@ import type { World } from "../sim/ecs/world.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { positionAt } from "../sim/math/kepler.ts";
 import { noseVector } from "../sim/systems/ship-movement.ts";
+import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
 
 export interface Renderer {
@@ -32,10 +33,11 @@ export interface Renderer {
   getView(): CameraView;
 }
 
-// Chase camera constants.
-const CHASE_DIST   = 6;    // scene units behind ship
-const CHASE_HEIGHT = 2.5;  // scene units above ship
-const COCKPIT_FWD  = 0.6;  // camera sits just ahead of the cone tip
+// Chase camera constants — tuned to the ship length (presentation.ts).
+const CHASE_DIST   = 1.7;  // scene units behind ship (≈ 5 ship-lengths)
+const CHASE_HEIGHT = 0.7;  // scene units above ship
+const COCKPIT_FWD  = 0.22; // camera sits just ahead of the cone tip
+const MAP_MARKER_SCALE = 6; // enlarge the ship in map view so it reads as a marker
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z
 
 export function createRenderer(world: World, canvasParent: HTMLElement): Renderer {
@@ -155,7 +157,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         // True coordinates; ship drawn at real position as a marker.
         worldRoot.position.set(0, 0, 0);
         shipMesh.position.set(sx, sy, sz);
-        shipMesh.scale.setScalar(2.2);   // enlarge so it reads at system scale
+        shipMesh.scale.setScalar(MAP_MARKER_SCALE); // reads at system scale
         shipMesh.visible = true;
         return; // camera driven by OrbitControls
       }
@@ -220,7 +222,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 // ---------------------------------------------------------------------------
 
 function buildShipMesh(): THREE.Mesh {
-  const geo = new THREE.ConeGeometry(0.25, 0.8, 6);
+  const geo = new THREE.ConeGeometry(SHIP_RADIUS, SHIP_LENGTH, 6);
   geo.rotateX(Math.PI / 2); // point the tip toward +Z
   const mat = new THREE.MeshStandardMaterial({
     color: 0xcdd6f4,

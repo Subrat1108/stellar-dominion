@@ -15,6 +15,7 @@
 
 import { createWorld, createEntity, type World } from "./ecs/world.ts";
 import type { CelestialBody } from "./ecs/components.ts";
+import { sceneDistance } from "./presentation.ts";
 import {
   tauCetiStar,
   ferrum,
@@ -24,8 +25,10 @@ import {
   titansEye,
 } from "./data/tau-ceti.ts";
 
-// Mira's reference orbital parameters (0.65 AU → scene radius 10.5).
-const MIRA_N = 0.08; // rad / sim-sec → period ≈ 78.5 sim-sec ≈ 79 real-sec at 60 fps
+// Mira's reference orbital parameters. This sets the RELATIVE speeds of the
+// planets; the global orbital clock is slowed by ORBITAL_TIME_RATE (orbital.ts)
+// so planets are nearly stationary during a flight.
+const MIRA_N = 0.08; // rad / sim-sec — relative mean motion reference
 
 // Scale mean motion by Kepler's third law: n(a) = MIRA_N * (MIRA_AU / a)^1.5
 function keplerN(realAu: number): number {
@@ -33,10 +36,7 @@ function keplerN(realAu: number): number {
   return MIRA_N * Math.pow(MIRA_AU / realAu, 1.5);
 }
 
-// Scene-unit semi-major axis: rough linear mapping keeping clear of star mesh.
-function sceneRadius(realAu: number): number {
-  return Math.max(5, realAu * 10 + 3);
-}
+// Scene-unit semi-major axis comes from the central presentation scale.
 
 export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): World {
   const world = createWorld({ seed });
@@ -63,7 +63,7 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
     orbit.set(id, {
       parent: starId,
       elements: {
-        semiMajorAxis: sceneRadius(au),
+        semiMajorAxis: sceneDistance(au),
         eccentricity: ecc,
         meanMotion: keplerN(au),
         meanAnomalyAtEpoch: m0,
@@ -130,9 +130,10 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
     depletionRatePerTick: 1,
   });
 
-  // Ship starts stationary just inside Ferrum's orbit, slightly off-centre.
+  // Ship starts stationary in open space in the inner system, clear of the star
+  // halo (sceneDistance(0) = STAR_CLEARANCE) and roughly between the inner orbits.
   world.components.transform.set(shipId, {
-    position: { x: 0, y: 0, z: 3 },
+    position: { x: 0, y: 0, z: 11 },
   });
 
   world.components.shipVelocity.set(shipId, {

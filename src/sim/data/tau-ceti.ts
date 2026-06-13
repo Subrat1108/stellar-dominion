@@ -11,6 +11,11 @@
 
 import type { CelestialBody } from "../ecs/components.ts";
 import { computeHabitability } from "../math/habitability.ts";
+import {
+  STAR_RENDER_RADIUS,
+  planetRenderRadius,
+  gasGiantRenderRadius,
+} from "../presentation.ts";
 
 // Physical constants
 const M_SOL   = 1.989e30; // kg
@@ -34,7 +39,7 @@ export const TAU_CETI_LUMINOSITY_SOL = 0.488;
 export const tauCetiStar: CelestialBody = {
   kind: "star",
   name: "Tau Ceti",
-  renderRadius: 2.5,
+  renderRadius: STAR_RENDER_RADIUS,
   color: 0xffd493,  // G8V — warm yellow-orange
   dataTag: "real",
   description:
@@ -60,7 +65,7 @@ const FERRUM_RADIUS = 0.82 * R_EARTH;
 export const ferrum: CelestialBody = {
   kind: "planet",
   name: "Ferrum",
-  renderRadius: 0.5,
+  renderRadius: planetRenderRadius(FERRUM_RADIUS),
   color: 0xb87333,  // copper-brown, scorched rock
   dataTag: "derived",
   description:
@@ -103,7 +108,7 @@ const CALDOR_RADIUS = 1.04 * R_EARTH;
 export const caldor: CelestialBody = {
   kind: "planet",
   name: "Caldor",
-  renderRadius: 0.65,
+  renderRadius: planetRenderRadius(CALDOR_RADIUS),
   color: 0xe09020,  // ochre-yellow, thick cloud deck
   dataTag: "derived",
   description:
@@ -148,7 +153,7 @@ const MIRA_RADIUS = 0.98 * R_EARTH;
 export const mira: CelestialBody = {
   kind: "planet",
   name: "Mira",
-  renderRadius: 0.72,
+  renderRadius: planetRenderRadius(MIRA_RADIUS),
   color: 0x6baed6,  // muted blue-green — thin ocean glint
   dataTag: "derived",
   description:
@@ -192,7 +197,7 @@ const GLACIUS_RADIUS = 0.93 * R_EARTH;
 export const glacius: CelestialBody = {
   kind: "planet",
   name: "Glacius",
-  renderRadius: 0.6,
+  renderRadius: planetRenderRadius(GLACIUS_RADIUS),
   color: 0xd0e8f0,  // icy pale blue-white
   dataTag: "derived",
   description:
@@ -236,7 +241,7 @@ const TITANS_EYE_RADIUS =  9 * R_EARTH;
 export const titansEye: CelestialBody = {
   kind: "gas-giant",
   name: "Titan's Eye",
-  renderRadius: 1.6,
+  renderRadius: gasGiantRenderRadius(TITANS_EYE_RADIUS),
   color: 0xc8a060,  // golden tan, Saturn-esque banding
   dataTag: "fictional",
   description:
