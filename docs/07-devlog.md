@@ -14,6 +14,22 @@ Entry template:
 
 ---
 
+## Session 6 — Phase 1B fixes: flight model rework (playtest feedback)
+- **Goal:** Fix three issues a playtest surfaced in the Session-5 build: (a) the star never got closer / "planets revolving around nothing"; (b) the ship could only go forward/back; (c) the speed lever felt wrong as time compression. Add debug instrumentation.
+- **Did:**
+  - **Floating-origin bug fixed** (`src/render/scene.ts`): root cause was `sync()` offsetting only meshes that have a `Transform` — the star (no transform) stayed pinned at render origin and the orbit rings + starfield were never moved, so the scene decohered the instant you flew. Rewrote it as the textbook pattern: star + planets + orbit rings + starfield + star-light all live in one `worldRoot` group offset by `-shipPos` each frame; the ship stays at render `(0,0,0)`. Map view sets the offset to zero (true coords) and draws the ship as an enlarged marker at its real position.
+  - **Full 3D flight** (`src/sim/systems/ship-movement.ts`): added `pitch` to `ShipControl`; velocity is now a full `Vec3`. Yaw + pitch orient the nose (shared `noseVector()` used by both sim and renderer); thrust drives along the nose; Space/Shift give world-vertical thrust. Pitch clamped to ±(90°−0.05) to avoid flipping. `Input` gained `pitch`, `vertical`, `throttle`. Autopilot updated to steer in 3D.
+  - **Speed → throttle** (`src/app/main.ts`, `speed-state.ts`): reverted the multi-tick time-compression loop; sim runs real-time (1 tick/frame). The 1×/10×/100×/1000× buttons now feed `Input.throttle`, scaling acceleration + max speed. HUD label → THROTTLE.
+  - **Three camera views** (`scene.ts`, `src/app/view-state.ts`): cockpit (first-person, hull hidden) / chase (behind+above, racing-style) / map (OrbitControls). `C` cycles, `M` toggles map. Right-click drag = look-around in flight views.
+  - **Input** (`src/app/input.ts`): W/S thrust, A/D yaw, ↑/↓ pitch, Space/Shift vertical, C cycle view, M map; prevents Space/arrows from scrolling the page.
+  - **Debug overlay** (`src/ui/DebugPanel.tsx`): bottom-left live readout (view, throttle, pos, vel, speed, heading, pitch, distance-to-star, autopilot) + a throttled (~1 Hz) console log of the same, for log-based testing.
+  - **Tests:** ship-movement suite rewritten for the 3D `Input` (helper fills defaults); added pitch/vertical/throttle/clamp coverage. **42/42 passing.** Typecheck + prod build clean.
+- **Decisions:** speed lever = throttle not time compression; full 3D flight (supersedes XZ-only); floating origin via `worldRoot` group; three camera views; debug overlay — all in `docs/09`. `docs/08` travel-speed section annotated with the Phase 1B revision.
+- **Next:** confirm the flight feel in-browser; then Phase 2 (first colony) or a polish pass on autopilot/approach.
+- **Open questions:** throttle scaling values (1×–1000×) are placeholders — tune once there's a real sense of system scale. True time-compression to be reintroduced as a separate "skip travel" control alongside autopilot routes (Phase 4).
+
+---
+
 ## Session 5 — Phase 1B: cockpit camera + in-system cruising
 - **Goal:** Phase 1B per `docs/05` — chase/cockpit camera, keyboard steering, configurable speed (time compression), floating origin, autopilot stub.
 - **Did:**

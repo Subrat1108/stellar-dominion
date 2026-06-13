@@ -73,7 +73,7 @@ Long jobs can run out of context before finishing. Keep every task resumable fro
 
 ## Current status
 
-- **Phase:** 1B — **complete**. Chase/cockpit camera follows ship (M toggles to system map view). WASD/arrow keys steer; ship thrusts in heading direction. Speed multiplier (1×/10×/100×/1000×) on HUD advances sim ticks per real frame — life support depletes faster at higher speed (intentional). Floating origin keeps ship at render (0,0,0). Autopilot stub: "SET COURSE" in SystemPanel → ship steers to target; manual input overrides; "CANCEL AUTOPILOT" on HUD. 38/38 tests passing.
-- **Confirmed:** XZ-plane movement (yaw only) for Phase 1B; drag=0.98/tick for natural deceleration; floating origin is renderer-only; `FIXED_DT` lives in `src/sim/constants.ts`.
-- **Next action:** Phase 2 — first colony: land on a body, found a dome, start resource flows.
-- **Last updated:** Session 5.
+- **Phase:** 1B — **complete** (reworked after playtest, Session 6). **Full 3D flight:** W/S thrust, A/D yaw, ↑/↓ pitch, Space/Shift world-vertical; thrust drives along the nose. **Three camera views** — cockpit / chase / map; `C` cycles, `M` toggles map; right-drag looks around. **Floating origin** correctly moves the whole system (star + planets + rings + starfield in one `worldRoot` group) so distance-to-star changes as you fly; ship stays at render (0,0,0); map view shows the ship as a marker at true position. **Speed lever = throttle** (scales ship accel/max-speed via `Input.throttle`); sim runs real-time. Autopilot steers in 3D toward a "SET COURSE" target; manual input overrides. On-screen **DebugPanel** + console telemetry for testing. 42/42 tests; typecheck + build clean.
+- **Confirmed (Session 6, supersedes Session 5):** speed is a throttle, **not** time compression (time-compression returns separately with autopilot in Phase 4); full 3D flight replaces XZ-plane-only; floating origin via one `worldRoot` group.
+- **Next action:** confirm flight feel in-browser, then Phase 2 — first colony (land on a body, found a dome, resource flows).
+- **Last updated:** Session 6.

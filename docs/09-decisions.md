@@ -6,7 +6,12 @@ Append here whenever an architectural or design choice is made; see `CLAUDE.md` 
 ---
 
 | Date | Decision | Rationale |
-| 2026-06-13 | XZ-plane movement only (yaw, no pitch) for Phase 1B | Matches the orbital plane; full 6-DOF adds complexity without payoff at this stage. |
+| 2026-06-13 | Speed lever is a **throttle** (scales ship accel/max-speed), not sim time compression | Playtesting showed time-compression made piloting feel disconnected; throttle gives direct control. Time compression returns separately with autopilot (Phase 4). Supersedes the Session-5 "throttle vs time" note. |
+| 2026-06-13 | Full 3D flight (yaw + pitch + world-vertical thrust); supersedes XZ-plane-only | Playtester needed to move in every direction; pinning to the orbital plane felt broken. Pitch clamped near ±90° to avoid gimbal flip. |
+| 2026-06-13 | Floating origin via a single `worldRoot` group offset by -shipPos | Per-mesh offsetting left transform-less objects (the star) and static geometry (orbit rings, starfield) pinned, decohering the scene; one group moves everything together. |
+| 2026-06-13 | Three camera views (cockpit / chase / map), C cycles, M toggles map | "Racing-style" inside + outside views per playtester; map kept for navigation. Cockpit hides the hull and looks down the nose. |
+| 2026-06-13 | On-screen DebugPanel + throttled console log of ship telemetry | Lets bugs be diagnosed from a single screenshot/log during the flight-model bring-up. |
+| 2026-06-13 | XZ-plane movement only (yaw, no pitch) for Phase 1B *(superseded same day)* | Matches the orbital plane; full 6-DOF adds complexity without payoff at this stage. |
 | 2026-06-13 | Drag = 0.98/tick on ship velocity | Natural deceleration without a dedicated brake key; small non-Newtonian feel is an acceptable trade for playability. |
 | 2026-06-13 | Floating origin is renderer-only; sim keeps absolute coordinates | Keeps serialization/saves simple; float-jitter only matters in the render layer. |
 | 2026-06-13 | speedState is a plain mutable object, not React state | The frame loop mutates it synchronously; React only needs to read it on button click — React state would add unnecessary overhead. |

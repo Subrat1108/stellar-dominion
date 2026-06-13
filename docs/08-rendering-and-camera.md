@@ -29,6 +29,7 @@ Transitions between scales are eased camera moves + load/swap — they read as s
 - The **strategy simulation** (economy, population, orbits, politics) runs on a fixed deterministic tick — see `docs/03`.
 - The **flight/cruise view** is a real-time *presentation + control* layer that reads sim state and lets the player pilot.
 - **Travel speed = time compression.** Cruising at higher speed advances the sim clock faster; piloting actions resolve into sim outcomes (you arrive at body X at tick T). This keeps one source of truth and makes "configurable speed" a clean, single lever.
+  - **Phase 1B revision:** the in-flight speed buttons are currently a **throttle** (they scale the ship's acceleration / max speed), not time compression. The sim runs real-time. Reason: during playtesting, time-compression made piloting feel disconnected (the world raced while you nudged the stick). True time-compression returns as a *separate* control (autopilot / "skip travel") once autopilot routes land in Phase 4. See `docs/09` (Session 6).
 - **Autopilot / auto-mode** = the sim/pathing moves the ship along a computed route while the player watches or skips ahead.
 
 ## Floating-point precision & scale (the unavoidable problem)
