@@ -1,8 +1,8 @@
 // Ship movement system — deterministic, headless, no rendering code.
 //
-// Full 3D flight: yaw + pitch orient the nose; thrust drives the ship along
-// the nose vector; vertical thrust moves straight up/down in world space.
-// Velocity is a full Vec3, capped at maxSpeed (scaled by the throttle lever).
+// 3D flight: yaw + pitch orient the nose; thrust drives the ship along the
+// nose vector (climb/dive by pitching, then thrusting). Velocity is a full
+// Vec3, capped at maxSpeed (scaled by the throttle lever).
 // Manual input (any non-zero axis) immediately disables autopilot.
 
 import type { World } from "../ecs/world.ts";
@@ -33,14 +33,11 @@ export function shipMovementSystem(world: World, input: Input): void {
 
   if (!vel || !ctrl || !pos) return;
 
-  let { thrust, yaw, pitch, vertical } = input;
+  let { thrust, yaw, pitch } = input;
   const throttle = input.throttle > 0 ? input.throttle : 1;
 
   // Manual input overrides autopilot.
-  if (
-    Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 ||
-    Math.abs(pitch) > 0.01 || Math.abs(vertical) > 0.01
-  ) {
+  if (Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01) {
     ctrl.autopilotActive = false;
   }
 
@@ -71,10 +68,9 @@ export function shipMovementSystem(world: World, input: Input): void {
         thrust = Math.abs(yawDiff) < Math.PI / 4
           ? (dist < brakingDist ? -1 : 1)
           : 0;
-        vertical = 0;
       } else {
         ctrl.autopilotActive = false;
-        thrust = 0; yaw = 0; pitch = 0; vertical = 0;
+        thrust = 0; yaw = 0; pitch = 0;
       }
     }
   }
@@ -83,12 +79,12 @@ export function shipMovementSystem(world: World, input: Input): void {
   ctrl.heading += yaw * TURN_RATE * FIXED_DT;
   ctrl.pitch    = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, ctrl.pitch + pitch * TURN_RATE * FIXED_DT));
 
-  // Apply thrust along the nose, plus world-space vertical thrust, then drag.
+  // Apply thrust along the nose, then drag.
   const accel = BASE_ACCEL * throttle;
   const nose  = noseVector(ctrl.heading, ctrl.pitch);
 
   vel.vx = (vel.vx + thrust * accel * nose.x * FIXED_DT) * DRAG;
-  vel.vy = (vel.vy + (thrust * accel * nose.y + vertical * accel) * FIXED_DT) * DRAG;
+  vel.vy = (vel.vy + thrust * accel * nose.y * FIXED_DT) * DRAG;
   vel.vz = (vel.vz + thrust * accel * nose.z * FIXED_DT) * DRAG;
 
   // Clamp to maxSpeed (scaled by throttle).

@@ -10,7 +10,7 @@ import { FIXED_DT } from "../src/sim/constants.ts";
 
 /** Build a full Input from a partial, defaulting the rest to neutral. */
 function mk(partial: Partial<Input>): Input {
-  return { thrust: 0, yaw: 0, pitch: 0, vertical: 0, throttle: 1, ...partial };
+  return { thrust: 0, yaw: 0, pitch: 0, throttle: 1, ...partial };
 }
 
 function speed(world: ReturnType<typeof createStartingSystem>): number {
@@ -89,13 +89,6 @@ describe("ship movement system", () => {
     const p = world.components.shipControl.get(world.shipId)!.pitch;
     expect(p).toBeLessThan(Math.PI / 2);
     expect(p).toBeGreaterThan(Math.PI / 2 - 0.1);
-  });
-
-  it("vertical thrust moves ship straight up in world space", () => {
-    const world = createStartingSystem();
-    const y0 = world.components.transform.get(world.shipId)!.position.y;
-    for (let i = 0; i < 60; i++) step(world, mk({ vertical: 1 }));
-    expect(world.components.transform.get(world.shipId)!.position.y).toBeGreaterThan(y0);
   });
 
   it("velocity is capped at maxSpeed (scaled by throttle)", () => {

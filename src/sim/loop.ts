@@ -12,7 +12,8 @@ import { shipMovementSystem } from "./systems/ship-movement.ts";
 import { FIXED_DT } from "./constants.ts";
 export { FIXED_DT };
 
-/** Per-tick player intents. */
+/** Per-tick player intents. Flight is a six-key scheme: thrust (W/S),
+ *  yaw (A/D), pitch (↑/↓). No world-vertical axis. */
 export interface Input {
   /** Forward/back thrust along the nose: -1 (brake) to 1 (full ahead). */
   thrust: number;
@@ -20,8 +21,6 @@ export interface Input {
   yaw: number;
   /** Pitch rate: -1 (nose down) to 1 (nose up). */
   pitch: number;
-  /** Vertical thrust in world space: -1 (down) to 1 (up). */
-  vertical: number;
   /** Throttle multiplier scaling acceleration and max speed (>= 1). */
   throttle: number;
 }
@@ -31,7 +30,6 @@ export const ZERO_INPUT: Input = {
   thrust: 0,
   yaw: 0,
   pitch: 0,
-  vertical: 0,
   throttle: 1,
 };
 

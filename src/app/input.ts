@@ -4,13 +4,14 @@
 // getSimInput() converts that to an Input for the sim each frame (throttle is
 // filled in by the caller from speedState). consume* helpers fire once per press.
 //
-// Control scheme (flight):
-//   W / S ............ thrust forward / back along the nose
-//   A / D ............ yaw left / right
-//   ↑ / ↓ ............ pitch nose up / down
-//   Space / Shift .... thrust up / down (world vertical)
-//   C ................ cycle camera view (cockpit → chase → map)
-//   M ................ toggle map view
+// Flight is a deliberately small six-key scheme:
+//   W / S ... thrust forward / back along the nose
+//   A / D ... steer left / right (yaw)
+//   ↑ / ↓ ... steer up / down (pitch)
+// Camera:
+//   C ....... cycle camera view (cockpit → chase → map)
+//   M ....... toggle map view
+//   right-drag (handled in the renderer) ... look around
 
 import type { Input } from "../sim/loop.ts";
 
@@ -22,10 +23,8 @@ window.addEventListener("keydown", (e) => {
   held.add(e.code);
   if (e.code === "KeyM" && !e.repeat) mapTogglePending = true;
   if (e.code === "KeyC" && !e.repeat) viewCyclePending = true;
-  // Stop Space/arrows from scrolling the page while flying.
-  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) {
-    e.preventDefault();
-  }
+  // Stop the pitch arrows from scrolling the page while flying.
+  if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
 });
 
 window.addEventListener("keyup", (e) => {
@@ -36,18 +35,15 @@ window.addEventListener("keyup", (e) => {
 export function getSimInput(): Input {
   const forward  = held.has("KeyW");
   const backward = held.has("KeyS");
-  const yawLeft  = held.has("KeyA") || held.has("ArrowLeft");
-  const yawRight = held.has("KeyD") || held.has("ArrowRight");
+  const yawLeft  = held.has("KeyA");
+  const yawRight = held.has("KeyD");
   const pitchUp  = held.has("ArrowUp");
   const pitchDn  = held.has("ArrowDown");
-  const up       = held.has("Space");
-  const down     = held.has("ShiftLeft") || held.has("ShiftRight");
 
   return {
-    thrust:   forward ? 1 : backward ? -1 : 0,
-    yaw:      yawRight ? 1 : yawLeft ? -1 : 0,
-    pitch:    pitchUp ? 1 : pitchDn ? -1 : 0,
-    vertical: up ? 1 : down ? -1 : 0,
+    thrust: forward ? 1 : backward ? -1 : 0,
+    yaw:    yawRight ? 1 : yawLeft ? -1 : 0,
+    pitch:  pitchUp ? 1 : pitchDn ? -1 : 0,
     throttle: 1,
   };
 }
