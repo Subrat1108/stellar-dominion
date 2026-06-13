@@ -1,154 +1,189 @@
-// Three.js render layer — Phase 1B: chase camera + system map view.
+// Three.js render layer — Phase 1B: cockpit / chase / map cameras.
 //
 // Hard boundary (docs/03): renderer READS sim state, never mutates it.
 // The sim never imports anything from here.
 //
-// Two camera modes (docs/08):
-//   'flight' — chase camera behind/above ship; WASD steers ship via sim input.
-//   'map'    — OrbitControls free-look of the whole system.
-// Press M to toggle. Both share one scene; only the active camera/controls differ.
+// Three camera views (docs/08):
+//   'cockpit' — first-person from the ship's nose, looking down the heading.
+//   'chase'   — third-person behind & above the ship (racing-style).
+//   'map'     — OrbitControls free-look of the whole system, ship as a marker.
+// 'C' cycles cockpit → chase → map; 'M' toggles map.
+//
+// Floating origin (docs/08): in flight views EVERYTHING in the system lives in
+// one `worldRoot` group that is offset by -shipPos each frame, so the ship stays
+// at render (0,0,0) and star + planets + orbit rings + starfield all move
+// together and stay coherent. In map view the offset is zero (true coordinates)
+// and the ship is drawn at its real position as a marker.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { World } from "../sim/ecs/world.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { positionAt } from "../sim/math/kepler.ts";
-
-export type CameraMode = "flight" | "map";
+import { noseVector } from "../sim/systems/ship-movement.ts";
+import { viewState, type CameraView } from "../app/view-state.ts";
 
 export interface Renderer {
   sync(world: World): void;
   render(): void;
   resize(width: number, height: number): void;
-  toggleCameraMode(): void;
-  getCameraMode(): CameraMode;
+  cycleView(): void;
+  toggleMap(): void;
+  getView(): CameraView;
 }
 
 // Chase camera constants.
-const CHASE_DIST   = 5;    // scene units behind ship
-const CHASE_HEIGHT = 2;    // scene units above ship
-const LOOK_AHEAD   = 1.5;  // scene units ahead of ship that camera aims at
+const CHASE_DIST   = 6;    // scene units behind ship
+const CHASE_HEIGHT = 2.5;  // scene units above ship
+const COCKPIT_FWD  = 0.6;  // camera sits just ahead of the cone tip
+const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z
 
 export function createRenderer(world: World, canvasParent: HTMLElement): Renderer {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x05060a);
 
-  // --- Cameras ---
   const camera = new THREE.PerspectiveCamera(
-    55,
+    60,
     window.innerWidth / window.innerHeight,
-    0.1,
-    2000,
+    0.05,
+    4000,
   );
-  camera.position.set(0, 24, 38);
 
   const webgl = new THREE.WebGLRenderer({ antialias: true });
   webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   webgl.setSize(window.innerWidth, window.innerHeight);
   canvasParent.appendChild(webgl.domElement);
 
-  // --- Map-mode controls (OrbitControls, disabled in flight mode) ---
   const controls = new OrbitControls(camera, webgl.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxDistance = 300;
+  controls.maxDistance = 600;
+  controls.enabled = false; // only in map view
 
-  let cameraMode: CameraMode = "flight";
-  controls.enabled = cameraMode === "map";
-
-  // --- Mouse-look state for flight mode (right-click drag) ---
+  // --- Mouse-look for chase view (right-click drag) ---
   const mouseLook = { yaw: 0, pitch: 0 };
   let mouseDown = false;
-
   webgl.domElement.addEventListener("mousedown", (e) => {
     if (e.button === 2) { mouseDown = true; e.preventDefault(); }
   });
-  webgl.domElement.addEventListener("mouseup",   () => { mouseDown = false; });
-  webgl.domElement.addEventListener("mouseleave",() => { mouseDown = false; });
+  webgl.domElement.addEventListener("mouseup",    () => { mouseDown = false; });
+  webgl.domElement.addEventListener("mouseleave", () => { mouseDown = false; });
   webgl.domElement.addEventListener("mousemove", (e) => {
-    if (!mouseDown || cameraMode !== "flight") return;
+    if (!mouseDown || viewState.view === "map") return;
     mouseLook.yaw   -= e.movementX * 0.003;
     mouseLook.pitch -= e.movementY * 0.003;
     mouseLook.pitch  = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, mouseLook.pitch));
   });
   webgl.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // --- Lighting ---
+  // --- Lighting (added to the scene, not the moving world group) ---
   scene.add(new THREE.AmbientLight(0x223044, 0.7));
-  scene.add(new THREE.PointLight(0xfff2d8, 2.4, 0, 0.0));
 
-  scene.add(makeStarfield(world));
+  // --- worldRoot: everything that should move under the floating origin ---
+  const worldRoot = new THREE.Group();
+  scene.add(worldRoot);
 
-  // --- Celestial body meshes ---
+  // Star's point light lives inside worldRoot so it tracks the star's offset.
+  const starLight = new THREE.PointLight(0xfff2d8, 2.4, 0, 0.0);
+  worldRoot.add(starLight);
+
+  worldRoot.add(makeStarfield(world));
+
   const bodyMeshes = new Map<number, THREE.Mesh>();
   for (const [entity, body] of world.components.celestialBody) {
     const mesh = buildBodyMesh(body);
-    scene.add(mesh);
+    worldRoot.add(mesh);
     bodyMeshes.set(entity, mesh);
   }
 
-  // --- Static orbit guide-lines ---
   for (const [, orb] of world.components.orbit) {
-    scene.add(makeOrbitLine(orb.elements));
+    worldRoot.add(makeOrbitLine(orb.elements));
   }
 
-  // --- Ship mesh (low-poly cone pointing toward +Z) ---
+  // --- Ship mesh lives in the scene (NOT worldRoot) so it stays near origin ---
   const shipMesh = buildShipMesh();
   scene.add(shipMesh);
 
-  // Helper vectors (reused each frame to avoid allocations).
-  const _shipPos  = new THREE.Vector3();
-  const _forward  = new THREE.Vector3();
-  const _backward = new THREE.Vector3();
-  const _camPos   = new THREE.Vector3();
-  const _lookAt   = new THREE.Vector3();
-  const _up       = new THREE.Vector3(0, 1, 0);
-  const _qLook    = new THREE.Quaternion();
+  // Reused scratch vectors.
+  const _nose   = new THREE.Vector3();
+  const _camPos = new THREE.Vector3();
+  const _lookAt = new THREE.Vector3();
+  const _offset = new THREE.Vector3();
+  const _up     = new THREE.Vector3(0, 1, 0);
+  const _qLook  = new THREE.Quaternion();
+  const _qShip  = new THREE.Quaternion();
+
+  function setView(v: CameraView): void {
+    viewState.view = v;
+    controls.enabled = v === "map";
+    mouseLook.yaw = 0;
+    mouseLook.pitch = 0;
+    if (v === "map") {
+      camera.position.set(0, 60, 90);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }
 
   return {
     sync(w: World) {
-      // Floating origin: keep ship near world (0,0,0) each frame.
-      // All mesh positions are expressed relative to the ship's sim position.
-      // The sim retains absolute coordinates; this is renderer-only (docs/08).
       const shipT    = w.components.transform.get(w.shipId);
       const shipCtrl = w.components.shipControl.get(w.shipId);
-      const originX  = shipT?.position.x ?? 0;
-      const originZ  = shipT?.position.z ?? 0;
+      const sx = shipT?.position.x ?? 0;
+      const sy = shipT?.position.y ?? 0;
+      const sz = shipT?.position.z ?? 0;
 
-      // Update planet/star mesh positions relative to ship origin.
+      // Update every body mesh to its TRUE position (inside worldRoot).
+      // The star has no transform → it stays at the group's local origin (0,0,0),
+      // which is correct: the group offset handles its placement.
       for (const [entity, mesh] of bodyMeshes) {
         const t = w.components.transform.get(entity);
-        if (t) mesh.position.set(t.position.x - originX, t.position.y, t.position.z - originZ);
+        if (t) mesh.position.set(t.position.x, t.position.y, t.position.z);
       }
 
-      // Ship mesh always at render origin; only its rotation changes.
-      shipMesh.position.set(0, 0, 0);
+      // Orient the ship from its heading + pitch (shared nose math with the sim).
       if (shipCtrl) {
-        shipMesh.rotation.y = -shipCtrl.heading;
+        const n = noseVector(shipCtrl.heading, shipCtrl.pitch);
+        _nose.set(n.x, n.y, n.z).normalize();
+        _qShip.setFromUnitVectors(FORWARD_AXIS, _nose);
+        shipMesh.quaternion.copy(_qShip);
       }
 
-      // Floating origin: _shipPos is (0,0,0) in render space.
-      _shipPos.set(0, 0, 0);
+      const view = viewState.view;
 
-      // Position camera in flight mode.
-      if (cameraMode === "flight" && shipCtrl) {
-        const h = shipCtrl.heading;
-        _forward.set(Math.sin(h), 0, Math.cos(h));
-        _backward.set(-Math.sin(h), 0, -Math.cos(h));
+      if (view === "map") {
+        // True coordinates; ship drawn at real position as a marker.
+        worldRoot.position.set(0, 0, 0);
+        shipMesh.position.set(sx, sy, sz);
+        shipMesh.scale.setScalar(2.2);   // enlarge so it reads at system scale
+        shipMesh.visible = true;
+        return; // camera driven by OrbitControls
+      }
 
-        // Rotate the chase offset by the mouse-look yaw/pitch.
-        _qLook.setFromEuler(
-          new THREE.Euler(mouseLook.pitch, mouseLook.yaw, 0, "YXZ"),
-        );
-        _camPos
-          .copy(_backward)
-          .multiplyScalar(CHASE_DIST)
-          .setY(CHASE_HEIGHT)
-          .applyQuaternion(_qLook)
-          .add(_shipPos);
+      // Flight views: floating origin keeps the ship at render (0,0,0).
+      worldRoot.position.set(-sx, -sy, -sz);
+      shipMesh.position.set(0, 0, 0);
+      shipMesh.scale.setScalar(1);
+      shipMesh.visible = view !== "cockpit"; // hide own hull in first-person
 
-        _lookAt.copy(_shipPos).addScaledVector(_forward, LOOK_AHEAD).setY(0.3);
+      if (!shipCtrl) return;
 
+      // Mouse-look offset rotates the camera around the ship.
+      _qLook.setFromEuler(new THREE.Euler(mouseLook.pitch, mouseLook.yaw, 0, "YXZ"));
+
+      if (view === "cockpit") {
+        _camPos.copy(_nose).multiplyScalar(COCKPIT_FWD);
+        _lookAt.copy(_camPos).add(_nose);
+        _offset.copy(_lookAt).sub(_camPos).applyQuaternion(_qLook).add(_camPos);
+        camera.position.copy(_camPos);
+        camera.up.copy(_up);
+        camera.lookAt(_offset);
+      } else {
+        // chase: behind along -nose, raised, with mouse-look swing.
+        _offset.copy(_nose).multiplyScalar(-CHASE_DIST).setY(CHASE_HEIGHT);
+        _offset.applyQuaternion(_qLook);
+        _camPos.set(0, 0, 0).add(_offset);
+        _lookAt.copy(_nose).multiplyScalar(2).setY(0.3);
         camera.position.copy(_camPos);
         camera.up.copy(_up);
         camera.lookAt(_lookAt);
@@ -156,7 +191,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     },
 
     render() {
-      if (cameraMode === "map") controls.update();
+      if (viewState.view === "map") controls.update();
       webgl.render(scene, camera);
     },
 
@@ -166,20 +201,17 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       webgl.setSize(width, height);
     },
 
-    toggleCameraMode() {
-      cameraMode = cameraMode === "flight" ? "map" : "flight";
-      controls.enabled = cameraMode === "map";
-      if (cameraMode === "map") {
-        // Restore a sensible map-view position the first time.
-        camera.position.set(0, 24, 38);
-        controls.update();
-      }
-      // Reset mouse-look offset when switching.
-      mouseLook.yaw   = 0;
-      mouseLook.pitch = 0;
+    cycleView() {
+      const order: CameraView[] = ["cockpit", "chase", "map"];
+      const next = order[(order.indexOf(viewState.view) + 1) % order.length]!;
+      setView(next);
     },
 
-    getCameraMode() { return cameraMode; },
+    toggleMap() {
+      setView(viewState.view === "map" ? "chase" : "map");
+    },
+
+    getView() { return viewState.view; },
   };
 }
 
@@ -188,10 +220,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 // ---------------------------------------------------------------------------
 
 function buildShipMesh(): THREE.Mesh {
-  // Cone pointing toward +Z; low-poly so it reads as a small arrow-like ship.
   const geo = new THREE.ConeGeometry(0.25, 0.8, 6);
-  // Rotate geometry so the tip points in +Z (cone tip is at +Y by default).
-  geo.rotateX(Math.PI / 2);
+  geo.rotateX(Math.PI / 2); // point the tip toward +Z
   const mat = new THREE.MeshStandardMaterial({
     color: 0xcdd6f4,
     roughness: 0.5,
@@ -207,14 +237,11 @@ function buildBodyMesh(body: CelestialBody): THREE.Mesh {
   const geo = new THREE.SphereGeometry(body.renderRadius, 24, 16);
 
   if (body.kind === "star") {
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshBasicMaterial({ color: body.color }),
-    );
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: body.color }));
     mesh.name = body.name;
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(body.renderRadius * 1.45, 24, 16),
-      new THREE.MeshBasicMaterial({ color: body.color, transparent: true, opacity: 0.10 }),
+      new THREE.MeshBasicMaterial({ color: body.color, transparent: true, opacity: 0.1 }),
     );
     mesh.add(halo);
     return mesh;
