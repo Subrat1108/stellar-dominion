@@ -14,24 +14,37 @@ export { FIXED_DT };
 
 /** Per-tick player intents. */
 export interface Input {
-  /** Forward/back thrust: -1 (brake) to 1 (full ahead). */
+  /** Forward/back thrust along the nose: -1 (brake) to 1 (full ahead). */
   thrust: number;
-  /** Turn rate: -1 (left) to 1 (right). */
+  /** Yaw rate: -1 (left) to 1 (right). */
   yaw: number;
+  /** Pitch rate: -1 (nose down) to 1 (nose up). */
+  pitch: number;
+  /** Vertical thrust in world space: -1 (down) to 1 (up). */
+  vertical: number;
+  /** Throttle multiplier scaling acceleration and max speed (>= 1). */
+  throttle: number;
 }
 
+/** A no-op input — ship coasts. */
+export const ZERO_INPUT: Input = {
+  thrust: 0,
+  yaw: 0,
+  pitch: 0,
+  vertical: 0,
+  throttle: 1,
+};
+
 /** Advance the world by exactly one fixed tick. */
-export function step(world: World, input: Input = { thrust: 0, yaw: 0 }): void {
+export function step(world: World, input: Input = ZERO_INPUT): void {
   world.tick += 1;
   world.time = world.tick * FIXED_DT;
 
   // Systems run in a fixed, deterministic order every tick.
   orbitalSystem(world);
-  shipMovementSystem(world, input.thrust, input.yaw);
+  shipMovementSystem(world, input);
   lifeSupportSystem(world);
 }
-
-const ZERO_INPUT: Input = { thrust: 0, yaw: 0 };
 
 /** Advance the world by `count` ticks, feeding one input per tick if provided. */
 export function run(world: World, count: number, inputs?: readonly Input[]): void {

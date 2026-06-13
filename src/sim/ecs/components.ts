@@ -141,10 +141,15 @@ export interface ShipVelocity {
 
 export interface ShipControl {
   /**
-   * Current heading angle in the XZ plane, radians.
-   * 0 = pointing toward +Z; increases clockwise viewed from +Y.
+   * Yaw: heading angle in the XZ plane, radians.
+   * 0 = pointing toward +Z; increases turning toward +X.
    */
   heading: number;
+  /**
+   * Pitch: nose elevation, radians. 0 = level; positive = nose up (+Y).
+   * Clamped to just under ±90° so the ship never flips over the pole.
+   */
+  pitch: number;
   /** If set and autopilotActive, the ship steers toward this entity. */
   autopilotTargetId?: number;
   autopilotActive: boolean;

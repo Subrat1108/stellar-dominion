@@ -144,6 +144,7 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
 
   world.components.shipControl.set(shipId, {
     heading: 0,
+    pitch: 0,
     autopilotActive: false,
   });
 

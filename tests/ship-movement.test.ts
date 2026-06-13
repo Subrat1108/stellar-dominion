@@ -5,8 +5,18 @@
 
 import { describe, it, expect } from "vitest";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
-import { step, run } from "../src/sim/loop.ts";
+import { step, run, type Input } from "../src/sim/loop.ts";
 import { FIXED_DT } from "../src/sim/constants.ts";
+
+/** Build a full Input from a partial, defaulting the rest to neutral. */
+function mk(partial: Partial<Input>): Input {
+  return { thrust: 0, yaw: 0, pitch: 0, vertical: 0, throttle: 1, ...partial };
+}
+
+function speed(world: ReturnType<typeof createStartingSystem>): number {
+  const v = world.components.shipVelocity.get(world.shipId)!;
+  return Math.hypot(v.vx, v.vy, v.vz);
+}
 
 describe("ship movement system", () => {
   it("ship entity has transform, shipVelocity, and shipControl after world setup", () => {
@@ -23,8 +33,9 @@ describe("ship movement system", () => {
     run(world, 60); // 1 real second
 
     const posAfter = world.components.transform.get(world.shipId)!.position;
-    // Drag alone decays velocity to ~zero; ship started with zero velocity so position is stable.
+    // Drag alone decays velocity to ~zero; ship started with zero velocity.
     expect(Math.abs(posAfter.x - posBefore.x)).toBeLessThan(0.001);
+    expect(Math.abs(posAfter.y - posBefore.y)).toBeLessThan(0.001);
     expect(Math.abs(posAfter.z - posBefore.z)).toBeLessThan(0.001);
   });
 
@@ -32,67 +43,83 @@ describe("ship movement system", () => {
     const world = createStartingSystem();
     const posZ0 = world.components.transform.get(world.shipId)!.position.z;
 
-    // Apply full forward thrust for 60 ticks.
-    for (let i = 0; i < 60; i++) step(world, { thrust: 1, yaw: 0 });
+    for (let i = 0; i < 60; i++) step(world, mk({ thrust: 1 }));
 
-    const posZ1 = world.components.transform.get(world.shipId)!.position.z;
-    expect(posZ1).toBeGreaterThan(posZ0);
-    // X should be virtually unchanged (heading = 0 → sin(0) = 0).
-    expect(Math.abs(world.components.transform.get(world.shipId)!.position.x)).toBeLessThan(0.001);
+    const pos = world.components.transform.get(world.shipId)!.position;
+    expect(pos.z).toBeGreaterThan(posZ0);
+    expect(Math.abs(pos.x)).toBeLessThan(0.001); // sin(0) = 0
+    expect(Math.abs(pos.y)).toBeLessThan(0.001); // level pitch
   });
 
-  it("right yaw rotates heading clockwise (heading increases)", () => {
-    const world = createStartingSystem();
-    const ctrl0 = world.components.shipControl.get(world.shipId)!;
-    const h0 = ctrl0.heading;
-
-    step(world, { thrust: 0, yaw: 1 });
-
-    const h1 = world.components.shipControl.get(world.shipId)!.heading;
-    expect(h1).toBeGreaterThan(h0);
-    expect(h1 - h0).toBeCloseTo(Math.PI / 2 * FIXED_DT, 5);
-  });
-
-  it("left yaw rotates heading counter-clockwise (heading decreases)", () => {
+  it("right yaw rotates heading (heading increases)", () => {
     const world = createStartingSystem();
     const h0 = world.components.shipControl.get(world.shipId)!.heading;
 
-    step(world, { thrust: 0, yaw: -1 });
+    step(world, mk({ yaw: 1 }));
 
     const h1 = world.components.shipControl.get(world.shipId)!.heading;
-    expect(h1).toBeLessThan(h0);
+    expect(h1).toBeGreaterThan(h0);
+    expect(h1 - h0).toBeCloseTo((Math.PI / 2) * FIXED_DT, 5);
   });
 
-  it("velocity is capped at maxSpeed", () => {
+  it("left yaw rotates heading the other way (heading decreases)", () => {
+    const world = createStartingSystem();
+    const h0 = world.components.shipControl.get(world.shipId)!.heading;
+
+    step(world, mk({ yaw: -1 }));
+
+    expect(world.components.shipControl.get(world.shipId)!.heading).toBeLessThan(h0);
+  });
+
+  it("pitch up raises the nose and forward thrust then gains altitude (+Y)", () => {
+    const world = createStartingSystem();
+    const y0 = world.components.transform.get(world.shipId)!.position.y;
+
+    // Pitch up for a while, then thrust forward.
+    for (let i = 0; i < 30; i++) step(world, mk({ pitch: 1 }));
+    expect(world.components.shipControl.get(world.shipId)!.pitch).toBeGreaterThan(0);
+    for (let i = 0; i < 60; i++) step(world, mk({ thrust: 1 }));
+
+    expect(world.components.transform.get(world.shipId)!.position.y).toBeGreaterThan(y0);
+  });
+
+  it("pitch is clamped near vertical (never flips over the pole)", () => {
+    const world = createStartingSystem();
+    for (let i = 0; i < 600; i++) step(world, mk({ pitch: 1 }));
+    const p = world.components.shipControl.get(world.shipId)!.pitch;
+    expect(p).toBeLessThan(Math.PI / 2);
+    expect(p).toBeGreaterThan(Math.PI / 2 - 0.1);
+  });
+
+  it("vertical thrust moves ship straight up in world space", () => {
+    const world = createStartingSystem();
+    const y0 = world.components.transform.get(world.shipId)!.position.y;
+    for (let i = 0; i < 60; i++) step(world, mk({ vertical: 1 }));
+    expect(world.components.transform.get(world.shipId)!.position.y).toBeGreaterThan(y0);
+  });
+
+  it("velocity is capped at maxSpeed (scaled by throttle)", () => {
     const world = createStartingSystem();
     const maxSpeed = world.components.shipVelocity.get(world.shipId)!.maxSpeed;
 
-    // Apply maximum thrust for a long time.
-    for (let i = 0; i < 600; i++) step(world, { thrust: 1, yaw: 0 });
-
-    const vel = world.components.shipVelocity.get(world.shipId)!;
-    const speed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz);
-    expect(speed).toBeLessThanOrEqual(maxSpeed + 0.0001);
+    for (let i = 0; i < 600; i++) step(world, mk({ thrust: 1 }));
+    expect(speed(world)).toBeLessThanOrEqual(maxSpeed + 0.0001);
   });
 
-  it("reverse thrust (braking) reduces speed before re-accelerating in reverse", () => {
+  it("throttle multiplier raises the effective top speed", () => {
+    const slow = createStartingSystem("throttle-a");
+    const fast = createStartingSystem("throttle-a");
+    for (let i = 0; i < 600; i++) step(slow, mk({ thrust: 1, throttle: 1 }));
+    for (let i = 0; i < 600; i++) step(fast, mk({ thrust: 1, throttle: 10 }));
+    expect(speed(fast)).toBeGreaterThan(speed(slow));
+  });
+
+  it("reverse thrust reduces speed before re-accelerating in reverse", () => {
     const world = createStartingSystem();
-
-    // Build up speed in +Z.
-    for (let i = 0; i < 60; i++) step(world, { thrust: 1, yaw: 0 });
-    const speedPeak = Math.sqrt(
-      world.components.shipVelocity.get(world.shipId)!.vx ** 2 +
-      world.components.shipVelocity.get(world.shipId)!.vz ** 2,
-    );
-
-    // Brake for a short burst — should reduce speed before reversing.
-    for (let i = 0; i < 20; i++) step(world, { thrust: -1, yaw: 0 });
-    const speedMidBrake = Math.sqrt(
-      world.components.shipVelocity.get(world.shipId)!.vx ** 2 +
-      world.components.shipVelocity.get(world.shipId)!.vz ** 2,
-    );
-
-    expect(speedMidBrake).toBeLessThan(speedPeak);
+    for (let i = 0; i < 60; i++) step(world, mk({ thrust: 1 }));
+    const peak = speed(world);
+    for (let i = 0; i < 20; i++) step(world, mk({ thrust: -1 }));
+    expect(speed(world)).toBeLessThan(peak);
   });
 
   it("manual input disables autopilot", () => {
@@ -101,7 +128,7 @@ describe("ship movement system", () => {
     ctrl.autopilotActive = true;
     ctrl.autopilotTargetId = 2;
 
-    step(world, { thrust: 1, yaw: 0 });
+    step(world, mk({ thrust: 1 }));
 
     expect(ctrl.autopilotActive).toBe(false);
   });
@@ -109,10 +136,13 @@ describe("ship movement system", () => {
   it("ship movement is deterministic", () => {
     const a = createStartingSystem("det-seed");
     const b = createStartingSystem("det-seed");
-    const inputs = Array.from({ length: 120 }, (_, i) => ({
-      thrust: i < 60 ? 1 : -1,
-      yaw: i % 30 < 15 ? 0.5 : -0.5,
-    }));
+    const inputs = Array.from({ length: 120 }, (_, i) =>
+      mk({
+        thrust: i < 60 ? 1 : -1,
+        yaw: i % 30 < 15 ? 0.5 : -0.5,
+        pitch: i % 20 < 10 ? 0.3 : -0.3,
+      }),
+    );
 
     for (const inp of inputs) step(a, inp);
     for (const inp of inputs) step(b, inp);
@@ -120,9 +150,13 @@ describe("ship movement system", () => {
     const posA = a.components.transform.get(a.shipId)!.position;
     const posB = b.components.transform.get(b.shipId)!.position;
     expect(posA.x).toBe(posB.x);
+    expect(posA.y).toBe(posB.y);
     expect(posA.z).toBe(posB.z);
     expect(a.components.shipControl.get(a.shipId)!.heading).toBe(
       b.components.shipControl.get(b.shipId)!.heading,
+    );
+    expect(a.components.shipControl.get(a.shipId)!.pitch).toBe(
+      b.components.shipControl.get(b.shipId)!.pitch,
     );
   });
 });
