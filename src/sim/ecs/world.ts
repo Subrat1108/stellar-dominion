@@ -20,6 +20,8 @@ import {
   type Crew,
   type Inventory,
   type LifeSupport,
+  type ShipVelocity,
+  type ShipControl,
 } from "./components.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
 
@@ -76,12 +78,16 @@ export interface SerializedWorld {
     crew: [number, Crew][];
     inventory: [number, Inventory][];
     lifeSupport: [number, LifeSupport][];
+    shipVelocity: [number, ShipVelocity][];
+    shipControl: [number, ShipControl][];
   };
 }
 
 export function serializeWorld(world: World): SerializedWorld {
-  const { celestialBody, orbit, transform, crew, inventory, lifeSupport } =
-    world.components;
+  const {
+    celestialBody, orbit, transform, crew, inventory, lifeSupport,
+    shipVelocity, shipControl,
+  } = world.components;
   return {
     tick: world.tick,
     time: world.time,
@@ -95,6 +101,8 @@ export function serializeWorld(world: World): SerializedWorld {
       crew: [...crew.entries()],
       inventory: [...inventory.entries()],
       lifeSupport: [...lifeSupport.entries()],
+      shipVelocity: [...shipVelocity.entries()],
+      shipControl: [...shipControl.entries()],
     },
   };
 }

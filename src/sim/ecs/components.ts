@@ -128,6 +128,29 @@ export interface LifeSupport {
 }
 
 // ---------------------------------------------------------------------------
+// Ship movement
+// ---------------------------------------------------------------------------
+
+export interface ShipVelocity {
+  vx: number;
+  vy: number;
+  vz: number;
+  /** Maximum speed in scene units per sim-second. */
+  maxSpeed: number;
+}
+
+export interface ShipControl {
+  /**
+   * Current heading angle in the XZ plane, radians.
+   * 0 = pointing toward +Z; increases clockwise viewed from +Y.
+   */
+  heading: number;
+  /** If set and autopilotActive, the ship steers toward this entity. */
+  autopilotTargetId?: number;
+  autopilotActive: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // ECS component registry
 // ---------------------------------------------------------------------------
 
@@ -138,6 +161,8 @@ export interface Components {
   crew: Map<number, Crew>;
   inventory: Map<number, Inventory>;
   lifeSupport: Map<number, LifeSupport>;
+  shipVelocity: Map<number, ShipVelocity>;
+  shipControl: Map<number, ShipControl>;
 }
 
 export function createComponents(): Components {
@@ -148,5 +173,7 @@ export function createComponents(): Components {
     crew: new Map(),
     inventory: new Map(),
     lifeSupport: new Map(),
+    shipVelocity: new Map(),
+    shipControl: new Map(),
   };
 }

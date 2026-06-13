@@ -123,11 +123,28 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
   });
 
   // Life support: 100 000 units; 1 unit/tick → ~28 min real time at 60 fps.
-  // Time compression (Part B) will multiply this rate by the speed factor.
+  // More ticks per second at higher speed = more depletion per second (intentional).
   world.components.lifeSupport.set(shipId, {
     current: 100_000,
     capacity: 100_000,
     depletionRatePerTick: 1,
+  });
+
+  // Ship starts stationary just inside Ferrum's orbit, slightly off-centre.
+  world.components.transform.set(shipId, {
+    position: { x: 0, y: 0, z: 3 },
+  });
+
+  world.components.shipVelocity.set(shipId, {
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    maxSpeed: 10, // scene units / sim-sec
+  });
+
+  world.components.shipControl.set(shipId, {
+    heading: 0,
+    autopilotActive: false,
   });
 
   return world;
