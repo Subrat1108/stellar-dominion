@@ -14,6 +14,19 @@ Entry template:
 
 ---
 
+## Session 7 — Phase 1B tuning: orbital time, scale, controls
+- **Goal:** Three small tuning changes from playtest feel. Keep determinism + tests green.
+- **Did:**
+  - **Orbital time decoupled from flight time** (`src/sim/systems/orbital.ts`): planets were positioned from real-time `world.time` and whipped around their orbits as you flew, so you could never close on one. Added `ORBITAL_TIME_RATE = 0.003`; the orbital system now advances on `world.time * ORBITAL_TIME_RATE`. Innermost planet (Ferrum, ~0.2 AU) effective period ≈ 1 h → nearly stationary during a flight, visibly drifts over several real minutes. Still a pure function of tick (deterministic). New `tests/orbital.test.ts` guards it.
+  - **Presentation scale centralized** (`src/sim/presentation.ts`, new): the only place for AU→scene distance (`sceneDistance`), body render-radius scaling (`planetRenderRadius`/`gasGiantRenderRadius`/`STAR_RENDER_RADIUS`), and ship size (`SHIP_RADIUS`/`SHIP_LENGTH`). Re-tuned for a believable hierarchy: ship 0.32 long, planets ~0.8–1.0, gas giant ~2.3, star 4.5; distances `8 + au*12`. `tau-ceti.ts` render radii now derive from physical radii via the helpers (physical values untouched/tagged); `world-setup.ts` uses `sceneDistance` and the ship spawns at z=11 clear of the larger star; `scene.ts` uses the ship-size constants and retuned chase/cockpit offsets + a map-marker scale.
+  - **Controls simplified to six keys** (`input.ts`, `loop.ts`, `ship-movement.ts`, `DebugPanel.tsx`): W/S thrust, A/D yaw, ↑/↓ pitch. Removed Space/Shift world-vertical entirely (climb/dive by pitch-then-thrust); `Input` lost the `vertical` axis. Kept C (cycle view), M (map), right-drag look-around.
+  - **Tests:** removed the now-irrelevant vertical-thrust test, added the orbital-decoupling test → **42/42 green**; typecheck + prod build clean.
+- **Decisions:** orbital-time decoupling via `ORBITAL_TIME_RATE`; central presentation scale with compressed (non-physical) render radii; six-key control scheme (world-vertical removed) — all in `docs/09`. `docs/08` gained Flight-controls, Presentation-scale, and Orbital-time sections.
+- **Next:** confirm feel in-browser (planets approachable, sizes believable, controls simpler), then Phase 2 (first colony).
+- **Open questions:** throttle scaling (1×–1000×) vs system size still placeholder — at high throttle you cross the system near-instantly; revisit when autopilot/approach lands.
+
+---
+
 ## Session 6 — Phase 1B fixes: flight model rework (playtest feedback)
 - **Goal:** Fix three issues a playtest surfaced in the Session-5 build: (a) the star never got closer / "planets revolving around nothing"; (b) the ship could only go forward/back; (c) the speed lever felt wrong as time compression. Add debug instrumentation.
 - **Did:**

@@ -6,6 +6,9 @@ Append here whenever an architectural or design choice is made; see `CLAUDE.md` 
 ---
 
 | Date | Decision | Rationale |
+| 2026-06-13 | Orbital time decoupled from flight time via `ORBITAL_TIME_RATE` (0.003) | Planets advanced on real-time `world.time` and whipped around as you flew; a slow orbital clock keeps them nearly stationary during a flight while staying a deterministic function of tick. |
+| 2026-06-13 | All scene-scale constants centralized in `src/sim/presentation.ts`; render radii compressed (non-physical) | One tunable place for AU→scene distance, body render-radius, and ship size; physical radii span ~1:86 so a compressed mapping is needed for a legible ship≪planet≪star hierarchy. Real sim data stays untouched/tagged. |
+| 2026-06-13 | Flight simplified to six keys (W/S thrust, A/D yaw, ↑/↓ pitch); world-vertical removed | Space/Shift world-vertical was redundant with pitch-then-thrust and cluttered the scheme; climb/dive via pitch is enough and reads more like piloting. |
 | 2026-06-13 | Speed lever is a **throttle** (scales ship accel/max-speed), not sim time compression | Playtesting showed time-compression made piloting feel disconnected; throttle gives direct control. Time compression returns separately with autopilot (Phase 4). Supersedes the Session-5 "throttle vs time" note. |
 | 2026-06-13 | Full 3D flight (yaw + pitch + world-vertical thrust); supersedes XZ-plane-only | Playtester needed to move in every direction; pinning to the orbital plane felt broken. Pitch clamped near ±90° to avoid gimbal flip. |
 | 2026-06-13 | Floating origin via a single `worldRoot` group offset by -shipPos | Per-mesh offsetting left transform-less objects (the star) and static geometry (orbit rings, starfield) pinned, decohering the scene; one group moves everything together. |

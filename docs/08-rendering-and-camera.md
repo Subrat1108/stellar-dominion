@@ -32,6 +32,15 @@ Transitions between scales are eased camera moves + load/swap — they read as s
   - **Phase 1B revision:** the in-flight speed buttons are currently a **throttle** (they scale the ship's acceleration / max speed), not time compression. The sim runs real-time. Reason: during playtesting, time-compression made piloting feel disconnected (the world raced while you nudged the stick). True time-compression returns as a *separate* control (autopilot / "skip travel") once autopilot routes land in Phase 4. See `docs/09` (Session 6).
 - **Autopilot / auto-mode** = the sim/pathing moves the ship along a computed route while the player watches or skips ahead.
 
+## Flight controls (Phase 1B)
+A deliberately small six-key scheme keeps piloting legible: **W/S** thrust forward/back along the nose, **A/D** steer left/right (yaw), **↑/↓** steer up/down (pitch). You climb or dive by pitching and then thrusting — there is no separate world-vertical key. Camera: **C** cycles cockpit → chase → map, **M** toggles map, right-drag looks around. The in-flight speed buttons are a **throttle** (scale ship accel/max-speed), not time compression — see the revision note above.
+
+## Presentation scale (one tunable place)
+All scene-scale knobs live in `src/sim/presentation.ts`: AU→scene-unit distance, body render-radius scaling, and ship size. The mapping is **non-physical and compressed** — real radii span ~1:86 (rocky planet:star), too wide to render legibly together — so rocky planets scale ~linearly in Earth-radii while the gas giant and star are compressed. The goal is a believable hierarchy (ship ≪ planet ≪ star) that stays navigable (a planet reachable in a short flight, visibly growing on approach). Real physical values stay in the tagged sim data and are never edited for looks.
+
+## Orbital time vs flight time
+Orbital motion runs on a **much slower clock** than the real-time flight view (`ORBITAL_TIME_RATE` in `src/sim/systems/orbital.ts`). At real-time rates planets whip around their orbits faster than you can close on them; slowed, the innermost planet has an effective period of ~an hour, so it's nearly stationary during a flight yet visibly drifts over several real minutes. Still a pure function of tick (deterministic). A player-facing time-compression lever (skip-travel) is deferred to Phase 4.
+
 ## Floating-point precision & scale (the unavoidable problem)
 
 Space distances overflow normal 32-bit float precision and cause jitter. Standard solutions we'll adopt as needed:
