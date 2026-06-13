@@ -76,3 +76,15 @@ Built as **vertical slices**: each phase produces something playable end-to-end,
 - Determinism + tests on the sim core from day one.
 - Devlog entry per session.
 - Keep content data-driven so balancing never requires code changes.
+
+## Parking lot (good ideas, deliberately deferred)
+Captured so they aren't lost, but **not** to be built until the slice that needs them.
+- **Moons.** Bodies orbiting planets rather than the star. The orbit data model is
+  already moon-ready (`Orbit.parent` + parent-composed positioning in `orbitalSystem`,
+  Session 8); content + UI come later.
+- **Surface characteristics on approach.** LOD planet textures / detail that resolves
+  as you near a body (today a planet is a flat-shaded sphere that just grows). Pairs
+  with the approach/orbit scale in Phase 4.
+- **Multi-scale map zoom.** A single navigation map that zooms across moon → system →
+  galaxy/interstellar scales (the Session-8 minimap is system-scale only; galaxy/
+  interstellar is Phase 5).

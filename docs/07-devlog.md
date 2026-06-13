@@ -14,6 +14,24 @@ Entry template:
 
 ---
 
+## Session 8 — Phase 1B polish: flight & navigation
+- **Goal:** Polish the flight/nav feel — fix inverted yaw, spread the system to real-AU scale, add a proximity readout + system minimap, keep the orbit model moon-ready. Determinism + tests stay green.
+- **Did:**
+  - **Inverted yaw fixed** (`src/sim/systems/ship-movement.ts`): `Input.yaw` already contracts +1 = right, but the heading update applied it as an *increase*, and in the flight camera (behind the ship, looking down +nose) world +X renders screen-left — so pressing D turned the nose left. Flipped the heading-update sign and the autopilot's computed-yaw sign to match. Updated the two yaw-direction tests + added a turn-direction test (`yaw=+1` then thrust ⇒ ship gains −X / screen-right). Works in cockpit and chase (shared nose-based camera).
+  - **Real-AU distance scale** (`src/sim/presentation.ts`): `AU_TO_SCENE` 12→200, `STAR_CLEARANCE` 8→4 → Ferrum 44 u … Titan's Eye ~704 u, planet radii still ~1 u so a planet reads as a point that grows on approach. `STAR_RENDER_RADIUS` 4.5→10. Ship spawns at z=60 (just outside Ferrum).
+  - **Speed retuned** (`world-setup.ts`, `ship-movement.ts`): ship `maxSpeed` 10→0.01 (1× = fine docking, 1000× = 10 u/s → Titan's Eye reachable from start in ~1 min), `BASE_ACCEL` 4→0.03 so there's an acceleration ramp instead of snapping to the cap. `ORBITAL_TIME_RATE` 0.003→0.0015 so planets stay near-stationary at the larger radii.
+  - **Renderer scaled to the bigger system** (`src/render/scene.ts`): starfield pushed to 4000–6000 u (so the ship never reaches the shell mid-flight), camera far plane 4000→12000, map camera (0,600,900) + `maxDistance` 6000, map-marker scale 6→40.
+  - **Proximity readout** (`src/ui/DebugPanel.tsx`): new NEAREST row (nearest-body name + distance) for approach feel.
+  - **System minimap** (`src/ui/Minimap.tsx`, new; wired in `App.tsx`): top-left top-down radar drawing star/planets/ship to scale (X/Z projection, edge-clamped); clicking a body sets an autopilot course. System-scale only.
+  - **Orbit model moon-ready** (`src/sim/systems/orbital.ts`): `orbitalSystem` now composes a body's Kepler position with its parent's transform when the parent has one. Current bodies parent the transform-less star → fall back to the origin, so behaviour + determinism are unchanged. Design-only; no moons added.
+  - **Docs:** `docs/05` gained a Parking-lot section (moons; surface LOD on approach; multi-scale map zoom). Decisions added to `docs/09`.
+  - **Tests:** 43/43 green (added the turn-direction test); typecheck + prod build clean.
+- **Decisions:** real-AU scale (`AU_TO_SCENE` 200); speed/accel retune; sim-layer yaw fix; moon-ready orbit composition; fixed system-scale minimap — all in `docs/09`.
+- **Next:** confirm flight feel in-browser (yaw direction, planets growing on approach, ~1 min cruise to Titan's Eye, minimap click-to-course), then Phase 2 (first colony).
+- **Open questions:** the fixed 1×–1000× throttle range makes 1× precision-only (not a system stroll); if that feels too slow in-browser, add a 10000× step.
+
+---
+
 ## Session 7 — Phase 1B tuning: orbital time, scale, controls
 - **Goal:** Three small tuning changes from playtest feel. Keep determinism + tests green.
 - **Did:**
