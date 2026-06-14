@@ -1,6 +1,5 @@
-// Colony panel (Phase 2B) — lives inside the surface view when the ship is
-// landed. Shows each resource's stockpile and net per-tick flow, the buildings,
-// and a build menu that issues BuildStructure commands. Functional, not fancy.
+// Colony panel (Phase 2B-2C) — lives inside the surface view when the ship is
+// landed. Shows population stats, resource ledger, and a build menu.
 //
 // Reads colony state live from the world ref (refreshed by useGameTick). When no
 // colony exists yet it shows the "Found colony" action instead — so founding a
@@ -11,6 +10,7 @@ import type { Colony } from "../sim/ecs/components.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
+import { housingCapacity } from "../sim/systems/colony.ts";
 import {
   RESOURCES,
   RESOURCE_LABEL,
@@ -27,6 +27,11 @@ interface ColonyPanelProps {
 
 function fmt(n: number): string {
   return Math.abs(n) >= 100 ? n.toFixed(0) : n.toFixed(1);
+}
+
+function fmtRate(n: number): string {
+  // Per-second rates; show two decimal places so small changes are legible.
+  return (n >= 0 ? "+" : "") + n.toFixed(2) + "/s";
 }
 
 function netColor(net: number): string {
@@ -62,6 +67,9 @@ export default function ColonyPanel({ world, bus, bodyId }: ColonyPanelProps) {
 
   return (
     <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Population */}
+      <PopSection colony={colony} />
+
       {/* Resource ledger */}
       <div>
         <SectionLabel>RESOURCES</SectionLabel>
@@ -113,6 +121,34 @@ export default function ColonyPanel({ world, bus, bodyId }: ColonyPanelProps) {
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function PopSection({ colony }: { colony: Colony }) {
+  const pop = Math.floor(colony.population);
+  const cap = housingCapacity(colony);
+  const rate = colony.popGrowthRate;
+  const isGrowing = rate > 0.001;
+  const isDeclining = rate < -0.001;
+
+  return (
+    <div>
+      <SectionLabel>POPULATION</SectionLabel>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+        <span style={{ flex: 1, color: "#a6adc8" }}>Colonists</span>
+        <span style={{ color: "#cdd6f4" }}>
+          {pop} / {cap}
+        </span>
+        <span style={{ minWidth: 56, textAlign: "right", color: netColor(rate) }}>
+          {fmtRate(rate)}
+        </span>
+      </div>
+      {(isGrowing || isDeclining || colony.popLimitingFactor !== "stable") && (
+        <div style={{ fontSize: 10, color: isDeclining ? "#f38ba8" : "#585b70", marginTop: 2 }}>
+          {colony.popLimitingFactor}
+        </div>
+      )}
     </div>
   );
 }

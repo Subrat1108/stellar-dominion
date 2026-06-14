@@ -1,14 +1,14 @@
-// Colony economy data (Phase 2B) — the single data-driven source of resources,
-// buildings, crew demand, and founding seed. Balancing happens here, not in code.
+// Colony economy data (Phases 2B + 2C) — the single data-driven source of
+// resources, buildings, crew demand, population dynamics, and founding seed.
+// Balancing happens here, not in code.
 //
 // All flow rates are PER ECONOMY-TICK (≈1 real second; see ECONOMY_TICK_INTERVAL
 // in constants.ts), NOT per flight tick. Sized so a bare starting reserve lasts
 // minutes of real time and a small build-out reaches equilibrium.
 //
-// Scope (docs/05 Phase 2B): the resource economy only. Terraforming levers
-// (temperature/pressure/biosphere) are Phase 3; population dynamics are 2C;
-// multiple colonies are Phase 4. Propellant is produced and stockpiled but has
-// NO consumer yet — its sink (in-system transfers) arrives in Phase 4 (docs/09).
+// Scope (docs/05 Phase 2B-2C): resource economy + population dynamics. Terraforming
+// levers are Phase 3; multiple colonies are Phase 4. Propellant is produced but
+// has NO consumer yet — its sink (in-system transfers) arrives in Phase 4.
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -45,10 +45,11 @@ export type BuildingType =
   | "waterExtractor"
   | "smelter"
   | "electrolysis"
-  | "hydroponics";
+  | "hydroponics"
+  | "habitation";
 
 export const BUILDING_TYPES: BuildingType[] = [
-  "solar", "waterExtractor", "smelter", "electrolysis", "hydroponics",
+  "solar", "waterExtractor", "smelter", "electrolysis", "hydroponics", "habitation",
 ];
 
 export interface BuildingDef {
@@ -124,6 +125,18 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     inputs: { water: 1.5 },
     outputs: { food: 1.2 },
   },
+  habitation: {
+    type: "habitation",
+    name: "Habitation Module",
+    description:
+      "Pressurised dome housing 10 colonists. One is granted free at founding " +
+      "(the landing dome). Without power, life-support systems go cold and growth " +
+      "is penalised — colony still stands, but conditions worsen.",
+    costMetals: 80,
+    powerDraw: 3,
+    inputs: {},
+    outputs: {},
+  },
 };
 
 /**
@@ -134,19 +147,65 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
  * stockpile, so shortages cascade deterministically.
  */
 export const POWER_PRIORITY: BuildingType[] = [
-  "waterExtractor", "electrolysis", "hydroponics", "smelter",
+  "waterExtractor", "electrolysis", "hydroponics", "habitation", "smelter",
 ];
 
 // ---------------------------------------------------------------------------
 // Crew demand & founding
 // ---------------------------------------------------------------------------
 
-/** Survival consumables drawn per crew member per econ-tick. */
-export const CREW_CONSUMPTION_PER_MEMBER: Partial<Record<ResourceId, number>> = {
+/** Survival consumables drawn per colonist per econ-tick. */
+export const POPULATION_CONSUMPTION_PER_PERSON: Partial<Record<ResourceId, number>> = {
   oxygen: 0.1,
   water: 0.08,
   food: 0.06,
 };
+
+// ---------------------------------------------------------------------------
+// Population dynamics (Phase 2C)
+// ---------------------------------------------------------------------------
+
+/** Colonists housed per Habitation Module. Founding grants 1 module free. */
+export const HOUSING_PER_MODULE = 10;
+
+/**
+ * Population growth rate, per econ-tick, scaled by the body's habitability
+ * (0–1). E.g. hab 0.5 → +0.01/tick; hab 1.0 → +0.02/tick.
+ */
+export const GROWTH_RATE_BASE = 0.02;
+
+/** Growth per econ-tick is capped at this, regardless of conditions. */
+export const MAX_GROWTH_PER_TICK = 0.1;
+
+/** Minimum habitability scale factor applied to growth (clamps hostile worlds). */
+export const MIN_HABITABILITY_FACTOR = 0.1;
+
+/** Below this habitability, the limiting factor label reads "hostile environment". */
+export const HOSTILE_HABITABILITY_THRESHOLD = 0.3;
+
+/**
+ * Stockpile below which a resource is considered critically low for the
+ * shortage-death check (must also have net < 0 — a recovering stockpile is fine).
+ */
+export const RESOURCE_CRITICAL_THRESHOLD = 10;
+
+/**
+ * Proportional death rates per econ-tick (fraction of current population).
+ * Keeps crisis timing independent of colony size: ~15-30 s to 20% loss.
+ *   Oxygen: ~15 s to 20% loss (fastest — immediate asphyxiation)
+ *   Water:  ~22 s to 20% loss
+ *   Food:   ~57 s to 20% loss (slow starvation)
+ */
+export const OXYGEN_DEATH_RATE = 0.015;
+export const WATER_DEATH_RATE = 0.010;
+export const FOOD_STARVATION_RATE = 0.004;
+
+/**
+ * Growth multiplier when ALL habitation modules lose power.
+ * Actual multiplier = HOUSING_UNPOWERED_GROWTH_PENALTY + (1 - penalty) × poweredFraction.
+ * So fully-powered = ×1.0; fully-unpowered = ×0.5 (half-speed growth).
+ */
+export const HOUSING_UNPOWERED_GROWTH_PENALTY = 0.5;
 
 /**
  * Initial colony stockpile on FoundColony. Conserved from the ship:

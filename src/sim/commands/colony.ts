@@ -61,6 +61,13 @@ export function foundColony(world: World, bodyId: number): CommandResult {
 
   const buildings: Record<string, number> = {};
   for (const b of BUILDING_TYPES) buildings[b] = 0;
+  // Founding grants 1 free Habitation Module (the landing dome) so the crew
+  // have somewhere to live from day one. Additional modules cost metals.
+  buildings.habitation = 1;
+
+  // Seed population from the ship's crew — they are the founding settlers.
+  // Known debt: these crew are also still listed as ship crew (docs/09).
+  const crewCount = world.components.crew.get(world.shipId)?.members.length ?? 5;
 
   const colony: Colony = {
     bodyId,
@@ -68,6 +75,9 @@ export function foundColony(world: World, bodyId: number): CommandResult {
     stockpiles,
     buildings,
     flows: {},
+    population: crewCount,
+    popGrowthRate: 0,
+    popLimitingFactor: "stable",
   };
   world.components.colony.set(bodyId, colony);
 

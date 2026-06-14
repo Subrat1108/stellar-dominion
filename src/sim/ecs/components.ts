@@ -189,6 +189,17 @@ export interface Colony {
   buildings: Record<string, number>;
   /** Last economy-tick flows per ResourceId, for the UI (net = prod − cons). */
   flows: Record<string, ResourceFlow>;
+  /**
+   * Aggregate colonist count (float for fractional growth; render as Math.floor).
+   * Seeded at crew count on founding (Phase 2C). Known debt: founding crew are
+   * counted both as ship crew and colony population — to reconcile when the crew
+   * arc lands (Phase 5–6, docs/09).
+   */
+  population: number;
+  /** Population delta from the last economy tick (positive = growth, negative = loss). */
+  popGrowthRate: number;
+  /** Human-readable description of the dominant growth or decline driver. */
+  popLimitingFactor: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,17 +1,18 @@
-// Colony economy system (Phase 2B) — deterministic, headless.
+// Colony economy + population system (Phases 2B + 2C) — deterministic, headless.
 //
 // Runs on the slower ECONOMY cadence (constants.ts), not the 60 Hz flight tick,
 // so colony rates are sized per real second. Each economy tick, every colony
 // resolves in a fixed order so shortages cascade deterministically:
-//   1. power generation  (solar × insolation)
-//   2. power allocation  (suppliers before consumers, by POWER_PRIORITY)
+//   1. power generation   (solar × insolation)
+//   2. power allocation   (suppliers before consumers, by POWER_PRIORITY)
 //   3. extraction + production (same priority order; material inputs drawn from
-//      the shared stockpile in order, so feedstock is replenished before use)
-//   4. crew consumption  (oxygen / water / food)
+//      the shared stockpile in order — feedstock replenished before use)
+//   4. population consumption (oxygen / water / food per colonist)
 //   5. clamp ≥ 0, cache per-resource flows for the UI
+//   6. population dynamics (growth / shortage deaths, using finalised flows)
 //
-// Body physics feed the economy: solar output scales with insolation (L/r²) and
-// water yield with the body's water abundance (icy/wet worlds rich, barren dry).
+// Body physics feed the economy: solar output scales with insolation (L/r²),
+// water yield with the body's water abundance, and habitability modulates growth.
 
 import type { World } from "../ecs/world.ts";
 import type { Colony, CelestialBody, ResourceFlow } from "../ecs/components.ts";
@@ -22,7 +23,17 @@ import {
   POWER_PRIORITY,
   RESOURCES,
   STORED_RESOURCES,
-  CREW_CONSUMPTION_PER_MEMBER,
+  POPULATION_CONSUMPTION_PER_PERSON,
+  HOUSING_PER_MODULE,
+  GROWTH_RATE_BASE,
+  MAX_GROWTH_PER_TICK,
+  MIN_HABITABILITY_FACTOR,
+  HOSTILE_HABITABILITY_THRESHOLD,
+  RESOURCE_CRITICAL_THRESHOLD,
+  OXYGEN_DEATH_RATE,
+  WATER_DEATH_RATE,
+  FOOD_STARVATION_RATE,
+  HOUSING_UNPOWERED_GROWTH_PENALTY,
   type ResourceId,
   type BuildingType,
 } from "../data/colony.ts";
@@ -44,6 +55,11 @@ export function insolationAt(world: World, bodyId: number, body: CelestialBody |
   return insolation(luminositySol, au);
 }
 
+/** Total housing capacity from built habitation modules. */
+export function housingCapacity(colony: Colony): number {
+  return (colony.buildings.habitation ?? 0) * HOUSING_PER_MODULE;
+}
+
 function emptyFlows(): Record<string, ResourceFlow> {
   const flows: Record<string, ResourceFlow> = {};
   for (const r of RESOURCES) flows[r] = { production: 0, consumption: 0, net: 0 };
@@ -54,13 +70,12 @@ export function colonySystem(world: World): void {
   // Economy cadence: only advance on the economy tick.
   if (world.tick % ECONOMY_TICK_INTERVAL !== 0) return;
 
-  const crewCount = world.components.crew.get(world.shipId)?.members.length ?? 0;
   for (const [bodyId, colony] of world.components.colony) {
-    runColony(world, bodyId, colony, crewCount);
+    runColony(world, bodyId, colony);
   }
 }
 
-function runColony(world: World, bodyId: number, colony: Colony, crewCount: number): void {
+function runColony(world: World, bodyId: number, colony: Colony): void {
   const body = world.components.celestialBody.get(bodyId);
   const insol = insolationAt(world, bodyId, body);
   const abundance = waterAbundance(body);
@@ -99,6 +114,7 @@ function runColony(world: World, bodyId: number, colony: Colony, crewCount: numb
     const def = BUILDINGS[type];
     const units = activeUnits[type] ?? 0;
     if (units <= 0) continue;
+    if (Object.keys(def.outputs).length === 0) continue; // habitation: no resource output
 
     const outScale = def.scaling === "waterAbundance" ? abundance : 1;
 
@@ -123,10 +139,11 @@ function runColony(world: World, bodyId: number, colony: Colony, crewCount: numb
     }
   }
 
-  // 4. Crew consumption — can't draw more than is in store (a shortfall is a
-  //    survival problem: low/zero oxygen stops the ship's life-support relief).
-  for (const res of Object.keys(CREW_CONSUMPTION_PER_MEMBER) as ResourceId[]) {
-    const need = (CREW_CONSUMPTION_PER_MEMBER[res] ?? 0) * crewCount;
+  // 4. Population consumption — scales with colony.population, not ship crew.
+  //    A shortfall (less in store than needed) is a survival problem: low oxygen
+  //    will trigger shortage deaths in step 6.
+  for (const res of Object.keys(POPULATION_CONSUMPTION_PER_PERSON) as ResourceId[]) {
+    const need = (POPULATION_CONSUMPTION_PER_PERSON[res] ?? 0) * colony.population;
     const used = Math.min(need, sp[res] ?? 0);
     sp[res] = (sp[res] ?? 0) - used;
     flow(res).consumption += used;
@@ -136,6 +153,89 @@ function runColony(world: World, bodyId: number, colony: Colony, crewCount: numb
   for (const res of STORED_RESOURCES) sp[res] = Math.max(0, sp[res] ?? 0);
   for (const r of RESOURCES) flow(r).net = flow(r).production - flow(r).consumption;
   colony.flows = flows;
+
+  // 6. Population dynamics — runs after flows so shortage information is final.
+  populationStep(colony, body, activeUnits);
+}
+
+/**
+ * Advance population by one economy tick. Uses finalised flows and stockpiles
+ * from the same tick, so the dominant limiting factor is always identifiable.
+ *
+ * Priority: shortage deaths > starvation > housing cap > growth.
+ * Death rates are proportional to population so crisis timing is consistent
+ * regardless of colony size (~15-30 s to 20% loss, per docs/09).
+ */
+function populationStep(
+  colony: Colony,
+  body: CelestialBody | undefined,
+  activeUnits: Partial<Record<BuildingType, number>>,
+): void {
+  const { population, stockpiles, flows } = colony;
+  const housing = housingCapacity(colony);
+  const hab = body?.habitability ?? 0.5;
+
+  const oxyNet  = flows.oxygen?.net  ?? 0;
+  const waterNet = flows.water?.net  ?? 0;
+  const foodNet  = flows.food?.net   ?? 0;
+
+  // Shortage conditions: stockpile critically low AND still declining (net < 0).
+  // A recovering stockpile (net ≥ 0) is not an emergency even if absolute levels are low.
+  const oxyShort   = (stockpiles.oxygen ?? 0) < RESOURCE_CRITICAL_THRESHOLD && oxyNet   < 0;
+  const waterShort = (stockpiles.water  ?? 0) < RESOURCE_CRITICAL_THRESHOLD && waterNet < 0;
+  const foodShort  = (stockpiles.food   ?? 0) < RESOURCE_CRITICAL_THRESHOLD && foodNet  < 0;
+
+  let delta: number;
+  let limitingFactor: string;
+
+  if (oxyShort) {
+    delta = -OXYGEN_DEATH_RATE * population;
+    limitingFactor = "declining: oxygen deficit";
+  } else if (waterShort) {
+    delta = -WATER_DEATH_RATE * population;
+    limitingFactor = "declining: water deficit";
+  } else if (foodShort) {
+    delta = -FOOD_STARVATION_RATE * population;
+    limitingFactor = "declining: food shortage";
+  } else if (population >= housing) {
+    delta = 0;
+    limitingFactor = "growth capped: housing";
+  } else {
+    // Growth: base rate × habitability factor × housing-power multiplier,
+    // capped at housing headroom and MAX_GROWTH_PER_TICK.
+    const habFactor = Math.max(MIN_HABITABILITY_FACTOR, hab);
+
+    // Habitation power penalty: growth × (0.5 + 0.5 × poweredFraction).
+    // Fully powered → ×1.0; fully unpowered → ×0.5 (half-speed growth).
+    const totalHab   = colony.buildings.habitation ?? 0;
+    const poweredHab = activeUnits.habitation ?? 0;
+    const poweredFrac = totalHab > 0 ? poweredHab / totalHab : 1;
+    const housingMultiplier = HOUSING_UNPOWERED_GROWTH_PENALTY
+      + (1 - HOUSING_UNPOWERED_GROWTH_PENALTY) * poweredFrac;
+
+    const headroom = Math.max(0, housing - population);
+    delta = Math.min(
+      GROWTH_RATE_BASE * habFactor * housingMultiplier,
+      MAX_GROWTH_PER_TICK,
+      headroom,
+    );
+
+    if (delta > 0.001) {
+      if (poweredFrac < 1) {
+        limitingFactor = "growing (housing low power)";
+      } else if (hab < HOSTILE_HABITABILITY_THRESHOLD) {
+        limitingFactor = "growing: hostile environment";
+      } else {
+        limitingFactor = "growing";
+      }
+    } else {
+      limitingFactor = "stable";
+    }
+  }
+
+  colony.population = Math.max(0, population + delta);
+  colony.popGrowthRate = delta;
+  colony.popLimitingFactor = limitingFactor;
 }
 
 /** The colony on a body, if any. */

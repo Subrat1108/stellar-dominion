@@ -1,15 +1,23 @@
-// Tests for the colony economy (Phase 2B): founding conservation, the economy
-// cadence, resource flows, power/water shortage cascades, the survival-clock
+// Tests for the colony economy + population (Phases 2B + 2C): founding
+// conservation, the economy cadence, resource flows, power/water shortage
+// cascades, population growth/decline, housing cap, the survival-clock
 // relief, and determinism. Headless — no renderer, no DOM.
 
 import { describe, it, expect } from "vitest";
 import { serializeWorld } from "../src/sim/ecs/world.ts";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { step, run } from "../src/sim/loop.ts";
-import { colonySystem } from "../src/sim/systems/colony.ts";
+import { colonySystem, housingCapacity } from "../src/sim/systems/colony.ts";
 import { foundColony } from "../src/sim/commands/colony.ts";
 import { ECONOMY_TICK_INTERVAL } from "../src/sim/constants.ts";
-import { COLONY_SEED, FOUNDING_LIFE_SUPPORT_COST } from "../src/sim/data/colony.ts";
+import {
+  COLONY_SEED,
+  FOUNDING_LIFE_SUPPORT_COST,
+  OXYGEN_DEATH_RATE,
+  WATER_DEATH_RATE,
+  FOOD_STARVATION_RATE,
+  HOUSING_PER_MODULE,
+} from "../src/sim/data/colony.ts";
 import type { World } from "../src/sim/ecs/world.ts";
 import type { Colony } from "../src/sim/ecs/components.ts";
 
@@ -193,5 +201,163 @@ describe("determinism", () => {
     }
     for (let i = 0; i < 180; i++) { step(a); step(b); }
     expect(JSON.stringify(serializeWorld(a))).toBe(JSON.stringify(serializeWorld(b)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2C — population dynamics
+// ---------------------------------------------------------------------------
+
+describe("Phase 2C — founding & housing", () => {
+  it("seeds population from the ship's crew count", () => {
+    const world = startedWorld();
+    const crewCount = world.components.crew.get(world.shipId)!.members.length;
+    const colony = foundAt(world, planetId(world));
+    expect(colony.population).toBe(crewCount);
+  });
+
+  it("grants 1 free Habitation Module on founding (housing = 10)", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, planetId(world));
+    expect(colony.buildings.habitation).toBe(1);
+    expect(housingCapacity(colony)).toBe(HOUSING_PER_MODULE);
+  });
+});
+
+describe("Phase 2C — growth", () => {
+  it("population grows when all resources in surplus and housing available", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 5;
+    colony.buildings.waterExtractor = 3;
+    colony.buildings.electrolysis = 2;
+    colony.buildings.hydroponics = 2;
+    const popBefore = colony.population;
+    oneEconomyTick(world);
+    expect(colony.population).toBeGreaterThan(popBefore);
+    expect(colony.popGrowthRate).toBeGreaterThan(0);
+  });
+
+  it("population stops growing at housing capacity", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.population = housingCapacity(colony); // exactly at cap
+    // High stockpiles prevent false shortage deaths.
+    colony.stockpiles.oxygen = 500;
+    colony.stockpiles.water  = 500;
+    colony.stockpiles.food   = 500;
+    oneEconomyTick(world);
+    expect(colony.popGrowthRate).toBe(0);
+    expect(colony.popLimitingFactor).toBe("growth capped: housing");
+  });
+
+  it("higher habitability yields faster growth than lower habitability", () => {
+    const worldHigh = startedWorld();
+    const worldLow  = startedWorld();
+    const pidHigh = wetPlanetId(worldHigh);
+    const pidLow  = planetId(worldLow);
+
+    // Force explicit habitability values so the test is independent of world-setup.
+    worldHigh.components.celestialBody.get(pidHigh)!.habitability = 0.8;
+    worldLow.components.celestialBody.get(pidLow)!.habitability  = 0.2;
+
+    for (const [w, pid] of [[worldHigh, pidHigh], [worldLow, pidLow]] as const) {
+      const c = foundAt(w, pid);
+      c.population = 5;
+      c.stockpiles.oxygen = 500;
+      c.stockpiles.water  = 500;
+      c.stockpiles.food   = 500;
+    }
+    oneEconomyTick(worldHigh);
+    oneEconomyTick(worldLow);
+
+    const rateHigh = worldHigh.components.colony.get(pidHigh)!.popGrowthRate;
+    const rateLow  = worldLow.components.colony.get(pidLow)!.popGrowthRate;
+    expect(rateHigh).toBeGreaterThan(rateLow);
+  });
+
+  it("unpowered Habitation Module penalises growth", () => {
+    // No solar → habitation loses power → growth multiplier = 0.5.
+    const worldNoPwr = startedWorld();
+    const colNoPwr = foundAt(worldNoPwr, wetPlanetId(worldNoPwr));
+    colNoPwr.buildings.habitation = 2;
+    colNoPwr.stockpiles.oxygen = 500;
+    colNoPwr.stockpiles.water  = 500;
+    colNoPwr.stockpiles.food   = 500;
+    oneEconomyTick(worldNoPwr);
+    const penaltyRate = colNoPwr.popGrowthRate;
+
+    // Ample solar → habitation fully powered → no penalty.
+    const worldPwr = startedWorld();
+    const colPwr = foundAt(worldPwr, wetPlanetId(worldPwr));
+    colPwr.buildings.habitation = 2;
+    colPwr.buildings.solar = 6;
+    colPwr.stockpiles.oxygen = 500;
+    colPwr.stockpiles.water  = 500;
+    colPwr.stockpiles.food   = 500;
+    oneEconomyTick(worldPwr);
+    const fullRate = colPwr.popGrowthRate;
+
+    expect(fullRate).toBeGreaterThan(penaltyRate);
+    expect(colNoPwr.popLimitingFactor).toContain("low power");
+  });
+});
+
+describe("Phase 2C — shortage deaths", () => {
+  it("oxygen deficit causes proportional population loss", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, planetId(world));
+    // Stockpile below threshold, no production → net < 0.
+    colony.stockpiles.oxygen = 5;
+    const popBefore = colony.population;
+    oneEconomyTick(world);
+    expect(colony.population).toBeLessThan(popBefore);
+    expect(colony.popLimitingFactor).toBe("declining: oxygen deficit");
+    // Rate = -OXYGEN_DEATH_RATE × population (proportional, not flat).
+    expect(colony.popGrowthRate).toBeCloseTo(-OXYGEN_DEATH_RATE * popBefore, 4);
+  });
+
+  it("water deficit causes proportional population loss", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, planetId(world));
+    colony.stockpiles.oxygen = 500; // keep O2 above threshold
+    colony.stockpiles.water  = 3;   // below threshold, no production → net < 0
+    const popBefore = colony.population;
+    oneEconomyTick(world);
+    expect(colony.population).toBeLessThan(popBefore);
+    expect(colony.popLimitingFactor).toBe("declining: water deficit");
+    expect(colony.popGrowthRate).toBeCloseTo(-WATER_DEATH_RATE * popBefore, 4);
+  });
+
+  it("food shortage with net < 0 causes slow starvation", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, planetId(world));
+    colony.stockpiles.oxygen = 500;
+    colony.stockpiles.water  = 500;
+    colony.stockpiles.food   = 3;   // below threshold, no hydroponics → net < 0
+    const popBefore = colony.population;
+    oneEconomyTick(world);
+    expect(colony.population).toBeLessThan(popBefore);
+    expect(colony.popLimitingFactor).toBe("declining: food shortage");
+    expect(colony.popGrowthRate).toBeCloseTo(-FOOD_STARVATION_RATE * popBefore, 4);
+  });
+
+  it("food low but net-positive does NOT trigger starvation", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.stockpiles.oxygen = 500;
+    colony.stockpiles.water  = 500;
+    colony.stockpiles.food   = 5;   // below critical threshold but recovering
+    // Hydroponics produces more food than the colony consumes.
+    colony.buildings.solar = 4;
+    colony.buildings.waterExtractor = 2;
+    colony.buildings.hydroponics = 2;
+    const popBefore = colony.population;
+    oneEconomyTick(world);
+    // Net food must be positive for this scenario to be valid.
+    expect(colony.flows.food!.net).toBeGreaterThan(0);
+    // Starvation must not fire even though the stockpile was below the threshold.
+    expect(colony.popLimitingFactor).not.toBe("declining: food shortage");
+    expect(colony.population).toBeGreaterThanOrEqual(popBefore);
   });
 });
