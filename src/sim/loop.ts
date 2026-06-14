@@ -9,6 +9,7 @@ import type { World } from "./ecs/world.ts";
 import { orbitalSystem } from "./systems/orbital.ts";
 import { lifeSupportSystem } from "./systems/life-support.ts";
 import { shipMovementSystem } from "./systems/ship-movement.ts";
+import { colonySystem } from "./systems/colony.ts";
 import { applyCommand } from "./commands/apply.ts";
 import type { GameEvent } from "./commands/types.ts";
 import { FIXED_DT } from "./constants.ts";
@@ -63,9 +64,12 @@ export function step(world: World, input: Input = ZERO_INPUT): GameEvent[] {
     }
   }
 
-  // Systems run in a fixed, deterministic order every tick.
+  // Systems run in a fixed, deterministic order every tick. colonySystem runs
+  // on its own slower cadence (gated inside) but is sequenced here before
+  // life-support so the survival-clock relief sees this tick's colony state.
   orbitalSystem(world);
   shipMovementSystem(world, input);
+  colonySystem(world);
   lifeSupportSystem(world);
 
   return events;

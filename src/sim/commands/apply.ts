@@ -11,6 +11,7 @@
 import type { World } from "../ecs/world.ts";
 import { parkDistance } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
+import { foundColony } from "./colony.ts";
 
 /** Distance (scene units) from the ship to a body's centre, ∞ if unavailable. */
 function distanceToBody(world: World, bodyId: number): number {
@@ -76,11 +77,7 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
       return { ok: true, events: [{ kind: "TookOff", bodyId, tick }] };
     }
 
-    case "FoundColony": {
-      // Stub (Phase 2B builds the colony sim): validated + routed, no state yet.
-      if (ctrl.landedBodyId !== cmd.bodyId)
-        return { ok: false, reason: "must be landed on the body to found a colony" };
-      return { ok: true, events: [{ kind: "ColonyFounded", bodyId: cmd.bodyId, tick }] };
-    }
+    case "FoundColony":
+      return foundColony(world, cmd.bodyId);
   }
 }

@@ -22,3 +22,14 @@ export function surfaceGravity(massKg: number, radiusM: number): number {
 export function surfaceGravityG(massKg: number, radiusM: number): number {
   return surfaceGravity(massKg, radiusM) / EARTH_G;
 }
+
+/**
+ * Insolation (stellar flux) at a body, relative to Earth (Earth ≈ 1.0): the
+ * inverse-square law S = L / r² with L in solar luminosities and r in AU. The
+ * 4π of the physical S = L/(4πr²) cancels when expressed relative to Earth, so
+ * this is directly a "fraction of Earth sunlight" used to scale solar output.
+ */
+export function insolation(luminositySol: number, orbitalDistanceAu: number): number {
+  if (orbitalDistanceAu <= 0) return 0;
+  return luminositySol / (orbitalDistanceAu * orbitalDistanceAu);
+}

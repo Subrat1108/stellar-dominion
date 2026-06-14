@@ -161,6 +161,37 @@ export interface ShipControl {
 }
 
 // ---------------------------------------------------------------------------
+// Colony (Phase 2B)
+// ---------------------------------------------------------------------------
+
+/** Production / consumption / net for one resource over the last economy tick. */
+export interface ResourceFlow {
+  production: number;
+  consumption: number;
+  net: number;
+}
+
+/**
+ * A colony on a body. Keyed in the registry by the BODY's entity id (one colony
+ * per body in Phase 2B; the Map supports more later). Stockpiles, buildings, and
+ * flows are plain data so the colony serialises like any other component.
+ *
+ * `stockpiles` and `buildings` use the string keys from data/colony.ts; they are
+ * kept as plain records (not enums) so the data file stays the single source.
+ */
+export interface Colony {
+  /** Body entity this colony sits on (mirrors the registry key). */
+  bodyId: number;
+  foundedTick: number;
+  /** Units in store, keyed by ResourceId (power is always 0 — it is a flow). */
+  stockpiles: Record<string, number>;
+  /** Count of each building type built, keyed by BuildingType. */
+  buildings: Record<string, number>;
+  /** Last economy-tick flows per ResourceId, for the UI (net = prod − cons). */
+  flows: Record<string, ResourceFlow>;
+}
+
+// ---------------------------------------------------------------------------
 // ECS component registry
 // ---------------------------------------------------------------------------
 
@@ -173,6 +204,7 @@ export interface Components {
   lifeSupport: Map<number, LifeSupport>;
   shipVelocity: Map<number, ShipVelocity>;
   shipControl: Map<number, ShipControl>;
+  colony: Map<number, Colony>;
 }
 
 export function createComponents(): Components {
@@ -185,5 +217,6 @@ export function createComponents(): Components {
     lifeSupport: new Map(),
     shipVelocity: new Map(),
     shipControl: new Map(),
+    colony: new Map(),
   };
 }

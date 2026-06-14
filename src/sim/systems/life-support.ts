@@ -4,12 +4,24 @@
 // `depletionRatePerTick` units. The survival clock (docs/02) is driven here.
 // The system is deterministic: same rate, same ticks → same remaining value.
 // Clamped to 0 so it never goes negative.
+//
+// Phase 2B survival payoff: when the crew is landed at a colony that still has
+// oxygen, the ship's reserve RECOVERS instead of depleting (the crew breathes
+// colony air). This is how founding and sustaining a colony reverses the
+// survival clock — the whole point of the early game (docs/02, docs/10).
 
 import type { World } from "../ecs/world.ts";
+import { isCrewSustainedByColony } from "./colony.ts";
+import { LIFE_SUPPORT_REGEN_PER_TICK } from "../data/colony.ts";
 
 export function lifeSupportSystem(world: World): void {
-  for (const [, ls] of world.components.lifeSupport) {
-    ls.current = Math.max(0, ls.current - ls.depletionRatePerTick);
+  const sustained = isCrewSustainedByColony(world);
+  for (const [id, ls] of world.components.lifeSupport) {
+    if (id === world.shipId && sustained) {
+      ls.current = Math.min(ls.capacity, ls.current + LIFE_SUPPORT_REGEN_PER_TICK);
+    } else {
+      ls.current = Math.max(0, ls.current - ls.depletionRatePerTick);
+    }
   }
 }
 
