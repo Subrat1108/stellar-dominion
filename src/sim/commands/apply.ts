@@ -11,7 +11,7 @@
 import type { World } from "../ecs/world.ts";
 import { parkDistance } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
-import { foundColony, buildStructure } from "./colony.ts";
+import { foundColony, buildStructure, setTerraformAllocation } from "./colony.ts";
 
 /** Distance (scene units) from the ship to a body's centre, ∞ if unavailable. */
 function distanceToBody(world: World, bodyId: number): number {
@@ -82,5 +82,8 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
 
     case "BuildStructure":
       return buildStructure(world, cmd.bodyId, cmd.building);
+
+    case "SetTerraformAllocation":
+      return setTerraformAllocation(world, cmd.bodyId, cmd.lever, cmd.fraction);
   }
 }

@@ -63,8 +63,16 @@ export interface CelestialBody {
   atmosphere?: Atmosphere;
   /** Magnetosphere strength relative to Earth's: 0 = none, 1 = Earth-like. */
   magnetosphere?: number;
-  /** 0–1 score computed once at setup from physical inputs (docs/04). */
+  /** 0–1 score computed once at setup from physical inputs (docs/04). Mutated by
+   *  terraforming (Phase 3A) as the body's temp/pressure/water gauges shift. */
   habitability?: number;
+  /**
+   * Surface-water fraction, 0–1 (Phase 3A terraforming gauge). Initialised from
+   * `atmosphere.hasLiquidWater` the first time terraforming runs on the body;
+   * `hasLiquidWater` is then derived from it (≥ HYDRO_LIQUID_THRESHOLD = liquid).
+   * Only present once a body has been terraformed.
+   */
+  hydrosphere?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +235,25 @@ export interface Colony {
 }
 
 // ---------------------------------------------------------------------------
+// Terraforming (Phase 3A)
+// ---------------------------------------------------------------------------
+
+/**
+ * Terraforming state for a body, keyed by the BODY's entity id (parallel to
+ * Colony — a colony on the body funds the levers). Holds only the persistent
+ * per-lever allocation fractions (0–1, "share of colony output"). The physical
+ * gauges the levers drive (surfaceTempK, atmosphere.pressurePa, hydrosphere)
+ * live on the CelestialBody; gate/lock state is derived in the UI/system from
+ * those fields, so nothing transient is stored here.
+ */
+export interface Terraforming {
+  /** Body entity this terraforming program runs on (mirrors the registry key). */
+  bodyId: number;
+  /** Allocation fraction 0–1 per TerraformLever string. Absent lever = 0. */
+  allocations: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
 // ECS component registry
 // ---------------------------------------------------------------------------
 
@@ -240,6 +267,7 @@ export interface Components {
   shipVelocity: Map<number, ShipVelocity>;
   shipControl: Map<number, ShipControl>;
   colony: Map<number, Colony>;
+  terraforming: Map<number, Terraforming>;
 }
 
 export function createComponents(): Components {
@@ -253,5 +281,6 @@ export function createComponents(): Components {
     shipVelocity: new Map(),
     shipControl: new Map(),
     colony: new Map(),
+    terraforming: new Map(),
   };
 }

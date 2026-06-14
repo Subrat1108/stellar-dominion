@@ -42,8 +42,12 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
   const { celestialBody, orbit } = world.components;
 
   // --- Star (stationary at origin, no Orbit component) ---
+  // Bodies are inserted as DEEP CLONES of the shared catalog constants: the sim
+  // mutates body fields (terraforming shifts temperature/pressure/hydrosphere and
+  // rewrites habitability), so each world must own its copy or those mutations
+  // would leak into the module singletons (and into the next new game / save).
   const starId = createEntity(world);
-  celestialBody.set(starId, tauCetiStar);
+  celestialBody.set(starId, structuredClone(tauCetiStar));
 
   // --- Planets ---
   // [data, eccentricity, meanAnomalyAtEpoch, argumentOfPeriapsis]
@@ -57,7 +61,7 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
 
   for (const [data, ecc, m0, w] of bodyDefs) {
     const id = createEntity(world);
-    celestialBody.set(id, data);
+    celestialBody.set(id, structuredClone(data));
     const au = data.orbitalDistanceAu ?? 1;
     orbit.set(id, {
       parent: starId,

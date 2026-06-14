@@ -23,6 +23,7 @@ import {
   type ShipVelocity,
   type ShipControl,
   type Colony,
+  type Terraforming,
 } from "./components.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
 import type { Command } from "../commands/types.ts";
@@ -95,13 +96,14 @@ export interface SerializedWorld {
     shipVelocity: [number, ShipVelocity][];
     shipControl: [number, ShipControl][];
     colony: [number, Colony][];
+    terraforming: [number, Terraforming][];
   };
 }
 
 export function serializeWorld(world: World): SerializedWorld {
   const {
     celestialBody, orbit, transform, crew, inventory, lifeSupport,
-    shipVelocity, shipControl, colony,
+    shipVelocity, shipControl, colony, terraforming,
   } = world.components;
   return {
     tick: world.tick,
@@ -119,6 +121,7 @@ export function serializeWorld(world: World): SerializedWorld {
       shipVelocity: [...shipVelocity.entries()],
       shipControl: [...shipControl.entries()],
       colony: [...colony.entries()],
+      terraforming: [...terraforming.entries()],
     },
   };
 }

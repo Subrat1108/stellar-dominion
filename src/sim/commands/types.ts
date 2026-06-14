@@ -6,7 +6,7 @@
 // at a fixed point inside the tick (see loop.ts). Results emit back as typed
 // GameEvents through the GameBus. Nothing here imports the renderer or DOM.
 
-import type { BuildingType } from "../data/colony.ts";
+import type { BuildingType, TerraformLever } from "../data/colony.ts";
 
 /** A discrete player action queued for deterministic application in the tick. */
 export type Command =
@@ -15,7 +15,8 @@ export type Command =
   | { kind: "LandAtBody"; bodyId: number }
   | { kind: "TakeOff" }
   | { kind: "FoundColony"; bodyId: number }
-  | { kind: "BuildStructure"; bodyId: number; building: BuildingType };
+  | { kind: "BuildStructure"; bodyId: number; building: BuildingType }
+  | { kind: "SetTerraformAllocation"; bodyId: number; lever: TerraformLever; fraction: number };
 
 /** Result of applying a command (events emitted on success; reason on reject). */
 export type GameEvent =
@@ -25,6 +26,7 @@ export type GameEvent =
   | { kind: "TookOff"; bodyId: number; tick: number }
   | { kind: "ColonyFounded"; bodyId: number; tick: number }
   | { kind: "StructureBuilt"; bodyId: number; building: BuildingType; tick: number }
+  | { kind: "TerraformAllocationSet"; bodyId: number; lever: TerraformLever; fraction: number; tick: number }
   | { kind: "CommandRejected"; command: Command; reason: string; tick: number };
 
 /** Outcome of validating + applying one command. */

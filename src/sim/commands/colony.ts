@@ -4,15 +4,18 @@
 // deterministically, returning a CommandResult (events on success).
 
 import type { World } from "../ecs/world.ts";
-import type { Colony } from "../ecs/components.ts";
+import type { Colony, Terraforming } from "../ecs/components.ts";
 import type { CommandResult } from "./types.ts";
+import { hydrosphereGate } from "../math/terraforming.ts";
 import {
   COLONY_SEED,
   FOUNDING_LIFE_SUPPORT_COST,
   STORED_RESOURCES,
   BUILDING_TYPES,
   BUILDINGS,
+  TERRAFORM_LEVER_DEFS,
   type BuildingType,
+  type TerraformLever,
 } from "../data/colony.ts";
 
 /**
@@ -110,4 +113,48 @@ export function buildStructure(world: World, bodyId: number, building: BuildingT
   colony.buildings[building] = (colony.buildings[building] ?? 0) + 1;
 
   return { ok: true, events: [{ kind: "StructureBuilt", bodyId, building, tick }] };
+}
+
+/**
+ * SetTerraformAllocation — set a lever's share (0–1) of the colony's output for
+ * the body's terraforming program (Phase 3A). Requires a colony on the body, the
+ * ship landed there, a valid fraction, and — for a gated lever — that its
+ * prerequisites are met (only Hydrosphere is gated in 3A). Creates the
+ * Terraforming component on first use.
+ */
+export function setTerraformAllocation(
+  world: World,
+  bodyId: number,
+  lever: TerraformLever,
+  fraction: number,
+): CommandResult {
+  const tick = world.tick;
+  const ctrl = world.components.shipControl.get(world.shipId);
+  if (!ctrl || ctrl.landedBodyId !== bodyId)
+    return { ok: false, reason: "must be landed at the colony to terraform" };
+
+  const colony = world.components.colony.get(bodyId);
+  if (!colony) return { ok: false, reason: "no colony here to fund terraforming" };
+
+  if (!TERRAFORM_LEVER_DEFS[lever])
+    return { ok: false, reason: "unknown terraforming lever" };
+  if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1)
+    return { ok: false, reason: "allocation must be between 0 and 1" };
+
+  // Gate check (legibility): reject raising a locked lever, naming the reason.
+  if (fraction > 0 && lever === "hydrosphere") {
+    const body = world.components.celestialBody.get(bodyId);
+    const gate = hydrosphereGate(body?.atmosphere?.pressurePa ?? 0, body?.surfaceTempK ?? 0);
+    if (gate.locked)
+      return { ok: false, reason: `hydrosphere locked: ${gate.reason}` };
+  }
+
+  let tf = world.components.terraforming.get(bodyId);
+  if (!tf) {
+    tf = { bodyId, allocations: {} } satisfies Terraforming;
+    world.components.terraforming.set(bodyId, tf);
+  }
+  tf.allocations[lever] = fraction;
+
+  return { ok: true, events: [{ kind: "TerraformAllocationSet", bodyId, lever, fraction, tick }] };
 }

@@ -16,7 +16,9 @@
 
 import type { World } from "../ecs/world.ts";
 import type { Colony, CelestialBody, ResourceFlow, BuildingStatus } from "../ecs/components.ts";
-import { insolation } from "../math/physics.ts";
+import { insolation, surfaceGravity } from "../math/physics.ts";
+import { computeHabitability } from "../math/habitability.ts";
+import { hydrosphereGate } from "../math/terraforming.ts";
 import { ECONOMY_TICK_INTERVAL } from "../constants.ts";
 import {
   BUILDINGS,
@@ -34,8 +36,12 @@ import {
   WATER_DEATH_RATE,
   FOOD_STARVATION_RATE,
   HOUSING_UNPOWERED_GROWTH_PENALTY,
+  TERRAFORM_LEVERS,
+  TERRAFORM_LEVER_DEFS,
+  HYDRO_LIQUID_THRESHOLD,
   type ResourceId,
   type BuildingType,
+  type TerraformLever,
 } from "../data/colony.ts";
 
 /** Water richness of a body: drives ISRU extractor yield (data/colony.ts). */
@@ -188,8 +194,157 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
   colony.flows = flows;
   colony.buildingStatuses = buildingStatuses;
 
-  // 6. Population dynamics — runs after flows so shortage information is final.
+  // 6. Terraforming — funded by this colony's surplus. Runs after flows so it
+  //    draws on finalised stockpiles + surplus power, and before population so
+  //    the recomputed habitability feeds this same tick's growth.
+  terraformingStep(world, bodyId, body, colony, flows);
+
+  // 7. Population dynamics — runs after flows so shortage information is final.
   populationStep(colony, body, activeUnits);
+}
+
+/**
+ * Apply one econ-tick of terraforming to a body that has both a colony (the
+ * funder) and an active Terraforming program (Phase 3A). Each lever moves the
+ * body's real physical parameter toward its target, burning the allocated share
+ * of colony resources; habitability is then recomputed so the population model
+ * (and the UI) see the payoff immediately.
+ *
+ * Power is drawn from the colony's SURPLUS generation this tick (production −
+ * load), not a stockpile; stockpiled resources (metals/propellant/water) are
+ * drawn from store. A lever runs at the fraction its scarcest input allows, so
+ * shift and burn scale together — the same deterministic cascade as production.
+ * Levers resolve in a fixed order and share the running power surplus.
+ */
+function terraformingStep(
+  world: World,
+  bodyId: number,
+  body: CelestialBody | undefined,
+  colony: Colony,
+  flows: Record<string, ResourceFlow>,
+): void {
+  const tf = world.components.terraforming.get(bodyId);
+  if (!tf || !body) return;
+
+  const sp = colony.stockpiles;
+  const powerFlow = flows.power!;
+  // Surplus power available to terraforming after building load this tick.
+  let surplusPower = Math.max(0, powerFlow.production - powerFlow.consumption);
+
+  // Lazily initialise the hydrosphere gauge from the authored liquid-water flag.
+  if (body.hydrosphere === undefined) {
+    body.hydrosphere = body.atmosphere?.hasLiquidWater ? 1.0 : 0.0;
+  }
+
+  let changed = false;
+
+  for (const lever of TERRAFORM_LEVERS) {
+    const alloc = clamp01(tf.allocations[lever] ?? 0);
+    if (alloc <= 0) continue;
+    // Gated levers do nothing and burn nothing (3A: only Hydrosphere is gated).
+    if (lever === "hydrosphere") {
+      const gate = hydrosphereGate(body.atmosphere?.pressurePa ?? 0, body.surfaceTempK ?? 0);
+      if (gate.locked) continue;
+    }
+
+    const def = TERRAFORM_LEVER_DEFS[lever];
+
+    // Desired burn this tick, and the affordable fraction across all inputs.
+    let ratio = 1;
+    for (const res of Object.keys(def.maxBurn) as ResourceId[]) {
+      const want = (def.maxBurn[res] ?? 0) * alloc;
+      if (want <= 0) continue;
+      const have = res === "power" ? surplusPower : sp[res] ?? 0;
+      const r = have / want;
+      if (r < ratio) ratio = r;
+    }
+    ratio = clamp01(ratio);
+    if (ratio <= 0) continue;
+
+    // Burn the affordable share.
+    for (const res of Object.keys(def.maxBurn) as ResourceId[]) {
+      const used = (def.maxBurn[res] ?? 0) * alloc * ratio;
+      if (used <= 0) continue;
+      if (res === "power") {
+        surplusPower -= used;
+        flows.power!.consumption += used;
+      } else {
+        sp[res] = (sp[res] ?? 0) - used;
+        flows[res]!.consumption += used;
+      }
+    }
+
+    // Shift the parameter toward target, clamped so it never overshoots.
+    const step = def.maxShift * alloc * ratio;
+    applyLeverShift(body, lever, step);
+    changed = true;
+  }
+
+  if (!changed) return;
+
+  // Re-clamp burned stockpiles and refresh net flows touched by terraforming.
+  for (const res of STORED_RESOURCES) sp[res] = Math.max(0, sp[res] ?? 0);
+  for (const r of RESOURCES) flows[r]!.net = flows[r]!.production - flows[r]!.consumption;
+
+  // Derive liquid-water flag from the hydrosphere gauge, then recompute the score.
+  if (body.atmosphere) {
+    body.atmosphere.hasLiquidWater = (body.hydrosphere ?? 0) >= HYDRO_LIQUID_THRESHOLD;
+  }
+  recomputeHabitability(world, bodyId, body);
+}
+
+/** Move a body's parameter toward the lever target by at most `step`. */
+function applyLeverShift(body: CelestialBody, lever: TerraformLever, step: number): void {
+  const target = TERRAFORM_LEVER_DEFS[lever].target;
+  switch (lever) {
+    case "temperature": {
+      const cur = body.surfaceTempK ?? 0;
+      body.surfaceTempK = approach(cur, target, step);
+      break;
+    }
+    case "pressure": {
+      if (!body.atmosphere) return;
+      body.atmosphere.pressurePa = approach(body.atmosphere.pressurePa, target, step);
+      break;
+    }
+    case "hydrosphere": {
+      const cur = body.hydrosphere ?? 0;
+      body.hydrosphere = clamp01(approach(cur, target, step));
+      break;
+    }
+  }
+}
+
+/** Step `cur` toward `target` by at most `step`, never overshooting. */
+function approach(cur: number, target: number, step: number): number {
+  if (cur < target) return Math.min(target, cur + step);
+  if (cur > target) return Math.max(target, cur - step);
+  return cur;
+}
+
+function clamp01(x: number): number {
+  return Math.max(0, Math.min(1, x));
+}
+
+/**
+ * Recompute and cache the body's habitability from its (terraformed) physical
+ * inputs. HZ and gravity factors are constant; temp/pressure/water move. The
+ * population system reads body.habitability as its growth factor, so this is
+ * what makes terraforming visibly improve the colony.
+ */
+export function recomputeHabitability(world: World, bodyId: number, body: CelestialBody): void {
+  const orbit = world.components.orbit.get(bodyId);
+  const star = orbit ? world.components.celestialBody.get(orbit.parent) : undefined;
+  body.habitability = computeHabitability({
+    luminositySol: star?.luminositySol ?? 1,
+    orbitalDistanceAu: body.orbitalDistanceAu ?? 1,
+    surfaceTempK: body.surfaceTempK ?? 0,
+    gravityMs2: body.gravityMs2 ?? surfaceGravity(body.massKg, body.radiusM),
+    atmospherePressurePa: body.atmosphere?.pressurePa ?? 0,
+    atmosphereToxicity: body.atmosphere?.toxicity ?? 0,
+    hasLiquidWater: body.atmosphere?.hasLiquidWater ?? false,
+    magnetosphere: body.magnetosphere ?? 0,
+  });
 }
 
 /**

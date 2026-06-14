@@ -14,6 +14,23 @@ Entry template:
 
 ---
 
+## Session 14 — Phase 3A: terraforming core (Temperature / Pressure / Hydrosphere)
+- **Goal:** Ship the minimal tunable terraforming loop — three levers as a resource sink funded by a colony, precondition gating (Hydrosphere), and the habitability/stage payoff wired into the Phase 2C population model. Determinism + all tests green.
+- **Did:**
+  - **Data** (`data/colony.ts`): `TerraformLever` (temperature/pressure/hydrosphere), `TERRAFORM_LEVER_DEFS` (per-lever maxBurn, maxShift, target, unit — balance lives here), and thresholds `ARMSTRONG_PA = 6262`, `FREEZING_K = 273.15`, `ONE_ATM_PA`, `HYDRO_LIQUID_THRESHOLD = 0.5`. Levers drive the body's **real** fields toward Earth-like targets (288 K / 1 atm / hydrosphere 1.0).
+  - **Component** (`ecs/components.ts`): new `Terraforming` (per-lever 0–1 `allocations`, keyed by body id), added to the registry; new `hydrosphere?` gauge on `CelestialBody`. Both serialised (`ecs/world.ts`).
+  - **Math** (`math/terraforming.ts`, new): `hydrosphereGate(pressure, temp)` → locked + spelled-out reason; `terraformStage(pressure, temp, water)` → Barren/Frozen/Marginal/Habitable per docs/11 §4 (Barren defined by sub-Armstrong pressure).
+  - **System** (`systems/colony.ts`): `terraformingStep` runs each econ-tick after flows, before population. Per lever: burn = fraction × maxBurn capped by the affordable fraction (power from **surplus generation**, others from stockpile); shift = fraction × maxShift × ratio, clamped at target; levers share the running power surplus in fixed order. Then derives `hasLiquidWater` from the hydrosphere gauge and calls `recomputeHabitability` (exported) so the population model sees the new score that same tick.
+  - **Command** (`commands/types.ts`, `commands/colony.ts`, `commands/apply.ts`): `SetTerraformAllocation { bodyId, lever, fraction }` — validates colony+landed+fraction range, rejects raising a gated lever (names the reason), creates the `Terraforming` component on first use; emits `TerraformAllocationSet`.
+  - **UI** (`ui/TerraformingPanel.tsx`, new; rendered in `ColonyPanel`): per-lever current value → target, 0–100% slider, live burn, locked state with the unmet prerequisite; header shows resulting stage + habitability %.
+  - **Bug fix** (`world-setup.ts`): catalog bodies were inserted into the world **by reference** to shared module constants; terraforming mutations leaked across worlds. Now `structuredClone`d per body.
+  - **Tests** (`tests/terraforming.test.ts`, +10 → 98 total): shift scales with allocation, affordable-fraction cap + target clamp, zero-alloc no-op, hydrosphere gate locked/unlocks, habitability rises on warming, stage thresholds, population payoff (higher hab → faster growth), serialization round-trip.
+- **Decisions:** Phase 3 split 3A/3B; levers drive real body fields; per-lever independent 0–100% allocation; deep-clone bodies at setup. See `docs/09` 2026-06-14.
+- **Next:** confirm in-browser (found colony on cold Glacius → allocate Temperature → watch temp/habitability climb → Hydrosphere unlocks past 0 °C), then Phase 3B — magnetosphere/toxicity/biosphere + feedback loops.
+- **Open questions:** none.
+
+---
+
 ## Session 13 — Phase 2C legibility: per-building status + bottleneck surfacing
 - **Goal:** Make the colony UI answer "why isn't this working?" for every building — per-building status with reason (running / idle: no power / idle: insufficient water), bottleneck tagging on the resource ledger, and a logged Legibility design pillar. Determinism + tests green.
 - **Did:**

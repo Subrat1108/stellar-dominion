@@ -232,3 +232,87 @@ export const FOUNDING_LIFE_SUPPORT_COST = COLONY_SEED.water + COLONY_SEED.oxygen
  * sustaining a colony visibly reverses the survival clock.
  */
 export const LIFE_SUPPORT_REGEN_PER_TICK = 3;
+
+// ---------------------------------------------------------------------------
+// Terraforming (Phase 3A) — three levers + gate thresholds + targets.
+//
+// Phase 3A scope (docs/11 §8): Temperature, Pressure, Hydrosphere — direct
+// lever→parameter effects + the Hydrosphere gate only. Deferred to 3B:
+// Magnetosphere, Toxicity (Sabatier), Biosphere, and ALL cross-lever feedback
+// (runaway greenhouse, pressure broadening, Urey drain, albedo trap, solar
+// stripping). So in 3A a lever moves its parameter toward a fixed target and
+// burns the allocated resources — nothing else.
+//
+// A lever drives the body's REAL physical field (surfaceTempK, atmosphere
+// pressure, hydrosphere fraction) — the same fields computeHabitability reads —
+// so terraforming visibly raises habitability, which the population model already
+// consumes as its growth factor (systems/colony.ts).
+//
+// Allocation is a per-lever fraction 0–1 ("share of colony output"). Each econ
+// tick a lever's burn = fraction × maxBurn (capped by what the colony can afford
+// this tick), and its parameter shift = fraction × maxShift × affordableFraction.
+// Levers are independent; real resource scarcity is the limiter. Power is drawn
+// from the colony's surplus generation this tick (not a stockpile).
+// ---------------------------------------------------------------------------
+
+export type TerraformLever = "temperature" | "pressure" | "hydrosphere";
+
+export const TERRAFORM_LEVERS: TerraformLever[] = ["temperature", "pressure", "hydrosphere"];
+
+/** Armstrong limit (Pa): below this, water boils at body temperature — no oceans. */
+export const ARMSTRONG_PA = 6_262; // 0.0618 atm (docs/11 §2)
+
+/** Freezing point of water (K): the temperature gate for a liquid hydrosphere. */
+export const FREEZING_K = 273.15;
+
+/** Standard atmosphere (Pa), the pressure target and the UI's atm reference. */
+export const ONE_ATM_PA = 101_325;
+
+/** Hydrosphere fraction at/above which the surface counts as having liquid water. */
+export const HYDRO_LIQUID_THRESHOLD = 0.5;
+
+export interface TerraformLeverDef {
+  lever: TerraformLever;
+  name: string;
+  /** Short real mechanism, for the UI. */
+  mechanism: string;
+  /** Max resource burn per econ-tick at 100% allocation. `power` is drawn from
+   *  surplus generation; others from the stockpile. */
+  maxBurn: Partial<Record<ResourceId, number>>;
+  /** Max parameter shift per econ-tick at 100% allocation, in the param's unit. */
+  maxShift: number;
+  /** Value the parameter moves toward (param's unit). */
+  target: number;
+  /** UI unit suffix for the raw value ("K", "Pa", or "" for the 0–1 hydrosphere). */
+  unit: string;
+}
+
+export const TERRAFORM_LEVER_DEFS: Record<TerraformLever, TerraformLeverDef> = {
+  temperature: {
+    lever: "temperature",
+    name: "Temperature",
+    mechanism: "Orbital mirrors / L1 shades — drive surface temperature toward 15 °C.",
+    maxBurn: { power: 12, metals: 1.5 },
+    maxShift: 1.5, // K per econ-tick at 100%
+    target: 288, // 15 °C
+    unit: "K",
+  },
+  pressure: {
+    lever: "pressure",
+    name: "Pressure",
+    mechanism: "Volatile release / buffer-gas import — build atmospheric mass toward 1 atm.",
+    maxBurn: { power: 12, propellant: 1.5 },
+    maxShift: 600, // Pa per econ-tick at 100%
+    target: ONE_ATM_PA,
+    unit: "Pa",
+  },
+  hydrosphere: {
+    lever: "hydrosphere",
+    name: "Hydrosphere",
+    mechanism: "Melt ice / import cometary water — raise surface water toward a full ocean.",
+    maxBurn: { power: 9, water: 3.0 },
+    maxShift: 0.03, // hydrosphere fraction per econ-tick at 100%
+    target: 1.0,
+    unit: "",
+  },
+};

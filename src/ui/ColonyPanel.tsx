@@ -11,6 +11,7 @@ import type { GameBus } from "../app/game-bus.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { housingCapacity } from "../sim/systems/colony.ts";
+import TerraformingPanel from "./TerraformingPanel.tsx";
 import {
   RESOURCES,
   RESOURCE_LABEL,
@@ -132,6 +133,9 @@ export default function ColonyPanel({ world, bus, bodyId }: ColonyPanelProps) {
           })}
         </div>
       </div>
+
+      {/* Terraforming — levers funded by this colony's surplus output. */}
+      <TerraformingPanel world={world} bodyId={bodyId} />
     </div>
   );
 }
