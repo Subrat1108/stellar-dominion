@@ -342,6 +342,89 @@ describe("Phase 2C — shortage deaths", () => {
     expect(colony.popGrowthRate).toBeCloseTo(-FOOD_STARVATION_RATE * popBefore, 4);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2C (Session 13) — per-building status
+// ---------------------------------------------------------------------------
+
+describe("building statuses — power", () => {
+  it("solar array reports running after an economy tick", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 2;
+    oneEconomyTick(world);
+    expect(colony.buildingStatuses.solar?.state).toBe("running");
+    expect(colony.buildingStatuses.solar?.running).toBe(2);
+    expect(colony.buildingStatuses.solar?.total).toBe(2);
+  });
+
+  it("power-starved building reports idle-no-power", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    // No solar → smelter and other consumers lose power.
+    colony.buildings.smelter = 1;
+    oneEconomyTick(world);
+    expect(colony.buildingStatuses.smelter?.state).toBe("idle-no-power");
+    expect(colony.buildingStatuses.smelter?.running).toBe(0);
+  });
+
+  it("partial power reports correct running/total counts", () => {
+    const world = startedWorld();
+    // Mira with 1 solar: enough for the water extractor (4 pw) but not the smelter (6 pw).
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 1;
+    colony.buildings.waterExtractor = 1; // 4 pw — fits in ~10 pw (Mira insol × 10 × 2 solar ~ depends)
+    colony.buildings.smelter = 2;        // 6 pw each — power deficit
+    oneEconomyTick(world);
+    // Smelter is low-priority so it gets shed; check at least some are idle.
+    const smelterStatus = colony.buildingStatuses.smelter;
+    expect(smelterStatus).toBeDefined();
+    expect(smelterStatus!.state).toBe("idle-no-power");
+    expect(smelterStatus!.total).toBe(2);
+  });
+});
+
+describe("building statuses — input starvation", () => {
+  it("water-starved hydroponics reports idle-no-input with water as limiting resource", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 5;        // ample power
+    colony.buildings.hydroponics = 1;
+    colony.stockpiles.water = 0;       // no water available
+    oneEconomyTick(world);
+    const status = colony.buildingStatuses.hydroponics;
+    expect(status?.state).toBe("idle-no-input");
+    expect(status?.limitingResource).toBe("water");
+    expect(status?.reason).toContain("water");
+  });
+
+  it("water-starved electrolysis reports idle-no-input with water as limiting resource", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 5;
+    colony.buildings.electrolysis = 1;
+    colony.stockpiles.water = 0;
+    oneEconomyTick(world);
+    const status = colony.buildingStatuses.electrolysis;
+    expect(status?.state).toBe("idle-no-input");
+    expect(status?.limitingResource).toBe("water");
+  });
+
+  it("fully-supplied building reports running", () => {
+    const world = startedWorld();
+    const colony = foundAt(world, wetPlanetId(world));
+    colony.buildings.solar = 5;
+    colony.buildings.waterExtractor = 3;
+    colony.buildings.electrolysis = 1;
+    colony.buildings.hydroponics = 1;
+    colony.stockpiles.water = 500;
+    oneEconomyTick(world);
+    expect(colony.buildingStatuses.electrolysis?.state).toBe("running");
+    expect(colony.buildingStatuses.hydroponics?.state).toBe("running");
+  });
+});
+
   it("food low but net-positive does NOT trigger starvation", () => {
     const world = startedWorld();
     const colony = foundAt(world, wetPlanetId(world));
@@ -360,4 +443,3 @@ describe("Phase 2C — shortage deaths", () => {
     expect(colony.popLimitingFactor).not.toBe("declining: food shortage");
     expect(colony.population).toBeGreaterThanOrEqual(popBefore);
   });
-});

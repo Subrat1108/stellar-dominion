@@ -15,7 +15,7 @@
 // water yield with the body's water abundance, and habitability modulates growth.
 
 import type { World } from "../ecs/world.ts";
-import type { Colony, CelestialBody, ResourceFlow } from "../ecs/components.ts";
+import type { Colony, CelestialBody, ResourceFlow, BuildingStatus } from "../ecs/components.ts";
 import { insolation } from "../math/physics.ts";
 import { ECONOMY_TICK_INTERVAL } from "../constants.ts";
 import {
@@ -84,10 +84,16 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
   // emptyFlows pre-populates every resource, so this lookup is always defined.
   const flow = (res: ResourceId) => flows[res]!;
 
+  // Building statuses: recomputed fresh each economy tick (transient/derived).
+  const buildingStatuses: Record<string, BuildingStatus> = {};
+
   // 1. Power generation (solar arrays, scaled by insolation).
   const solarCount = colony.buildings.solar ?? 0;
   const generation = solarCount * (BUILDINGS.solar.powerOutputBase ?? 0) * insol;
   flow("power").production = generation;
+  if (solarCount > 0) {
+    buildingStatuses.solar = { running: solarCount, total: solarCount, state: "running", reason: "" };
+  }
 
   // 2. Power allocation by priority. Each building unit runs only if the
   //    remaining power covers its full draw; lower-priority modules shut off
@@ -104,12 +110,23 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
     activeUnits[type] = canRun;
     available -= canRun * def.powerDraw;
     load += canRun * def.powerDraw;
+
+    // Initial status from power availability. Production pass may refine to
+    // "idle-no-input" if powered units are also input-starved.
+    if (count > 0) {
+      if (canRun < count) {
+        buildingStatuses[type] = { running: canRun, total: count, state: "idle-no-power", reason: "no power" };
+      } else {
+        buildingStatuses[type] = { running: canRun, total: count, state: "running", reason: "" };
+      }
+    }
   }
   flow("power").consumption = load;
 
   // 3. Extraction + production, suppliers first (POWER_PRIORITY order). Material
   //    inputs are limited by what is in the stockpile this tick; a building runs
   //    at the fraction its scarcest input allows (deterministic cascade).
+  //    Also finds the limiting input resource for the status display.
   for (const type of POWER_PRIORITY) {
     const def = BUILDINGS[type];
     const units = activeUnits[type] ?? 0;
@@ -118,13 +135,29 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
 
     const outScale = def.scaling === "waterAbundance" ? abundance : 1;
 
-    // Limiting ratio across inputs.
+    // Limiting ratio across inputs + track which resource caused the minimum.
     let ratio = 1;
+    let limitingResource: ResourceId | undefined;
     for (const res of Object.keys(def.inputs) as ResourceId[]) {
       const need = (def.inputs[res] ?? 0) * units;
-      if (need > 0) ratio = Math.min(ratio, (sp[res] ?? 0) / need);
+      if (need > 0) {
+        const r = (sp[res] ?? 0) / need;
+        if (r < ratio) { ratio = r; limitingResource = res; }
+      }
     }
     ratio = Math.max(0, Math.min(1, ratio));
+
+    // Only mark idle-no-input when ALL power is available (canRun === count).
+    // If power is already the problem, don't override that status.
+    if (limitingResource !== undefined && buildingStatuses[type]?.state === "running") {
+      buildingStatuses[type] = {
+        running: units,
+        total: colony.buildings[type] ?? 0,
+        state: "idle-no-input",
+        reason: `insufficient ${limitingResource}`,
+        limitingResource,
+      };
+    }
 
     for (const res of Object.keys(def.inputs) as ResourceId[]) {
       const used = (def.inputs[res] ?? 0) * units * ratio;
@@ -153,6 +186,7 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
   for (const res of STORED_RESOURCES) sp[res] = Math.max(0, sp[res] ?? 0);
   for (const r of RESOURCES) flow(r).net = flow(r).production - flow(r).consumption;
   colony.flows = flows;
+  colony.buildingStatuses = buildingStatuses;
 
   // 6. Population dynamics — runs after flows so shortage information is final.
   populationStep(colony, body, activeUnits);

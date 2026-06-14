@@ -14,6 +14,19 @@ Entry template:
 
 ---
 
+## Session 13 — Phase 2C legibility: per-building status + bottleneck surfacing
+- **Goal:** Make the colony UI answer "why isn't this working?" for every building — per-building status with reason (running / idle: no power / idle: insufficient water), bottleneck tagging on the resource ledger, and a logged Legibility design pillar. Determinism + tests green.
+- **Did:**
+  - **`BuildingStatus` type** (`ecs/components.ts`): `state ∈ {running, idle-no-power, idle-no-input}`, `running/total` counts, human-readable `reason`, machine-readable `limitingResource?`. Added `buildingStatuses: Record<string, BuildingStatus>` to `Colony` (transient/derived, like `popLimitingFactor`). Initialized as `{}` in `foundColony`.
+  - **`colonySystem`** (`systems/colony.ts`): solar always `running`. After power allocation (step 2), each POWER_PRIORITY building with `canRun < total` marked `idle-no-power`. During production (step 3), tracked the argmin resource across inputs; if a fully-powered building's ratio < 1, upgraded its status to `idle-no-input` with `limitingResource` set. Assigned `colony.buildingStatuses` at end of tick (step 5).
+  - **`ColonyPanel`** (`ui/ColonyPanel.tsx`): `BuildingStatusLine` subcomponent below each built structure — green "running" / amber "idle: no power" / amber "idle: insufficient water"; shows "3/4 running — idle: no power" for partial-power cases. Resource ledger: computed `bottlenecks` set from `buildingStatuses`; bottleneck resources tagged amber with "↑ needed" label.
+  - **Tests** (`tests/colony.test.ts`): 6 new cases (88 total) — solar running, power-starved idle-no-power, partial-power running/total, water-starved hydroponics idle-no-input (limiting resource = water), water-starved electrolysis, fully-supplied reports running. Restructured building-status tests into their own top-level `describe` blocks.
+  - **`docs/01`**: added Legibility as Design Pillar 6 — any system with dependencies must surface inputs, live status with reason, and current bottleneck; governs buildings now and Phase 3 terraforming levers next.
+  - **`docs/09`**: logged Legibility principle decision.
+- **Decisions:** Legibility as Pillar 6 — governs Phase 3 (terraforming levers show locked with unmet prerequisite named). See `docs/09` 2026-06-14.
+- **Next:** confirm in-browser (found colony → build hydroponics with no water → see "idle: insufficient water" → build water extractor → see "running"; check bottleneck tag on Water row), then Phase 3 — terraforming loop.
+- **Open questions:** none new.
+
 ## Session 12 — Phase 2C: population dynamics
 - **Goal:** Add aggregate population to the colony — seeded from crew at founding, grows when resources/housing allow, declines (proportionally) under oxygen/water/food shortages. No factions/politics (Phase 5–6), no migration (Phase 4). Determinism + tests green.
 - **Did:**

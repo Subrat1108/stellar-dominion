@@ -11,6 +11,7 @@ A grounded, science-respecting space 4X where a single stranded ship becomes a s
 3. **Transformation as the core fantasy.** Terraforming a dead rock into a living world over many stages is the signature loop.
 4. **Systems over scripts.** Outcomes emerge from interacting systems (climate, economy, population, politics) rather than hand-authored events.
 5. **Runs on a laptop.** Simulation depth, not graphical spectacle. Beautiful but cheap to render.
+6. **Legibility.** Any system with dependencies must surface each element's inputs/prerequisites, its live status with a reason when blocked, and the current bottleneck. The player can always answer "why isn't this working?" from the UI. This governs buildings (running/idle: no power/idle: insufficient water), population (limiting factor string), and every future system with prerequisites — including Phase 3 terraforming levers (shown locked with the unmet prerequisite named).
 
 ## What success looks like (this project, not commercial)
 

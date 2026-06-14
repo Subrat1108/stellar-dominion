@@ -171,6 +171,24 @@ export interface ResourceFlow {
   net: number;
 }
 
+export type BuildingStatusKind = "running" | "idle-no-power" | "idle-no-input";
+
+/**
+ * Live operational status of one building type, recomputed each economy tick.
+ * Answers "why isn't this working?" for every structure the colony owns.
+ */
+export interface BuildingStatus {
+  /** Units of this type currently producing (may be < total if power-shed). */
+  running: number;
+  /** Total units built. */
+  total: number;
+  state: BuildingStatusKind;
+  /** Human-readable reason when not at full capacity. Empty when fully running. */
+  reason: string;
+  /** Machine-readable limiting input resource (set when state === "idle-no-input"). */
+  limitingResource?: string;
+}
+
 /**
  * A colony on a body. Keyed in the registry by the BODY's entity id (one colony
  * per body in Phase 2B; the Map supports more later). Stockpiles, buildings, and
@@ -200,6 +218,12 @@ export interface Colony {
   popGrowthRate: number;
   /** Human-readable description of the dominant growth or decline driver. */
   popLimitingFactor: string;
+  /**
+   * Operational status per building type — recomputed each economy tick
+   * (transient/derived, like popLimitingFactor). Keyed by BuildingType string.
+   * Answers "why isn't this working?" for every structure the colony owns.
+   */
+  buildingStatuses: Record<string, BuildingStatus>;
 }
 
 // ---------------------------------------------------------------------------

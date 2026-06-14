@@ -78,6 +78,7 @@ export function foundColony(world: World, bodyId: number): CommandResult {
     population: crewCount,
     popGrowthRate: 0,
     popLimitingFactor: "stable",
+    buildingStatuses: {},
   };
   world.components.colony.set(bodyId, colony);
 
