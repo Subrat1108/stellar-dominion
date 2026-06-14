@@ -63,6 +63,20 @@ We are honest about the line:
 
 Everything outside these flagged areas should be defensible against a real textbook. When we bend a rule, we note it here.
 
+## Planetary archetypes
+
+*Distilled from `docs/research/01-foundational-macro-loops-and-territory.md`. Informs Phase 3 terraforming design (relative difficulty/ordering) and future body variety when procedural generation scales beyond the first system.*
+
+| Archetype | Sub-surface | Atmosphere | Primary economic yield | Shielding need |
+|---|---|---|---|---|
+| **Terrestrial** (G-class HZ) | Active tectonics, diverse minerals | N₂/O₂, stable pressure | Biomass, silicates, organics, base iron | Low — atmospheric protection sufficient |
+| **Martian analogue** | Dormant core, iron-oxide crust | Thin CO₂, easily stripped | Base metals, rare earths (impact craters) | High — subterranean habitats, regolith bulk shielding |
+| **Venusian analogue** | Sluggish tectonics, extreme heat/pressure | Supercritical CO₂, sulfuric acid clouds | Heavy isotopes, carbon, geothermal energy | Extreme — thermal radiators, pressure vessels |
+| **Oceanic / Hycean** | Liquid-water mantle over solid core | Thick H₂/water-vapor envelope | Deuterium, exotic marine organics, hydrogen | Moderate — submersible habitats, tethered orbital platforms |
+| **Chthonian** (stripped core) | Exposed metallic core, residual heat | Trace exosphere, metallic vapor | Super-heavy metals, fissiles, platinum group | Extreme — radiation/thermal shielding, automated-only extraction |
+
+Relative terraforming difficulty (easiest → hardest): Martian → Oceanic → Terrestrial-adjacent → Venusian → Chthonian. Venus is the canonical "extreme cost" anchor; Mars is the canonical "tractable but slow" anchor (see §Terraforming science above).
+
 ## R&D backlog (research before implementing)
 - Pick/finalise the first system (real star vs physically-seeded fictional).
 - Habitability scoring formula v1 (inputs → 0–1 score).

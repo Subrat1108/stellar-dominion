@@ -37,6 +37,17 @@ Decisions are proposed with rationale; the author (you) holds final veto.
 - **No art-asset rabbit holes.** Use stylised primitives (spheres, orbits, icons) until gameplay is proven.
 - **Defer anything that isn't in the current roadmap phase.** Write the idea into a "Later" section, then move on.
 
+## Long-term vision / north star
+
+The active roadmap (Phases 0–3, MVP) is the right thing to build now. Beyond it, the north-star is a **thermodynamic 4X**: an interstellar empire where energy budgets, gravity-well logistics, and the speed of light are the actual terrain of strategy — not a backdrop. In broad strokes:
+
+- **Thermodynamic depth.** EROI-driven economy: every outpost runs an energy ledger; expansion stretches supply lines before it delivers returns. Waste heat and radiation are persistent taxes on industrial ambition.
+- **Light-lag politics.** Communication delay is the primary driver of administrative decay. Distant colonies drift ideologically; governance structures (technocratic, confederal, martial, corporate) offer different trade-offs against this entropy.
+- **Territory control.** Autonomous AI factions project zones of influence over Lagrange points and transit corridors; the player's role in the late game is arbitration and grand-strategic doctrine, not unit micro-management.
+- **Eventual multiplayer.** The deterministic, command/event, serialisable sim is designed to accept a lockstep multiplayer layer — but no netcode is built until the single-player game is demonstrably fun.
+
+None of this is active scope. Decisions resolving the open design questions from the research brief are logged in `docs/09-decisions.md` (2026-06-14). Detailed analysis lives in `docs/research/01-foundational-macro-loops-and-territory.md`.
+
 ## Monetization stance (later, but never blocked)
 
 Not pursued now. Keep these paths open by keeping game logic engine-agnostic and data-driven:

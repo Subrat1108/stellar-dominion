@@ -88,3 +88,13 @@ Captured so they aren't lost, but **not** to be built until the slice that needs
 - **Multi-scale map zoom.** A single navigation map that zooms across moon → system →
   galaxy/interstellar scales (the Session-8 minimap is system-scale only; galaxy/
   interstellar is Phase 5).
+
+### Post-MVP / long-term vision pointers
+*These belong to Phase 4+ or beyond. Each is expanded in `docs/research/01-foundational-macro-loops-and-territory.md`.*
+- **Abstracted delta-v logistics (Phase 4+).** In-system transfers cost time + propellant derived from Hohmann/patched-conic math; players manage depots and windows rather than calculating equations manually. → research doc §"Delta-V as Logistical Currency"
+- **Governance, administrative decay & legitimacy (Phase 5–6).** Light-lag as abstracted friction: distant colonies accumulate unrest, tax compliance drops, local factions drift — resolved through delegation and policy, not input-lockout. → research doc §"Political Fragmentation and Light-Lag"
+- **MMO-style territory control (post-MVP).** Autonomous AI factions project zones of control over gravity wells and transit corridors; player arbitrates between internal powers rather than micromanaging. → research doc §"Integrating MMO-Style Territory Control"
+- **Thermal/radiation taxation.** Every habitat and foundry generates waste heat; radiator capacity gates industrial output; solar proton events force surface shutdowns without heavy shielding. → research doc §"Thermal and Radiation Taxation System"
+- **EROI economy depth.** Full supply-chain tiers (Extraction → Refining → Fabrication → Synthesis) with genuine energy bottlenecks and gravity-well trade friction, including Kessler Syndrome as emergent event. → research doc §"EROI Framework"
+- **Emergent event system (e.g. Kessler cascade, secession crisis, processor failure).** Events triggered by simulated conditions (orbital traffic, power shortages, distance-decay), not random modifiers. → research doc §"Event Archetypes"
+- **Gravity-map navigation UX.** Topographical "gravity map" view: wells as color-coded valleys, transit corridors as energy-cost gradients, node-based supply-chain overlay with bottleneck heat maps. → research doc §"Multi-Tiered Economic Legibility"
