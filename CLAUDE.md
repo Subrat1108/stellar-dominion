@@ -71,6 +71,7 @@ Long jobs can run out of context before finishing. Keep every task resumable fro
 | `docs/10-colony-science.md` | Colony resource & planetary architecture brief: resource set, production chains, ISRU, power scaling |
 | `docs/11-terraforming-science.md` | Terraforming reference: levers, gate conditions, stage thresholds, feedback loops, 3A/3B split |
 | `docs/12-exploration-science.md` | Step 1B interstellar-expansion reference: multi-scale map tiers, warp vs sub-light, Tau Ceti neighborhood, ESI tiers, anti-snowball economics (reconciled — see header) |
+| `docs/13-procedural-generation.md` | Step 1A procedural-generation reference: hybrid HYG + xxHash-seeded generation, Chen & Kipping mass-radius, peas-in-a-pod spacing, shader surfaces, save architecture (resolved — see header) |
 
 ---
 

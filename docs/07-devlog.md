@@ -14,6 +14,15 @@ Entry template:
 
 ---
 
+## Session 16 — 2026-06-15 — Step 1A procedural-generation brief landed
+- **Goal:** Bring the planning-room "Content Architecture & Universe Generation" research into the repo as a Step 1A reference (precursor to procedural neighborhood generation), with the architectural questions resolved up front.
+- **Did:** Saved the brief verbatim as `docs/13-procedural-generation.md` with a resolved-decisions header. Brief covers: hybrid real-HYG-catalog + seeded procedural fill, xxHash coordinate-seeded lazy generation (zero disk for the universe), Chen & Kipping (2017) mass-radius relations, "peas in a pod" ~20-mutual-Hill-radii spacing (Weiss 2018), property→shader appearance mapping (Simplex/FBM on GPU), and the SQLite-WASM/OPFS vs flat-JSON save-architecture question. The doc's two inline open questions (`→ CLAUDE`, `→ CLAUDE CODE`) are preserved for provenance but answered by the header.
+- **Decisions:** Header overrides the doc's two asks — **flat-JSON player deltas behind a swappable persistence interface** (defer SQLite-WASM/OPFS until the late-game data layer is actually needed), **procedural surfaces as Three.js `ShaderMaterial`** (not raw Canvas WebGL — stays inside the established engine), and **the existing `computeHabitability` score stands as the mechanic with ESI as a UI label only** (consistent with the Session 15 Step 1B reconciliation) → `docs/09`, `docs/13`.
+- **Next:** Confirm Phase 3A in-browser, then Phase 3B (magnetosphere/toxicity/biosphere + feedback loops). The procedural-generation brief is a forward reference for the eventual Step 1A neighborhood-generation slice, not the current phase.
+- **Open questions:** none — both doc questions resolved in the header.
+
+---
+
 ## Session 15 — 2026-06-15 — Step 1B exploration brief landed
 - **Goal:** Bring the planning-room interstellar-expansion research into the repo as a Step 1B reference (precursor to Phase 4/exploration), reconciled with current repo decisions.
 - **Did:** Fetched the Google Doc "Interstellar Exploration and Expansion Framework" and saved it verbatim as `docs/12-exploration-science.md` with a reconciliation header. Doc covers: multi-scale map tiers (galactic/sector/system/surface) + floating-origin, sub-light-vs-warp propulsion (4-phase warp jump), the real Tau Ceti neighborhood (YZ Ceti 1.6 ly, Luyten 726-8 3.1 ly, Epsilon Eridani 5.5 ly with astrophysical hooks), ESI habitability tiers, and anti-snowball macroeconomics (admin latency, gravity-well tax, bulk/strategic split). Inline `→ CLAUDE CODE` directives preserved verbatim, **not acted on** (save-only).
