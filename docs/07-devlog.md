@@ -14,6 +14,21 @@ Entry template:
 
 ---
 
+## Session 11 — Phase 2B: colony economy
+- **Goal:** Build the resource economy behind the `FoundColony` stub — data-driven resources/buildings, a deterministic colony system, the `BuildStructure` command, the survival-clock payoff, and the colony UI. Terraforming (Phase 3) and population (2C) explicitly out of scope. Determinism + tests stay green.
+- **Did:**
+  - **Data** (`src/sim/data/colony.ts`): full 6-resource set (Power, Water, Oxygen, Food, Metals, Propellant) + 5 buildings (Solar Array, Ice Extractor, Regolith Smelter, Electrolysis Plant, Hydroponics Biodome) with inputs/outputs/costs, crew demand, founding seed, and all tuning. Rates are per economy-tick.
+  - **Economy cadence:** `ECONOMY_TICK_INTERVAL = 60` (constants.ts) — colonySystem runs ~1 Hz (gated `world.tick % 60 === 0`), decoupled from the 60 Hz flight tick so reserves last minutes. Sequenced in `loop.ts` before life-support.
+  - **colonySystem** (`src/sim/systems/colony.ts`): deterministic, fixed order — power gen (solar × insolation `L/r²`) → power allocation by priority → extraction/production (suppliers before consumers; water replenished before drawn) → crew consumption → clamp + cached per-resource flows. Power deficit sheds low-priority modules; water shortage starves consumers in order. Body physics feed it (insolation, `waterAbundance`).
+  - **Colony component** keyed by body id; added to the registry + serialization.
+  - **Commands** (`src/sim/commands/colony.ts`, delegated from `apply.ts`): `FoundColony` made real — creates the colony **conserving** ship supplies (metals/food from inventory, propellant from fuel, water+oxygen offloaded from `lifeSupport.current`), rejected if short. `BuildStructure { bodyId, building }` — validates colony exists, ship landed, enough colony Metals; deducts cost, increments count, emits `StructureBuilt`.
+  - **Survival payoff** (`life-support.ts`): while landed at a colony with oxygen, the ship's reserve **recovers** (+3/flight-tick) instead of depleting — founding + sustaining a colony reverses the clock.
+  - **UI** (`src/ui/ColonyPanel.tsx` in SurfaceView): found action when no colony; once founded, a resource ledger (stockpile + net/s, green/red) and a structures list with a Metals-gated build menu. Live via `useGameTick`.
+  - **Tests:** `tests/colony.test.ts` (12 — founding conservation, cadence, flows, power/water cascades, relief, determinism) + 4 BuildStructure cases in `commands.test.ts`. 72/72 green; typecheck + build clean.
+- **Decisions** (`docs/09`): full 6-resource set with Propellant's sink deferred to Phase 4; decoupled economy cadence; founding conserves supplies; supplier-before-consumer power priority; multiplayer deferred but determinism/serialisation preserved for a possible future lockstep.
+- **Next:** confirm the loop in-browser (land Mira → found → build solar+water+electrolysis → watch O₂ go net-positive and the survival clock recover), then Phase 2C — population dynamics (growth/shrink with food, housing, conditions).
+- **Open questions:** balance is untuned by playtest (building counts to reach equilibrium feel plausible on paper); should low/zero oxygen or food trigger crew-health effects now or wait for 2C's population model?
+
 ## Session 10 — Phase 2A: command/event layer + landing transition
 - **Goal:** Build the deferred sim↔UI command/event layer at the start of Phase 2 (architecture, not colony economy — that's 2B), plus a placeholder landing transition + surface view. Determinism + tests stay green.
 - **Did:**
