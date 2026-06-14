@@ -116,6 +116,55 @@ describe("command validation", () => {
   });
 });
 
+describe("BuildStructure", () => {
+  /** Land + found a colony on a rocky planet, returning its body id. */
+  function landAndFound(world: ReturnType<typeof startedWorld>): number {
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    parkShipAt(world, planetId);
+    applyCommand(world, { kind: "LandAtBody", bodyId: planetId });
+    applyCommand(world, { kind: "FoundColony", bodyId: planetId });
+    return planetId;
+  }
+
+  it("builds a structure, deducting metals and incrementing the count", () => {
+    const world = startedWorld();
+    const pid = landAndFound(world);
+    const colony = world.components.colony.get(pid)!;
+    const m0 = colony.stockpiles.metals!;
+    const result = applyCommand(world, { kind: "BuildStructure", bodyId: pid, building: "solar" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.events[0]).toMatchObject({ kind: "StructureBuilt", building: "solar" });
+    expect(colony.buildings.solar).toBe(1);
+    expect(colony.stockpiles.metals).toBe(m0 - 50);
+  });
+
+  it("rejects building when there is no colony", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    parkShipAt(world, planetId);
+    applyCommand(world, { kind: "LandAtBody", bodyId: planetId });
+    const result = applyCommand(world, { kind: "BuildStructure", bodyId: planetId, building: "solar" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects building without enough metals", () => {
+    const world = startedWorld();
+    const pid = landAndFound(world);
+    const colony = world.components.colony.get(pid)!;
+    colony.stockpiles.metals = 10; // below any building cost
+    const result = applyCommand(world, { kind: "BuildStructure", bodyId: pid, building: "solar" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects building after take-off (no longer landed)", () => {
+    const world = startedWorld();
+    const pid = landAndFound(world);
+    applyCommand(world, { kind: "TakeOff" });
+    const result = applyCommand(world, { kind: "BuildStructure", bodyId: pid, building: "solar" });
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe("command application within the tick", () => {
   it("step() drains the queue and emits a Landed event the same tick", () => {
     const world = startedWorld();

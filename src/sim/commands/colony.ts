@@ -11,6 +11,8 @@ import {
   FOUNDING_LIFE_SUPPORT_COST,
   STORED_RESOURCES,
   BUILDING_TYPES,
+  BUILDINGS,
+  type BuildingType,
 } from "../data/colony.ts";
 
 /**
@@ -70,4 +72,31 @@ export function foundColony(world: World, bodyId: number): CommandResult {
   world.components.colony.set(bodyId, colony);
 
   return { ok: true, events: [{ kind: "ColonyFounded", bodyId, tick }] };
+}
+
+/**
+ * BuildStructure — add one building to a colony, paying its Metals cost from the
+ * colony's own stockpile. Requires the colony to exist, the ship to be landed on
+ * it, and enough metals in store.
+ */
+export function buildStructure(world: World, bodyId: number, building: BuildingType): CommandResult {
+  const tick = world.tick;
+  const ctrl = world.components.shipControl.get(world.shipId);
+  if (!ctrl || ctrl.landedBodyId !== bodyId)
+    return { ok: false, reason: "must be landed at the colony to build" };
+
+  const colony = world.components.colony.get(bodyId);
+  if (!colony) return { ok: false, reason: "no colony here" };
+
+  const def = BUILDINGS[building];
+  if (!def) return { ok: false, reason: "unknown structure" };
+
+  const metals = colony.stockpiles.metals ?? 0;
+  if (metals < def.costMetals)
+    return { ok: false, reason: `not enough metals (need ${def.costMetals})` };
+
+  colony.stockpiles.metals = metals - def.costMetals;
+  colony.buildings[building] = (colony.buildings[building] ?? 0) + 1;
+
+  return { ok: true, events: [{ kind: "StructureBuilt", bodyId, building, tick }] };
 }
