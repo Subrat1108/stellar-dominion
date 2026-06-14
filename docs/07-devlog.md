@@ -14,6 +14,22 @@ Entry template:
 
 ---
 
+## Session 12 — Phase 2C: population dynamics
+- **Goal:** Add aggregate population to the colony — seeded from crew at founding, grows when resources/housing allow, declines (proportionally) under oxygen/water/food shortages. No factions/politics (Phase 5–6), no migration (Phase 4). Determinism + tests green.
+- **Did:**
+  - **`Colony` component** (`ecs/components.ts`): added `population` (float, rendered as `Math.floor`), `popGrowthRate` (last tick delta), `popLimitingFactor` (human-readable driver string). Serialises automatically via the existing spread in `serializeWorld`.
+  - **Habitation Module** (`data/colony.ts`): new `BuildingType` added to `BUILDING_TYPES` and `POWER_PRIORITY` (between hydroponics and smelter). 80 Metals, 3 pw draw, 10 colonists per module. FoundColony grants 1 free module (the landing dome). Housing capacity = `buildings.habitation × HOUSING_PER_MODULE`.
+  - **`FoundColony` command** (`commands/colony.ts`): seeds `population = crew.members.length`; sets `buildings.habitation = 1`. Known debt: crew counted as both ship crew and colony population — cosmetic until the Phase 5–6 crew arc (logged in `docs/09`).
+  - **Consumption scaling** (`systems/colony.ts`): renamed `CREW_CONSUMPTION_PER_MEMBER` → `POPULATION_CONSUMPTION_PER_PERSON`; step 4 now uses `colony.population` instead of hardcoded ship-crew count. Rates unchanged (O₂ 0.1, water 0.08, food 0.06 per person per econ-tick).
+  - **`populationStep()`** (step 6 after flows finalised each economy tick): proportional death rates — oxygen critical (stockpile < 10 AND net < 0): −1.5 %/tick; water: −1.0 %/tick; food: −0.4 %/tick. All three require net < 0 (recovering stockpile ≠ shortage). Growth = `GROWTH_RATE_BASE × max(0.1, habitability) × housingMultiplier`; housing power multiplier = `0.5 + 0.5 × poweredFraction` — unpowered habitation halves growth. Capped at housing headroom. Dominant limiting factor cached in `popLimitingFactor`.
+  - **ColonyPanel** (`ui/ColonyPanel.tsx`): POPULATION section above resources — count / capacity / rate/s / limiting-factor label (colour-coded red for decline).
+  - **`housingCapacity(colony)`** exported helper used by UI and tests.
+  - **Tests** (`tests/colony.test.ts`): 10 new cases (82 total) — founding pop/housing, growth, housing cap, habitability speed difference, housing power penalty, O₂/water/food deaths, food-low-net-positive no starvation.
+  - **Decisions** (`docs/09`): proportional death rates; food requires net < 0; housing power penalty; aggregate population seeded from crew; founding crew double-counted (known debt).
+- **Decisions:** see `docs/09` — 2026-06-14 cluster of 5 population-model decisions.
+- **Next:** confirm in-browser (land Mira → found → colonists = 5, housing = 10 → build solar + water + electrolysis → watch pop grow → starve O₂ → see rapid decline), then Phase 3 — terraforming loop.
+- **Open questions:** population balancing (growth rates, building counts to sustain 10+ colonists) untested in-game; `RESOURCE_CRITICAL_THRESHOLD = 10` may need tuning once Habitation Module and real play reveal edge cases.
+
 ## Session 11 — Phase 2B: colony economy
 - **Goal:** Build the resource economy behind the `FoundColony` stub — data-driven resources/buildings, a deterministic colony system, the `BuildStructure` command, the survival-clock payoff, and the colony UI. Terraforming (Phase 3) and population (2C) explicitly out of scope. Determinism + tests stay green.
 - **Did:**
