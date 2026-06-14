@@ -1,12 +1,11 @@
-// Placeholder surface view (Phase 2A).
+// Surface view (Phase 2A overlay, Phase 2B colony economy).
 //
 // When the ship lands on a body (a Landed event), this overlay eases in over the
 // space view — a fade + zoom, NOT a seamless descent (docs/08): the space scene
 // stays put underneath and we cross-fade to a surface "deck". It shows the body's
 // key stats — including surface gravity computed from mass/radius (the first use
-// of gravity-as-a-stat, docs/09 Session 10) — and two stubbed actions:
-//   • Found colony here → FoundColony command (no colony sim yet — Phase 2B).
-//   • Take off          → TakeOff command, returning the ship to space.
+// of gravity-as-a-stat, docs/09 Session 10) — the colony panel (ColonyPanel:
+// found a colony, manage resources, build structures), and Take off.
 
 import { useRef, type CSSProperties } from "react";
 import type { World } from "../sim/ecs/world.ts";
@@ -14,6 +13,7 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { useLandingState } from "./hooks/useLandingState.ts";
+import ColonyPanel from "./ColonyPanel.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
 
@@ -42,9 +42,6 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
       ? world.components.celestialBody.get(displayId)
       : undefined;
 
-  function foundColony() {
-    if (landedBodyId !== null) dispatch(world, { kind: "FoundColony", bodyId: landedBodyId });
-  }
   function takeOff() {
     if (landedBodyId !== null) dispatch(world, { kind: "TakeOff" });
   }
@@ -109,16 +106,15 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
             />
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <button onClick={foundColony} style={primaryBtn}>
-              ⛶ FOUND COLONY HERE
-            </button>
+          {/* Colony economy — found, manage resources, build structures. */}
+          {displayId !== null && displayId !== undefined && (
+            <ColonyPanel world={world} bus={bus} bodyId={displayId} />
+          )}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
             <button onClick={takeOff} style={secondaryBtn}>
               ▲ TAKE OFF
             </button>
-          </div>
-          <div style={{ fontSize: 10, color: "#45475a", marginTop: 10 }}>
-            Colony construction arrives in Phase 2B — this button is wired but inert.
           </div>
         </div>
       )}
@@ -134,19 +130,6 @@ function StatRow({ label, value, valueColor }: { label: string; value: string; v
     </div>
   );
 }
-
-const primaryBtn: CSSProperties = {
-  flex: 1,
-  padding: "8px 12px",
-  fontSize: 12,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  background: "#1e3a5f",
-  color: "#89b4fa",
-  border: "1px solid #2a4a7f",
-  borderRadius: 4,
-  letterSpacing: 0.5,
-};
 
 const secondaryBtn: CSSProperties = {
   padding: "8px 12px",
