@@ -14,6 +14,15 @@ Entry template:
 
 ---
 
+## Session 15 — 2026-06-15 — Step 1B exploration brief landed
+- **Goal:** Bring the planning-room interstellar-expansion research into the repo as a Step 1B reference (precursor to Phase 4/exploration), reconciled with current repo decisions.
+- **Did:** Fetched the Google Doc "Interstellar Exploration and Expansion Framework" and saved it verbatim as `docs/12-exploration-science.md` with a reconciliation header. Doc covers: multi-scale map tiers (galactic/sector/system/surface) + floating-origin, sub-light-vs-warp propulsion (4-phase warp jump), the real Tau Ceti neighborhood (YZ Ceti 1.6 ly, Luyten 726-8 3.1 ly, Epsilon Eridani 5.5 ly with astrophysical hooks), ESI habitability tiers, and anti-snowball macroeconomics (admin latency, gravity-well tax, bulk/strategic split). Inline `→ CLAUDE CODE` directives preserved verbatim, **not acted on** (save-only).
+- **Decisions:** Reconciliation header overrides three doc asks — warp **ungated for now** (gate later), anti-snowball economics **deferred**, keep existing **habitability score** as the mechanic with **ESI only as a UI tier label** → `docs/09`, `docs/12`.
+- **Next:** Confirm Phase 3A in-browser, then start Phase 3B (magnetosphere/toxicity/biosphere + feedback loops). The exploration brief is a forward reference for the eventual Step 1B / interstellar slice, not the current phase.
+- **Open questions:** Doc proposes YZ Ceti + Luyten 726-8 as the first warp destinations and a separate Sector Map scene/data-layer — both to be revisited when the interstellar slice is actually scoped.
+
+---
+
 ## Session 14 — Phase 3A: terraforming core (Temperature / Pressure / Hydrosphere)
 - **Goal:** Ship the minimal tunable terraforming loop — three levers as a resource sink funded by a colony, precondition gating (Hydrosphere), and the habitability/stage payoff wired into the Phase 2C population model. Determinism + all tests green.
 - **Did:**

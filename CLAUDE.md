@@ -70,6 +70,7 @@ Long jobs can run out of context before finishing. Keep every task resumable fro
 | `docs/09-decisions.md` | Decision log: every architectural/design choice, dated, one-sentence rationale, newest first |
 | `docs/10-colony-science.md` | Colony resource & planetary architecture brief: resource set, production chains, ISRU, power scaling |
 | `docs/11-terraforming-science.md` | Terraforming reference: levers, gate conditions, stage thresholds, feedback loops, 3A/3B split |
+| `docs/12-exploration-science.md` | Step 1B interstellar-expansion reference: multi-scale map tiers, warp vs sub-light, Tau Ceti neighborhood, ESI tiers, anti-snowball economics (reconciled — see header) |
 
 ---
 
