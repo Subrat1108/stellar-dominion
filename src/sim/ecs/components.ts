@@ -43,6 +43,14 @@ export interface CelestialBody {
   color: number;
   dataTag: DataTag;
   description: string;
+  /**
+   * Stable semantic identity assigned by the content engine, e.g. "hyg:8087:2"
+   * (system + orbital index) or "hyg:8087:4.1" (moon 1 of body 4). Saves key
+   * player deltas to this — NOT the raw entity id, which is an artifact of
+   * generation/insertion order and would not survive engine changes (docs/13).
+   * Optional so hand-built fixtures without the engine still type-check.
+   */
+  bodyKey?: string;
 
   // Physical — all bodies
   massKg: number;

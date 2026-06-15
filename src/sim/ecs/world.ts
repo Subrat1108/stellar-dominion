@@ -37,6 +37,12 @@ export interface World {
   nextId: number;
   /** The single seeded RNG for the whole sim. */
   rng: Rng;
+  /**
+   * The seed the universe was generated from. Stored so a save can record it
+   * (a save = seed + player deltas, docs/13) and reconstruct regenerates the
+   * exact same universe. Transient/identity, not part of the component state.
+   */
+  universeSeed: string | number;
   components: Components;
   /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
   shipId: number;
@@ -58,6 +64,7 @@ export function createWorld(init: WorldInit): World {
     time: 0,
     nextId: 1,
     rng: makeRng(init.seed),
+    universeSeed: init.seed,
     components: createComponents(),
     shipId: 0,
     commandQueue: [],
