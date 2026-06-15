@@ -23,6 +23,7 @@ import { positionAt } from "../sim/math/kepler.ts";
 import { noseVector } from "../sim/systems/ship-movement.ts";
 import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
+import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
 
 export interface Renderer {
   sync(world: World): void;
@@ -91,14 +92,28 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
   worldRoot.add(makeStarfield(world));
 
+  // Find the star entity so orbit rings are drawn only for star-orbiting bodies
+  // (moons orbit a planet; their ring would otherwise be drawn around the origin).
+  let starEntity = -1;
+  for (const [entity, body] of world.components.celestialBody) {
+    if (body.kind === "star") { starEntity = entity; break; }
+  }
+
+  // Procedural-surface materials (planets + gas giants), updated each frame from
+  // live body state so the globe transforms as terraforming runs.
   const bodyMeshes = new Map<number, THREE.Mesh>();
+  const planetMaterials = new Map<number, THREE.ShaderMaterial>();
   for (const [entity, body] of world.components.celestialBody) {
     const mesh = buildBodyMesh(body);
     worldRoot.add(mesh);
     bodyMeshes.set(entity, mesh);
+    if (body.kind === "planet" || body.kind === "gas-giant") {
+      planetMaterials.set(entity, mesh.material as THREE.ShaderMaterial);
+    }
   }
 
   for (const [, orb] of world.components.orbit) {
+    if (orb.parent !== starEntity) continue; // skip moon rings (drawn at origin)
     worldRoot.add(makeOrbitLine(orb.elements));
   }
 
@@ -111,6 +126,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const _camPos = new THREE.Vector3();
   const _lookAt = new THREE.Vector3();
   const _offset = new THREE.Vector3();
+  const _lightDir = new THREE.Vector3();
   const _up     = new THREE.Vector3(0, 1, 0);
   const _qLook  = new THREE.Quaternion();
   const _qShip  = new THREE.Quaternion();
@@ -141,6 +157,17 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       for (const [entity, mesh] of bodyMeshes) {
         const t = w.components.transform.get(entity);
         if (t) mesh.position.set(t.position.x, t.position.y, t.position.z);
+      }
+
+      // Refresh procedural surfaces from live state. Light comes from the star at
+      // the worldRoot origin, so in each (unrotated) body's local frame the light
+      // direction is simply toward the origin: normalize(-bodyPos).
+      for (const [entity, material] of planetMaterials) {
+        const body = w.components.celestialBody.get(entity);
+        const t = w.components.transform.get(entity);
+        if (!body || !t) continue;
+        _lightDir.set(-t.position.x, -t.position.y, -t.position.z).normalize();
+        updatePlanetMaterial(material, body, w.time, _lightDir);
       }
 
       // Orient the ship from its heading + pitch (shared nose math with the sim).
@@ -249,17 +276,10 @@ function buildBodyMesh(body: CelestialBody): THREE.Mesh {
     return mesh;
   }
 
-  const mat =
-    body.kind === "gas-giant"
-      ? new THREE.MeshStandardMaterial({
-          color: body.color,
-          roughness: 0.7,
-          metalness: 0.0,
-          emissive: new THREE.Color(body.color).multiplyScalar(0.05),
-        })
-      : new THREE.MeshStandardMaterial({ color: body.color, roughness: 0.9, metalness: 0.0 });
-
-  const mesh = new THREE.Mesh(geo, mat);
+  // Planets + gas giants get the procedural ShaderMaterial (FBM/Simplex on the
+  // GPU); its appearance is a pure function of the body's properties + seed and
+  // transforms live as terraforming changes the body's state (docs/13).
+  const mesh = new THREE.Mesh(geo, makePlanetMaterial(body));
   mesh.name = body.name;
   return mesh;
 }
