@@ -6,7 +6,7 @@ Built as **vertical slices**: each phase produces something playable end-to-end,
 
 ---
 
-## Phase 0 — Foundations *(current)*
+## Phase 0 — Foundations *(complete)*
 - [ ] These docs reviewed and decisions confirmed.
 - [ ] Repo scaffolded: Vite + TypeScript (strict) + Vitest, with the `/src` layout from `docs/03`.
 - [ ] Minimal ECS skeleton + fixed-tick loop running headless (a test proves determinism).
@@ -35,14 +35,45 @@ Built as **vertical slices**: each phase produces something playable end-to-end,
 
 **Slice goal:** transform a marginal world a meaningful step toward habitable. This is the signature moment — make it satisfying.
 
-## Phase 4 — A full star system
+## Exploration-first interlude (re-sequenced) — the content engine, then the expansion layer
+
+After Phase 3A the build pivots to **exploration-first sequencing**: before deepening any single system (3B feedback, multi-colony logistics) we lay the universe foundation so there is somewhere to explore. This interlude precedes the original Phase 4/5 work, which is folded into it.
+
+### Step 1A — the content engine *(current)*
+- Deterministic, seeded universe generation: real stars from a bundled HYG subset + procedurally-filled planets/moons (xxHash-seeded, Chen & Kipping mass–radius, "peas in a pod" spacing). See `docs/13`.
+- Scope: the **local neighborhood only**. No sector/galaxy map, no warp UI, no tech tree, no economy changes — those are later steps.
+- Generated bodies keep the exact `CelestialBody` shape the colony/terraforming/population/save systems already consume; each body tagged real / derived / fictional.
+- Save = universe seed + player deltas (keyed by stable semantic identity, not raw entity id), behind a swappable save/load interface (flat JSON now; SQLite-WASM/OPFS deferred).
+- First-pass procedural surfaces: Three.js `ShaderMaterial` (FBM/Simplex) that is a pure function of body properties + seed, transforming as terraforming runs.
+
+**Slice goal:** the engine can generate a large, varied, grounded neighborhood from a seed — no hand-authoring per body — and the home system is itself produced through it.
+
+### Step 1B — exploration & expansion (warp layer)
+- Multi-scale map tiers (system → sector → galaxy) + warp/sub-light travel. See `docs/12`.
+- Warp is **temporarily ungated** ("god mode") during the build phase; tech-tree gating and the economy/purpose of travel are deferred.
+- The second star system is reachable and worth reaching.
+
+**Slice goal:** fly to a neighboring real star and explore a freshly-generated system.
+
+### Deferred / parked (so nothing falls off)
+Explicitly held back during the exploration-first interlude, to be picked up in their own slices:
+- **3B terraforming depth** — magnetosphere / toxicity / biosphere levers + cross-lever feedback (runaway greenhouse, pressure broadening, Urey drain, albedo trap, atmospheric stripping).
+- **Start-world difficulty / hard-start retune** — Step 1A keeps the current Tau Ceti tuning (Mira near-habitable). Retuning the home system into a deliberately harsh start (no free liveable world; terraforming as the only path) is a deliberate later content pass, not done now.
+- **In-system logistics / multi-colony networks** — orbital transfers (time + propellant), depots, multi-colony resource routing (original Phase 4).
+- **Dedicated economy / anti-snowball pass** — admin latency, gravity-well tax, bulk-vs-strategic resource split (`docs/12`).
+- **Trade, diplomacy & governance** — rival AI, trade routes/prices, policy/factions/stability (original Phase 6).
+- **Conflict & conquest** — fleets, defenses, tick/statistical resolution, governing taken worlds (original Phase 7).
+- **Universe tier + wormholes** — galaxy/"universe" grand-strategy scale and any FTL topology beyond warp (frontier scale, `docs/04`).
+- **Victory / balancing / monetization** — victory conditions across dominion paths, balancing pass, save hardening, desktop wrapper & monetization question (original Phase 8).
+
+## Phase 4 — A full star system *(folded into the interlude / revisit after 1B)*
 - Multiple bodies in play (planets, moons, asteroids, a gas giant).
 - In-system navigation & orbital logistics (transfers cost time + fuel).
 - Multi-colony resource network within the system.
 
 **Slice goal:** manage a system, not just a planet.
 
-## Phase 5 — Interstellar: the galaxy map
+## Phase 5 — Interstellar: the galaxy map *(superseded by Step 1B)*
 - Several star systems; abstracted (tech-gated) interstellar travel.
 - A galaxy/sector view; expansion beyond the home system.
 

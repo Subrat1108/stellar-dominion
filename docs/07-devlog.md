@@ -14,6 +14,21 @@ Entry template:
 
 ---
 
+> **Resume point (Session 17, in progress):** Step 1A content engine.
+> Done: docs/05 re-sequenced (Step 1A/1B + Deferred list), docs/09 decisions logged.
+> Next: build `src/sim/gen/` engine (hash → occurrence → mass-radius → spacing → archetype → system), `/tools/import-hyg.mjs` + stripped JSON, `data/real-planets.ts`, save interface + seed/delta round-trip, with tests. Then integrate home system, then renderer. Commits: docs / engine / home-system / renderer.
+
+## Session 17 — 2026-06-16 — Step 1A content engine *(in progress)*
+- **Goal:** Build the deterministic seeded content engine (Step 1A) so the universe is generated from a seed rather than hand-authored, regenerate the home system through it, and add first-pass procedural planet surfaces. Determinism + all existing tests green.
+- **Did (so far):**
+  - **docs/05** re-sequenced to exploration-first: Step 1A (content engine, current) + Step 1B (warp layer), original Phase 4/5 folded in, and a **Deferred / parked** list added (3B depth, **start-world hard-start retune**, in-system logistics/multi-colony, economy/anti-snowball, trade/diplomacy/governance, conflict, universe tier + wormholes, victory/balancing/monetization).
+  - **docs/09** logged the Session-17 decision cluster: exploration-first re-sequencing; universe = seed + deltas behind a swappable save interface (flat JSON now); **deltas keyed by stable semantic identity, not raw entity id**; the HYG + xxHash + Chen-Kipping + peas-in-a-pod pipeline with provenance tags (local ~25 ly subset now); real Tau Ceti candidates load verbatim (tagged real) with only moons + gas giant generated; shader surfaces; warp ungated; ESI as UI label only.
+- **Decisions:** see `docs/09` 2026-06-16 cluster.
+- **Next:** engine → home-system integration → renderer (see resume point above).
+- **Open questions:** none yet.
+
+---
+
 ## Session 16 — 2026-06-15 — Step 1A procedural-generation brief landed
 - **Goal:** Bring the planning-room "Content Architecture & Universe Generation" research into the repo as a Step 1A reference (precursor to procedural neighborhood generation), with the architectural questions resolved up front.
 - **Did:** Saved the brief verbatim as `docs/13-procedural-generation.md` with a resolved-decisions header. Brief covers: hybrid real-HYG-catalog + seeded procedural fill, xxHash coordinate-seeded lazy generation (zero disk for the universe), Chen & Kipping (2017) mass-radius relations, "peas in a pod" ~20-mutual-Hill-radii spacing (Weiss 2018), property→shader appearance mapping (Simplex/FBM on GPU), and the SQLite-WASM/OPFS vs flat-JSON save-architecture question. The doc's two inline open questions (`→ CLAUDE`, `→ CLAUDE CODE`) are preserved for provenance but answered by the header.
