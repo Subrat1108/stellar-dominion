@@ -14,18 +14,20 @@ Entry template:
 
 ---
 
-> **Resume point (Session 17, in progress):** Step 1A content engine.
-> Done: docs/05 re-sequenced (Step 1A/1B + Deferred list), docs/09 decisions logged.
-> Next: build `src/sim/gen/` engine (hash → occurrence → mass-radius → spacing → archetype → system), `/tools/import-hyg.mjs` + stripped JSON, `data/real-planets.ts`, save interface + seed/delta round-trip, with tests. Then integrate home system, then renderer. Commits: docs / engine / home-system / renderer.
-
-## Session 17 — 2026-06-16 — Step 1A content engine *(in progress)*
+## Session 17 — 2026-06-16 — Step 1A content engine + procedural surfaces
 - **Goal:** Build the deterministic seeded content engine (Step 1A) so the universe is generated from a seed rather than hand-authored, regenerate the home system through it, and add first-pass procedural planet surfaces. Determinism + all existing tests green.
-- **Did (so far):**
-  - **docs/05** re-sequenced to exploration-first: Step 1A (content engine, current) + Step 1B (warp layer), original Phase 4/5 folded in, and a **Deferred / parked** list added (3B depth, **start-world hard-start retune**, in-system logistics/multi-colony, economy/anti-snowball, trade/diplomacy/governance, conflict, universe tier + wormholes, victory/balancing/monetization).
-  - **docs/09** logged the Session-17 decision cluster: exploration-first re-sequencing; universe = seed + deltas behind a swappable save interface (flat JSON now); **deltas keyed by stable semantic identity, not raw entity id**; the HYG + xxHash + Chen-Kipping + peas-in-a-pod pipeline with provenance tags (local ~25 ly subset now); real Tau Ceti candidates load verbatim (tagged real) with only moons + gas giant generated; shader surfaces; warp ungated; ESI as UI label only.
+- **Did:**
+  - **docs:** re-sequenced `docs/05` to exploration-first (Step 1A engine + Step 1B warp; original Phase 4/5 folded in; **Deferred / parked** list incl. start-world hard-start retune, 3B depth, in-system logistics, economy/anti-snowball, trade/diplomacy/governance, conflict, universe tier + wormholes, victory/balancing). Logged the Session-17 decision cluster in `docs/09`.
+  - **Engine** (`src/sim/gen/`): `hash.ts` (pure-TS **xxHash32** → per-system seed from universe seed + star id + galactic coords); `mass-radius.ts` (**Chen & Kipping 2017** piecewise, continuous); `occurrence.ts` (spectral-type → planet count / mass / stellar params); `spacing.ts` (**peas-in-a-pod** ~20 mutual Hill radii, closed form); `archetype.ts` (docs/04 archetypes → surface temp / atmosphere / colour); `names.ts`; `system.ts` (`generateSystem` — real bodies verbatim where a `RealSystemDef` exists, generated fill otherwise; every body tagged real/derived/fictional + stable `bodyKey`; lazy + deterministic).
+  - **Catalog:** `tools/import-hyg.mjs` fetches the astronexus HYG CSV and writes a stripped **local ~25 ly subset** → `data/hyg-neighborhood.json` (167 stars incl. Tau Ceti = HYG 8087; no runtime fetch). `gen/catalog.ts` loads it.
+  - **Real systems** (`data/real-planets.ts`): Tau Ceti's real candidates (Ferrum/Caldor/Mira/Glacius) injected verbatim from `tau-ceti.ts`; only the outer gas giant + its moons are generated (fictional). Current tuning kept (hard-start retune parked).
+  - **Save model** (`src/sim/save/`): `SaveStore` interface (Memory + localStorage); `extractDeltas`/`reconstructWorld` — a save = universe seed + **player deltas keyed by stable `bodyKey`** (not entity id); body transforms re-derived from time on load. Flat JSON now; SQLite deferred. Added `CelestialBody.bodyKey?` and `World.universeSeed` (non-breaking).
+  - **Integration** (`world-setup.ts`): home system now built **through** `generateSystem`; bodies `structuredClone`d at insertion (Session-14 isolation); moons orbit their planet in scene units just outside its render radius.
+  - **Renderer** (`render/planet-material.ts` + `scene.ts`): procedural **ShaderMaterial** (4-octave 3D-simplex FBM) for planets/gas-giants; `bodyToVisualParams` is a **pure** property→uniform mapping (ocean←hydrosphere, ice←temperature, vegetation←habitability, haze←pressure, seed←bodyKey); uniforms refreshed each frame from live state so terraforming transforms the globe; light toward the star at worldRoot origin; orbit rings only for star-orbiters.
+  - **Tests** (+31 → **129**): `generation.test.ts` (xxHash, mass-radius, spacing, determinism, provenance, verbatim real bodies), `home-system.test.ts` (engine integration), `save.test.ts` (byte-identical seed+delta round-trip incl. colony + terraforming, stable-key deltas, SaveStore, version guard), `planet-visual.test.ts` (mapping purity + terraforming-driven look). Typecheck + build clean.
 - **Decisions:** see `docs/09` 2026-06-16 cluster.
-- **Next:** engine → home-system integration → renderer (see resume point above).
-- **Open questions:** none yet.
+- **Next:** confirm in-browser (procedural globes, gas giant + moons, terraforming visibly reshaping a world), then **Step 1B** — exploration/warp layer (multi-scale map, fly to a neighboring real star, generate its system on arrival).
+- **Open questions:** moon orbit rings not drawn (placed visually around the gas giant; first pass); generated gas giant replaces the old hand-authored "Titan's Eye" identity — revisit naming/flavour for generated outer bodies in 1B.
 
 ---
 
