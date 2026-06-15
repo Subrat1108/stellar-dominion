@@ -1,78 +1,97 @@
 // Phase 1 starting scenario: the Tau Ceti system + the stranded ship.
 //
-// Replaces the Phase 0 placeholder. Each body is built from the curated data
-// in src/sim/data/tau-ceti.ts (tagged real / derived / fictional per docs/04).
-// Orbital elements are scaled for visual appeal (see comment below); real
-// catalog import at physical scale is a later task.
+// Step 1A (Session 17): the home system is now produced THROUGH the content
+// engine (src/sim/gen) rather than hand-assembled. The engine loads Tau Ceti's
+// real star + real candidate planets verbatim from the real-systems table
+// (tagged real/derived) and procedurally generates the fill — an outer gas giant
+// and its moons (tagged fictional). This proves the pipeline on the home system
+// while keeping the real planets' tuning identical. Everything downstream
+// (colony, terraforming, population, saves) consumes the same CelestialBody
+// shape as before; only HOW bodies are produced changed.
 //
-// Orbital speed scaling:
-//   All mean-motion values (rad / sim-second) are derived from Mira's reference
-//   period using Kepler's third law: n ∝ a^(-3/2), giving pleasing relative
-//   motion. The global clock is then slowed by ORBITAL_TIME_RATE so planets are
-//   nearly stationary during a flight. Scene-unit semi-major axes come from
-//   sceneDistance() in presentation.ts (AU * AU_TO_SCENE + STAR_CLEARANCE).
+// Orbital speed scaling (unchanged): mean-motion values (rad / sim-second) are
+// derived from Mira's reference period via Kepler's third law (n ∝ a^-3/2),
+// giving pleasing relative motion; the global clock is slowed by
+// ORBITAL_TIME_RATE so planets are nearly stationary during a flight. Scene-unit
+// semi-major axes come from sceneDistance() in presentation.ts.
 
 import { createWorld, createEntity, type World } from "./ecs/world.ts";
-import type { CelestialBody } from "./ecs/components.ts";
 import { sceneDistance } from "./presentation.ts";
-import {
-  tauCetiStar,
-  ferrum,
-  caldor,
-  mira,
-  glacius,
-  titansEye,
-} from "./data/tau-ceti.ts";
+import { generateSystem } from "./gen/system.ts";
+import { starById } from "./gen/catalog.ts";
+import { realSystemFor, TAU_CETI_HYG_ID } from "./data/real-planets.ts";
+import type { GeneratedBody } from "./gen/types.ts";
 
 // Mira's reference orbital parameters. This sets the RELATIVE speeds of the
-// planets; the global orbital clock is slowed by ORBITAL_TIME_RATE (orbital.ts)
-// so planets are nearly stationary during a flight.
+// star-orbiting planets; the global orbital clock is slowed by ORBITAL_TIME_RATE
+// (orbital.ts) so planets are nearly stationary during a flight.
 const MIRA_N = 0.08; // rad / sim-sec — relative mean motion reference
+const MIRA_AU = 0.65;
 
 // Scale mean motion by Kepler's third law: n(a) = MIRA_N * (MIRA_AU / a)^1.5
 function keplerN(realAu: number): number {
-  const MIRA_AU = 0.65;
   return MIRA_N * Math.pow(MIRA_AU / realAu, 1.5);
 }
 
-// Scene-unit semi-major axis comes from the central presentation scale.
+// Moons orbit their planet on a fixed modest rate (their physical AU is tiny and
+// not visually meaningful at our scene scale; they're placed just outside the
+// planet's render radius). Faster than planets so they visibly circle.
+const MOON_N = MIRA_N * 5;
 
 export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): World {
   const world = createWorld({ seed });
   const { celestialBody, orbit } = world.components;
 
-  // --- Star (stationary at origin, no Orbit component) ---
-  // Bodies are inserted as DEEP CLONES of the shared catalog constants: the sim
-  // mutates body fields (terraforming shifts temperature/pressure/hydrosphere and
-  // rewrites habitability), so each world must own its copy or those mutations
-  // would leak into the module singletons (and into the next new game / save).
+  // --- Generate the home system through the content engine ---
+  const star = starById(TAU_CETI_HYG_ID);
+  if (!star) throw new Error(`Tau Ceti (HYG ${TAU_CETI_HYG_ID}) missing from bundled catalog`);
+  const system = generateSystem(seed, star, realSystemFor(TAU_CETI_HYG_ID));
+
+  // Insert bodies. They are structuredClone'd so the sim can mutate body fields
+  // (terraforming shifts temp/pressure/hydrosphere + rewrites habitability)
+  // without leaking into the shared catalog/real-planet constants (Session 14).
+  // Parents are emitted before their moons, so a key→id map resolves moon parents.
+  const keyToId = new Map<string, number>();
+
   const starId = createEntity(world);
-  celestialBody.set(starId, structuredClone(tauCetiStar));
+  celestialBody.set(starId, structuredClone(system.star.body));
+  keyToId.set(system.star.bodyKey, starId);
 
-  // --- Planets ---
-  // [data, eccentricity, meanAnomalyAtEpoch, argumentOfPeriapsis]
-  const bodyDefs: Array<[CelestialBody, number, number, number]> = [
-    [ferrum,    0.04, 0,              0             ],
-    [caldor,    0.08, Math.PI / 3,   Math.PI / 8   ],
-    [mira,      0.05, Math.PI / 4,   Math.PI / 5   ],
-    [glacius,   0.12, Math.PI * 0.7, Math.PI / 4   ],
-    [titansEye, 0.06, Math.PI * 1.3, Math.PI / 10  ],
-  ];
-
-  for (const [data, ecc, m0, w] of bodyDefs) {
+  for (const gb of system.bodies) {
     const id = createEntity(world);
-    celestialBody.set(id, structuredClone(data));
-    const au = data.orbitalDistanceAu ?? 1;
-    orbit.set(id, {
-      parent: starId,
-      elements: {
-        semiMajorAxis: sceneDistance(au),
-        eccentricity: ecc,
-        meanMotion: keplerN(au),
-        meanAnomalyAtEpoch: m0,
-        argumentOfPeriapsis: w,
-      },
-    });
+    celestialBody.set(id, structuredClone(gb.body));
+    keyToId.set(gb.bodyKey, id);
+    if (!gb.orbit) continue;
+
+    if (gb.parentKey) {
+      // Moon: orbit the parent planet, placed in scene units just outside it.
+      const parentId = keyToId.get(gb.parentKey) ?? starId;
+      const parentBody = celestialBody.get(parentId)!;
+      const moonIndex = Number(gb.bodyKey.split(".")[1] ?? 0);
+      orbit.set(id, {
+        parent: parentId,
+        elements: {
+          semiMajorAxis: parentBody.renderRadius * (1.8 + 0.9 * moonIndex),
+          eccentricity: gb.orbit.eccentricity,
+          meanMotion: MOON_N * (1 - 0.15 * moonIndex),
+          meanAnomalyAtEpoch: gb.orbit.meanAnomalyAtEpoch,
+          argumentOfPeriapsis: gb.orbit.argumentOfPeriapsis,
+        },
+      });
+    } else {
+      // Star-orbiting body: real-AU scene distance + Kepler-scaled mean motion.
+      const au = gb.orbit.semiMajorAxisAu;
+      orbit.set(id, {
+        parent: starId,
+        elements: {
+          semiMajorAxis: sceneDistance(au),
+          eccentricity: gb.orbit.eccentricity,
+          meanMotion: keplerN(au),
+          meanAnomalyAtEpoch: gb.orbit.meanAnomalyAtEpoch,
+          argumentOfPeriapsis: gb.orbit.argumentOfPeriapsis,
+        },
+      });
+    }
   }
 
   // --- Ship entity: ISS Prometheus (stranded) ---
@@ -139,9 +158,9 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
     position: { x: 0, y: 0, z: 60 },
   });
 
-  // Base max speed is small because the system is now large (Titan's Eye ~704 u).
-  // The throttle lever scales it: 1× = 0.01 u/s (fine docking near a ~1 u planet),
-  // 1000× = 10 u/s (Titan's Eye reachable from start in ~1 min). See presentation.ts.
+  // Base max speed is small because the system is large (gas giant ~1000+ u).
+  // The throttle lever scales it: 1× = 0.01 u/s (fine docking near a planet),
+  // 1000× = 10 u/s. See presentation.ts.
   world.components.shipVelocity.set(shipId, {
     vx: 0,
     vy: 0,
@@ -157,3 +176,6 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
 
   return world;
 }
+
+/** Re-export for callers that want the generated form without instantiating a world. */
+export type { GeneratedBody };
