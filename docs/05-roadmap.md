@@ -48,7 +48,7 @@ After Phase 3A the build pivots to **exploration-first sequencing**: before deep
 
 **Slice goal:** the engine can generate a large, varied, grounded neighborhood from a seed — no hand-authoring per body — and the home system is itself produced through it.
 
-### Step 1B — exploration & expansion (warp layer) *(active)*
+### Step 1B — exploration & expansion (warp layer) *(complete — Session 18)*
 - A dedicated **SectorView** scene (separate from the system map, entered by an eased zoom-out cross-fade) showing three real, catalog-placed star nodes: **Tau Ceti** (home), **YZ Ceti** (1.60 ly), **Luyten 726-8** (3.36 ly, the Gliese 65 binary); Epsilon Eridani + the rest are dim, locked background nodes (Step 1C). See `docs/12`.
 - **Warp** is **ungated** ("god mode") this phase — no tech prerequisite, no resource cost. Four phases: **SCAN** (coarse probabilistic preview only) → **SPOOL** (committed countdown) → **TRANSIT** (locked sector crossing) → **ARRIVE** (destination generated via the 1A `generateSystem`, fog lifted, drop into the new system).
 - **One active system** is fully simulated at a time (single persistent world, content swapped on warp; the ship entity persists). Off-view systems are **paused and lazily caught up** on re-entry (deterministic batch of the existing economy, clamped) — not ticked per-frame.
@@ -59,9 +59,17 @@ After Phase 3A the build pivots to **exploration-first sequencing**: before deep
 
 **Out of scope (deferred):** tech tree + warp gating/cost; the economy/anti-snowball systems (admin latency, courier upkeep, gravity-well tax, interstellar freight); sub-light interstellar probes; Epsilon Eridani; galaxy/universe tiers; any shielding-research / hazard-damage mechanic.
 
+### Exploration polish — making the exploration leg *feel* good *(active)*
+A focused, no-new-features pass triggered by playtest verdict: the exploration leg feels unrealistic and unsatisfying. **Governing principle (see `docs/09`):** *true relative proportions + real-AU distances + NO inflated bodies, made navigable by speed, targeting, and (later) the map* — **not** literal 1:1 with no aids (that makes space an empty void). Sub-phases:
+- **A — rendering & flight-feel *(active)*.** Star-lit hemisphere + real day/night terminator on bodies (lighting from the system star at sim-origin); remove the 6× planet inflation so bodies sit at true radius in the existing AU→scene mapping (a world is a small dot until you close on it); re-derive everything coupled to the old inflated radius (autopilot park distance, soft-surface stop, scanner, **and the ship-avatar + camera-rig scale**, which shrink with honest bodies — scale-coupling, not new camera behavior); throttle/speed rework (5 exponential gears DOCK→MAX); a minimal flight-HUD target marker (edge-chevron extension of the cockpit scanner) so real-scale flight is navigable on its own.
+- **B — controls & cameras.** Camera changes / mouse-steering polish.
+- **C — unified multi-scale clickable map.** The single zoomable map (system↔sector↔…) + promoting the minimap.
+- **D — body detail UI.** The body-inspection / detail panel.
+
 ### Deferred / parked (so nothing falls off)
 Explicitly held back during the exploration-first interlude, to be picked up in their own slices:
 - **3B terraforming depth** — magnetosphere / toxicity / biosphere levers + cross-lever feedback (runaway greenhouse, pressure broadening, Urey drain, albedo trap, atmospheric stripping).
+- **Fully-honest tight-system orbit spacing** — Exploration-polish A keeps the 1B orbit-placement floors (`orbitSceneRadius`, moon spacing) untouched (they're distance placement baked into sim data; touching them risks the YZ-Ceti / save-determinism tests). At honest body scale the floors' original justification (bodies overlapping at ultra-tight separations, esp. **YZ Ceti** 0.016–0.028 AU) weakens, so revisiting/relaxing them is a deferred follow-up.
 - **Start-world difficulty / hard-start retune** — Step 1A keeps the current Tau Ceti tuning (Mira near-habitable). Retuning the home system into a deliberately harsh start (no free liveable world; terraforming as the only path) is a deliberate later content pass, not done now.
 - **In-system logistics / multi-colony networks** — orbital transfers (time + propellant), depots, multi-colony resource routing (original Phase 4).
 - **Dedicated economy / anti-snowball pass** — admin latency, gravity-well tax, bulk-vs-strategic resource split (`docs/12`).

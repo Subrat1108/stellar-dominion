@@ -14,6 +14,19 @@ Entry template:
 
 ---
 
+> **Resume point (Session 19, in progress — Exploration polish A):** docs slice DONE (this file + 05/08/09). Next: lighting slice (planet-material.ts FRAG — day/night terminator + ambient + lit-limb haze; star stays MeshBasic emitter). Then real-scale + speed + marker slice. Commit per slice; all 157 tests stay green + new pure-fn tests.
+
+## Session 19 — 2026-06-24 — Exploration polish A (rendering & flight-feel) *(in progress)*
+- **Goal:** Make the exploration leg feel real & navigable without new features. Governing principle (docs/09): true relative proportions + real-AU distances + no inflated bodies, navigable via speed/targeting/(map). Three fixes: (1) star-lit hemisphere + day/night terminator on bodies; (2) remove the 6× planet inflation → honest physical radii, re-derive park/soft-stop/scanner/landing + the ship-avatar & camera-rig scale; (3) throttle rework (5 exponential gears) + a minimal flight-HUD target marker. Determinism untouched; all 157 tests green + new pure-fn tests.
+- **Checklist:**
+  - [x] Docs: 05 (1B complete + Exploration-polish A/B/C/D sub-phase, A active; tight-system spacing deferred), 09 (governing principle), 08 (physical bodies + avatar/camera coupling + log depth + gears), this resume point.
+  - [ ] Lighting: planet-material.ts FRAG — Lambert×albedo day side, smoothstep terminator, tunable ambient/starlight floor, lit-limb-only haze; reuse uLightDir. Star untouched (MeshBasic).
+  - [ ] Real scale: physicalRadiusToScene + unify radii (drop inflation/min); re-derive parkDistance/soft-stop/scanner; shrink ship+camera rig (single factor, ratios preserved); log depth buffer + near plane; map-marker scale. Update parkDistance-referencing tests.
+  - [ ] Speed: pure maxSpeedForGear (5 gears DOCK→MAX), wire ship-movement + HUD + speed-state type.
+  - [ ] Marker: edge-chevron flight-HUD target indicator (extends Scanner).
+  - [ ] New tests: maxSpeedForGear, physicalRadiusToScene, parkDistance/scanner derivations.
+- **Decisions:** see docs/09 2026-06-24 governing-principle row.
+
 ## Session 18 — 2026-06-24 — Step 1B exploration / warp layer
 - **Goal:** Turn the 167-star catalog into places the player can fly to: a dedicated sector map, a four-phase ungated warp FSM, single-active-system swap with deterministic lazy catch-up for off-view systems, arrival generation reusing the 1A engine (YZ Ceti via a RealSystemDef), and the save extended with active-system + discovered + ship. Determinism + all existing tests green.
 - **Did:**
