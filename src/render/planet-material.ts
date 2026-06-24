@@ -105,10 +105,12 @@ export function bodyToVisualParams(body: CelestialBody): PlanetVisualParams {
 
 const VERT = /* glsl */ `
   varying vec3 vPos;
-  varying vec3 vNormal;
+  varying vec3 vNormal;     // OBJECT space (bodies are unrotated, so == world space)
+  varying vec3 vViewNormal; // VIEW space — only for the camera-facing limb glow
   void main() {
     vPos = position;
-    vNormal = normalize(normalMatrix * normal);
+    vNormal = normal;
+    vViewNormal = normalize(normalMatrix * normal);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -119,6 +121,7 @@ const FRAG = /* glsl */ `
   precision highp float;
   varying vec3 vPos;
   varying vec3 vNormal;
+  varying vec3 vViewNormal;
 
   uniform float uSeed;
   uniform float uTime;
@@ -132,7 +135,8 @@ const FRAG = /* glsl */ `
   uniform float uIceLevel;
   uniform float uVegetation;
   uniform float uAtmDensity;
-  uniform vec3  uLightDir;
+  uniform vec3  uLightDir;   // world-space direction from the body TOWARD the star
+  uniform float uAmbient;    // starlight floor so the night side isn't pure black
 
   vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
   vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
@@ -188,9 +192,10 @@ const FRAG = /* glsl */ `
 
   void main(){
     vec3 n=normalize(vNormal);
+    float ndl=dot(n,normalize(uLightDir)); // <0 = night-facing
     vec3 sp=normalize(vPos)*2.0+vec3(uSeed*100.0);
-    float light=clamp(dot(n,normalize(uLightDir)),0.0,1.0)*0.9+0.1;
 
+    // --- Surface albedo (unlit) ---
     vec3 color;
     if(uIsGasGiant==1){
       // Latitudinal bands warped by noise — slow drift over time.
@@ -211,10 +216,18 @@ const FRAG = /* glsl */ `
       color=surface;
     }
 
-    color*=light;
-    // Atmospheric rim glow (Fresnel) scaled by density.
-    float rim=pow(1.0-max(dot(n,vec3(0.0,0.0,1.0)),0.0),3.0);
-    color+=uAtmColor*rim*uAtmDensity*0.6;
+    // --- Star lighting: Lambert day side + ambient floor + real terminator ---
+    // The cosine falloff (max(ndl,0)) gives a physically real day/night line;
+    // uAmbient keeps the night side legible without washing it out.
+    float lambert=max(ndl,0.0);
+    color*=uAmbient+(1.0-uAmbient)*lambert;
+
+    // Atmospheric limb glow (Fresnel) — reads on the LIT limb, fades to night.
+    // dayness softens across the terminator so the glow doesn't pop at the line.
+    float dayness=smoothstep(-0.1,0.2,ndl);
+    float rim=pow(1.0-max(normalize(vViewNormal).z,0.0),3.0);
+    color+=uAtmColor*rim*uAtmDensity*0.6*dayness;
+
     gl_FragColor=vec4(color,1.0);
   }
 `;
@@ -234,8 +247,13 @@ function uniformsFor(p: PlanetVisualParams) {
     uVegetation: { value: p.vegetation },
     uAtmDensity: { value: p.atmosphereDensity },
     uLightDir: { value: new THREE.Vector3(0, 0, 1) },
+    uAmbient: { value: AMBIENT_STARLIGHT },
   };
 }
+
+// Night-side floor: small enough that the terminator reads clearly, large enough
+// that the dark hemisphere stays legible (not a pure-black silhouette). Tunable.
+const AMBIENT_STARLIGHT = 0.05;
 
 /** Build a procedural ShaderMaterial for a planet or gas giant. */
 export function makePlanetMaterial(body: CelestialBody): THREE.ShaderMaterial {
