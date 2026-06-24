@@ -43,6 +43,14 @@ export interface World {
    * exact same universe. Transient/identity, not part of the component state.
    */
   universeSeed: string | number;
+  /**
+   * The system whose bodies currently populate the world (Step 1B). One system
+   * is fully simulated at a time; warp swaps the world's contents. Stable id
+   * (`hyg:<starId>`), set by world-setup / setActiveSystem.
+   */
+  activeSystemId: string;
+  /** Stable ids of systems whose fog of war has been permanently lifted. */
+  discovered: string[];
   components: Components;
   /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
   shipId: number;
@@ -65,6 +73,8 @@ export function createWorld(init: WorldInit): World {
     nextId: 1,
     rng: makeRng(init.seed),
     universeSeed: init.seed,
+    activeSystemId: "",
+    discovered: [],
     components: createComponents(),
     shipId: 0,
     commandQueue: [],

@@ -24,6 +24,12 @@ import { noseVector } from "../sim/systems/ship-movement.ts";
 import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
+import { buildSectorScene } from "./sector-scene.ts";
+import {
+  nextMapTier,
+  SECTOR_DEFAULT_CAM_DIST,
+  SYSTEM_DEFAULT_CAM_DIST,
+} from "./sector-layout.ts";
 
 export interface Renderer {
   sync(world: World): void;
@@ -39,6 +45,7 @@ const CHASE_DIST   = 1.7;  // scene units behind ship (≈ 5 ship-lengths)
 const CHASE_HEIGHT = 0.7;  // scene units above ship
 const COCKPIT_FWD  = 0.22; // camera sits just ahead of the cone tip
 const MAP_MARKER_SCALE = 40; // enlarge the ship in map view so it reads as a marker
+const TRANSITION_SECS = 0.45; // eased cross-fade duration on a map-tier flip
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z
 
 export function createRenderer(world: World, canvasParent: HTMLElement): Renderer {
@@ -121,6 +128,13 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const shipMesh = buildShipMesh();
   scene.add(shipMesh);
 
+  // --- Sector map (Tier 1): a separate scene of the stellar neighbourhood,
+  // shown when the map view is zoomed all the way out (docs/12). The same
+  // perspective camera + OrbitControls drive both tiers; a tier flip reframes
+  // the camera and kicks an eased fade (viewState.transitionT) for the overlay.
+  const sectorView = buildSectorScene(world.activeSystemId);
+  let lastSyncMs = performance.now();
+
   // Reused scratch vectors.
   const _nose   = new THREE.Vector3();
   const _camPos = new THREE.Vector3();
@@ -137,14 +151,35 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     mouseLook.yaw = 0;
     mouseLook.pitch = 0;
     if (v === "map") {
+      // Always (re)enter the map at the in-system tier.
+      viewState.mapTier = "system";
       camera.position.set(0, 600, 900); // pulled back to frame the whole system
       controls.target.set(0, 0, 0);
       controls.update();
     }
   }
 
+  // Reframe the camera when the map crosses between system and sector tiers,
+  // and kick the eased cross-fade overlay.
+  function applyTierFlip(tier: "system" | "sector"): void {
+    viewState.mapTier = tier;
+    viewState.transitionT = 1;
+    controls.target.set(0, 0, 0);
+    const dist = tier === "sector" ? SECTOR_DEFAULT_CAM_DIST : SYSTEM_DEFAULT_CAM_DIST;
+    camera.position.set(0, dist * 0.55, dist * 0.83).setLength(dist);
+    controls.update();
+  }
+
   return {
     sync(w: World) {
+      // Decay the map-tier cross-fade overlay (eased; viewState.transitionT).
+      const nowMs = performance.now();
+      const dt = (nowMs - lastSyncMs) / 1000;
+      lastSyncMs = nowMs;
+      if (viewState.transitionT > 0) {
+        viewState.transitionT = Math.max(0, viewState.transitionT - dt / TRANSITION_SECS);
+      }
+
       const shipT    = w.components.transform.get(w.shipId);
       const shipCtrl = w.components.shipControl.get(w.shipId);
       const sx = shipT?.position.x ?? 0;
@@ -181,7 +216,20 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       const view = viewState.view;
 
       if (view === "map") {
-        // True coordinates; ship drawn at real position as a marker.
+        // Tier detection from camera distance (hysteretic); a flip reframes the
+        // camera and kicks the cross-fade. Zoom out → sector; zoom in → system.
+        const camDist = camera.position.distanceTo(controls.target);
+        const tier = nextMapTier(viewState.mapTier, camDist);
+        if (tier !== viewState.mapTier) applyTierFlip(tier);
+
+        if (viewState.mapTier === "sector") {
+          // The sector scene is static geometry; just track the active node.
+          sectorView.setActiveSystem(w.activeSystemId);
+          shipMesh.visible = false;
+          return; // camera driven by OrbitControls; sectorView.scene rendered
+        }
+
+        // System tier: true coordinates; ship drawn at real position as a marker.
         worldRoot.position.set(0, 0, 0);
         shipMesh.position.set(sx, sy, sz);
         shipMesh.scale.setScalar(MAP_MARKER_SCALE); // reads at system scale
@@ -221,7 +269,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
     render() {
       if (viewState.view === "map") controls.update();
-      webgl.render(scene, camera);
+      const useSector = viewState.view === "map" && viewState.mapTier === "sector";
+      webgl.render(useSector ? sectorView.scene : scene, camera);
     },
 
     resize(width: number, height: number) {

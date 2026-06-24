@@ -12,6 +12,7 @@ import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { parkDistance } from "../sim/presentation.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
+import { viewState } from "../app/view-state.ts";
 
 // Landing is offered a little past the autopilot park point (matches the
 // LANDING_RANGE_FACTOR in commands/apply.ts).
@@ -37,6 +38,9 @@ const TAG_STYLE: Record<string, CSSProperties> = {
 export default function SystemPanel({ world, bus }: SystemPanelProps) {
   useGameTick(bus, 12); // low freq — panel content is mostly static
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // Hidden at the sector zoom tier — the SectorPanel takes over there.
+  if (viewState.view === "map" && viewState.mapTier === "sector") return null;
 
   const bodies: [number, CelestialBody][] = [
     ...world.components.celestialBody.entries(),

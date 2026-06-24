@@ -46,6 +46,9 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
   const star = starById(TAU_CETI_HYG_ID);
   if (!star) throw new Error(`Tau Ceti (HYG ${TAU_CETI_HYG_ID}) missing from bundled catalog`);
   const system = generateSystem(seed, star, realSystemFor(TAU_CETI_HYG_ID));
+  // The home system is the initially active + discovered system (Step 1B).
+  world.activeSystemId = system.systemId;
+  world.discovered = [system.systemId];
 
   // Insert bodies. They are structuredClone'd so the sim can mutate body fields
   // (terraforming shifts temp/pressure/hydrosphere + rewrites habitability)
