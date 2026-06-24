@@ -15,7 +15,7 @@ import { dispatch } from "../app/command-bus.ts";
 import { useLandingState } from "./hooks/useLandingState.ts";
 import ColonyPanel from "./ColonyPanel.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
-import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
+import { habitabilityLabel, habitabilityColor, esiTierLabel } from "../sim/math/habitability.ts";
 
 interface SurfaceViewProps {
   world: World;
@@ -104,6 +104,9 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
               value={`${habitabilityLabel(body.habitability)} (${Math.round(body.habitability * 100)}%)`}
               valueColor={habColor}
             />
+          )}
+          {body.habitability !== undefined && (
+            <StatRow label="ESI tier" value={esiTierLabel(body.habitability)} />
           )}
 
           {/* Colony economy — found, manage resources, build structures. */}

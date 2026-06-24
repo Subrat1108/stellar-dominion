@@ -32,7 +32,39 @@ export default function App({ world, bus, speedState }: AppProps) {
       <SurfaceView world={world} bus={bus} />
       <DebugPanel world={world} bus={bus} speedState={speedState} />
       <TransitionFade bus={bus} />
+      <HazardBanner world={world} bus={bus} />
     </>
+  );
+}
+
+/** Surfaces the active system's environmental hazard (e.g. YZ Ceti's SPI). */
+function HazardBanner({ world, bus }: { world: World; bus: GameBus }) {
+  useGameTick(bus, 4);
+  const hazard = world.activeHazard;
+  // Shown in flight only (the sector/map views have their own UI).
+  if (!hazard || viewState.view === "map") return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 10,
+        left: "50%",
+        transform: "translateX(-50%)",
+        maxWidth: 520,
+        padding: "6px 14px",
+        background: "rgba(40,28,8,0.9)",
+        border: "1px solid #5c4a1e",
+        borderRadius: 4,
+        font: "11px/1.4 ui-monospace, monospace",
+        color: "#f9e2af",
+        textAlign: "center",
+        pointerEvents: "none",
+        zIndex: 60,
+      }}
+    >
+      ⚠ SYSTEM HAZARD — {hazard.label}
+      <div style={{ color: "#cbb88f", fontSize: 10, marginTop: 2 }}>{hazard.description}</div>
+    </div>
   );
 }
 

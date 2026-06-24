@@ -23,6 +23,7 @@ import type {
 import { generateSystemById } from "./gen/system.ts";
 import { instantiateSystem } from "./instantiate.ts";
 import { hygIdFromSystemId } from "./data/sector.ts";
+import { catchUpColony } from "./catch-up.ts";
 import type { GeneratedSystem } from "./gen/types.ts";
 
 /** Diff a body's mutable (terraformable) fields against its pristine baseline. */
@@ -139,24 +140,39 @@ function resetShipForArrival(world: World): void {
   }
 }
 
+export interface SetActiveOptions {
+  /** Stash the current system before swapping (true for warp; false on load). */
+  stashCurrent?: boolean;
+  /** Reposition the ship into a fresh start (true for warp; false on load). */
+  resetShip?: boolean;
+}
+
 export interface ArrivalResult {
   system: GeneratedSystem;
-  /** True if this system had been visited before (stash was re-applied). */
+  /** True if this system had been visited before (stash was re-applied + caught up). */
   revisited: boolean;
+  /** Economy-ticks resolved by the off-view catch-up (0 if first visit). */
+  caughtUpEconTicks: number;
 }
 
 /**
  * Swap the active system to `targetSystemId`: stash the current one, regenerate
- * + instantiate the destination, re-apply its stash if previously visited, and
- * reposition the ship. Deterministic. Returns the generated system (for the
- * hazard/UI) and whether it was a revisit (so the caller can run catch-up).
+ * + instantiate the destination, re-apply its stash if previously visited (and
+ * catch its economy up for the elapsed off-view time), and reposition the ship.
+ * Deterministic. Invariant: `world.systemDeltas` holds only INACTIVE systems —
+ * the destination's stash is removed once applied.
  */
-export function setActiveSystem(world: World, targetSystemId: string): ArrivalResult {
+export function setActiveSystem(
+  world: World,
+  targetSystemId: string,
+  opts: SetActiveOptions = {},
+): ArrivalResult {
+  const { stashCurrent = true, resetShip = true } = opts;
   const hygId = hygIdFromSystemId(targetSystemId);
   if (hygId === undefined) throw new Error(`setActiveSystem: bad systemId "${targetSystemId}"`);
 
-  // 1. Stash the system we're leaving.
-  if (world.activeSystemId) {
+  // 1. Stash the system we're leaving (skipped on load — already in the map).
+  if (stashCurrent && world.activeSystemId) {
     world.systemDeltas.set(world.activeSystemId, collectSystemStash(world));
   }
 
@@ -165,15 +181,23 @@ export function setActiveSystem(world: World, targetSystemId: string): ArrivalRe
   const system = generateSystemById(world.universeSeed, hygId);
   const { keyToId } = instantiateSystem(world, system);
 
-  // 4. Re-apply previously-stashed deltas for the destination, if any.
+  // 4. Re-apply previously-stashed deltas for the destination, if any, then
+  //    catch its economy up for the time spent away. The stash is removed from
+  //    the map (it's now the live active system).
   const prior = world.systemDeltas.get(targetSystemId);
   const revisited = prior !== undefined;
-  if (prior) applyStash(world, prior, keyToId);
+  let caughtUpEconTicks = 0;
+  if (prior) {
+    applyStash(world, prior, keyToId);
+    world.systemDeltas.delete(targetSystemId);
+    caughtUpEconTicks = catchUpColony(world, world.tick - prior.lastSimTick).ranEconTicks;
+  }
 
-  // 5. Reposition the ship; 6. mark active + discovered.
-  resetShipForArrival(world);
+  // 5. Reposition the ship; 6. mark active + discovered + hazard.
+  if (resetShip) resetShipForArrival(world);
   world.activeSystemId = targetSystemId;
+  world.activeHazard = system.hazard ?? null;
   if (!world.discovered.includes(targetSystemId)) world.discovered.push(targetSystemId);
 
-  return { system, revisited };
+  return { system, revisited, caughtUpEconTicks };
 }

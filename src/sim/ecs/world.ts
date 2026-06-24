@@ -27,6 +27,7 @@ import {
   type WarpState,
   type SystemStash,
 } from "./components.ts";
+import type { SystemHazard } from "../gen/types.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
 import type { Command } from "../commands/types.ts";
 
@@ -53,6 +54,10 @@ export interface World {
   activeSystemId: string;
   /** Stable ids of systems whose fog of war has been permanently lifted. */
   discovered: string[];
+  /** Active system's environmental hazard trait, if any (surfaced in the UI).
+   *  Derived from the active system (not saved) — set wherever the active
+   *  system changes. */
+  activeHazard: SystemHazard | null;
   /** Warp FSM state (Step 1B); `phase: "idle"` when not warping. */
   warp: WarpState;
   /**
@@ -84,6 +89,7 @@ export function createWorld(init: WorldInit): World {
     universeSeed: init.seed,
     activeSystemId: "",
     discovered: [],
+    activeHazard: null,
     warp: { phase: "idle", destinationSystemId: null, ticksRemaining: 0 },
     systemDeltas: new Map(),
     components: createComponents(),

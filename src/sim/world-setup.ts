@@ -31,6 +31,7 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
   // The home system is the initially active + discovered system (Step 1B).
   world.activeSystemId = system.systemId;
   world.discovered = [system.systemId];
+  world.activeHazard = system.hazard ?? null;
   instantiateSystem(world, system);
 
   // --- Ship entity: ISS Prometheus (stranded) ---

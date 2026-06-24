@@ -75,7 +75,16 @@ function emptyFlows(): Record<string, ResourceFlow> {
 export function colonySystem(world: World): void {
   // Economy cadence: only advance on the economy tick.
   if (world.tick % ECONOMY_TICK_INTERVAL !== 0) return;
+  runColonyEconomy(world);
+}
 
+/**
+ * Resolve every colony's economy by ONE economy-tick, ungated by cadence. Used
+ * by colonySystem (after its gate) and by the off-view catch-up, which batch-runs
+ * it for the elapsed economy-ticks on re-entry (catch-up.ts). Deterministic and
+ * independent of the absolute tick value.
+ */
+export function runColonyEconomy(world: World): void {
   for (const [bodyId, colony] of world.components.colony) {
     runColony(world, bodyId, colony);
   }

@@ -15,7 +15,38 @@ import {
   SAVE_VERSION,
 } from "../src/sim/save/serialize.ts";
 import { MemorySaveStore } from "../src/sim/save/store.ts";
+import { setActiveSystem } from "../src/sim/galaxy.ts";
+import { systemIdFor, TAU_CETI_HYG_ID, YZ_CETI_HYG_ID } from "../src/sim/data/sector.ts";
 import type { Colony } from "../src/sim/ecs/components.ts";
+import type { SavePayload } from "../src/sim/save/serialize.ts";
+
+const TAU_CETI = systemIdFor(TAU_CETI_HYG_ID);
+const YZ_CETI = systemIdFor(YZ_CETI_HYG_ID);
+
+/** The stash for a given system in a payload. */
+function systemStash(payload: SavePayload, systemId: string) {
+  return new Map(payload.deltas.systems).get(systemId);
+}
+
+/** A semantic snapshot of the active system: bodies + colonies keyed by bodyKey. */
+function semanticSnapshot(world: World) {
+  const idToKey = new Map<number, string>();
+  const bodies: Record<string, unknown> = {};
+  for (const [id, b] of world.components.celestialBody) {
+    if (b.bodyKey) { idToKey.set(id, b.bodyKey); bodies[b.bodyKey] = b; }
+  }
+  const colonies: Record<string, unknown> = {};
+  for (const [id, col] of world.components.colony) {
+    const key = idToKey.get(id);
+    if (key) colonies[key] = { ...col, bodyId: 0 };
+  }
+  return JSON.stringify({
+    activeSystemId: world.activeSystemId,
+    discovered: [...world.discovered].sort(),
+    bodies,
+    colonies,
+  });
+}
 
 /** A cold dry planet id (the terraforming subject). */
 function coldPlanetId(world: World): number {
@@ -57,11 +88,12 @@ describe("save round-trip (seed + deltas)", () => {
     );
   });
 
-  it("captures terraforming progress as a per-body override", () => {
+  it("captures terraforming progress as a per-body override in the active stash", () => {
     const { world, bodyId } = playedWorld();
     const key = world.components.celestialBody.get(bodyId)!.bodyKey!;
     const payload = extractDeltas(world);
-    const override = payload.deltas.bodyOverrides.find(([k]) => k === key);
+    const stash = systemStash(payload, world.activeSystemId)!;
+    const override = stash.bodyOverrides.find(([k]) => k === key);
     expect(override).toBeDefined();
     expect(override![1].surfaceTempK).toBeDefined();
   });
@@ -69,9 +101,10 @@ describe("save round-trip (seed + deltas)", () => {
   it("keys colonies + terraforming by stable bodyKey, not entity id", () => {
     const { world } = playedWorld();
     const payload = extractDeltas(world);
-    expect(payload.deltas.colonies.length).toBe(1);
-    expect(payload.deltas.colonies[0]![0]).toMatch(/^hyg:\d+:/);
-    expect(payload.deltas.terraforming[0]![0]).toMatch(/^hyg:\d+:/);
+    const stash = systemStash(payload, world.activeSystemId)!;
+    expect(stash.colonies.length).toBe(1);
+    expect(stash.colonies[0]![0]).toMatch(/^hyg:\d+:/);
+    expect(stash.terraforming[0]![0]).toMatch(/^hyg:\d+:/);
   });
 
   it("persists the universe seed and current version", () => {
@@ -105,6 +138,48 @@ describe("save round-trip (seed + deltas)", () => {
     const world = createStartingSystem("clean");
     step(world);
     const payload = extractDeltas(world);
-    expect(payload.deltas.bodyOverrides.length).toBe(0);
+    const stash = systemStash(payload, world.activeSystemId)!;
+    expect(stash.bodyOverrides.length).toBe(0);
+  });
+});
+
+describe("multi-system save (Step 1B)", () => {
+  it("persists active system + discovered set across a warp", () => {
+    const world = createStartingSystem("multi");
+    run(world, 60);
+    setActiveSystem(world, YZ_CETI);
+    const payload = extractDeltas(world);
+    expect(payload.deltas.activeSystemId).toBe(YZ_CETI);
+    expect(payload.deltas.discovered).toEqual(expect.arrayContaining([TAU_CETI, YZ_CETI]));
+    // A stash exists for both the home (inactive) and YZ (active) systems.
+    expect(systemStash(payload, TAU_CETI)).toBeDefined();
+    expect(systemStash(payload, YZ_CETI)).toBeDefined();
+  });
+
+  it("reconstructs a warped world semantically (active system + home colony stash)", () => {
+    const world = createStartingSystem("multi-rt");
+    // Found a home colony, then warp to YZ Ceti.
+    run(world, 60);
+    const bodyId = [...world.components.celestialBody.entries()].find(([, b]) => b.kind === "planet")![0];
+    world.components.shipControl.get(world.shipId)!.landedBodyId = bodyId;
+    foundColony(world, bodyId);
+    setActiveSystem(world, YZ_CETI);
+
+    const restored = reconstructWorld(extractDeltas(world));
+    expect(restored.activeSystemId).toBe(YZ_CETI);
+    expect(semanticSnapshot(restored)).toBe(semanticSnapshot(world));
+    // The home colony survives in the inactive stash.
+    expect(restored.systemDeltas.get(TAU_CETI)?.colonies.length).toBe(1);
+  });
+
+  it("does not retain pre-arrival data: a scanned-but-not-warped save has only the home system", () => {
+    const world = createStartingSystem("no-prearrival");
+    run(world, 60);
+    // Begin a scan of YZ Ceti but do NOT warp.
+    world.warp = { phase: "scan", destinationSystemId: YZ_CETI, ticksRemaining: 0 };
+    const payload = extractDeltas(world);
+    const ids = new Map(payload.deltas.systems).keys();
+    expect([...ids]).toEqual([TAU_CETI]); // YZ Ceti never materialised into the save
+    expect(payload.deltas.activeSystemId).toBe(TAU_CETI);
   });
 });

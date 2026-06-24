@@ -104,6 +104,18 @@ export function habitabilityLabel(score: number): string {
   return "Barren";
 }
 
+/**
+ * ESI tier LABEL for display only (docs/09, docs/12): a coarse banding derived
+ * from the existing habitability score. ESI never competes with or overrides
+ * `computeHabitability` — it is purely a UI tier readout (Prime → Dead).
+ */
+export function esiTierLabel(score: number): string {
+  if (score >= 0.85) return "Prime";
+  if (score >= 0.60) return "Marginal";
+  if (score >= 0.30) return "Hostile";
+  return "Dead";
+}
+
 /** CSS-safe colour string for a habitability score. */
 export function habitabilityColor(score: number): string {
   if (score >= 0.65) return "#4caf50";
