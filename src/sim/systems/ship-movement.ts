@@ -8,7 +8,7 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
-import { orbitInsertionRadius, ORBIT_RATE, SHIP_LENGTH } from "../presentation.ts";
+import { orbitInsertionRadius, ORBIT_RATE, softStopRadius } from "../presentation.ts";
 import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
@@ -17,9 +17,6 @@ const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per seco
 const ACCEL_RATIO   = 3;
 const DRAG          = 0.98;              // velocity multiplied each tick
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
-// Soft-surface stop: stop a hair above the body's REAL surface (proportional, so
-// it works at honest scale) plus the ship's own length so the hull doesn't clip.
-const SURFACE_MARGIN_FRAC = 0.1;
 
 /** Unit nose vector for a given yaw (heading) and pitch. */
 export function noseVector(heading: number, pitch: number): { x: number; y: number; z: number } {
@@ -174,7 +171,7 @@ export function shipMovementSystem(world: World, input: Input): void {
   const bodies = world.components.celestialBody;
   for (const [entity, body] of bodies) {
     const bpos = transform.get(entity)?.position ?? { x: 0, y: 0, z: 0 };
-    const minR = body.renderRadius * (1 + SURFACE_MARGIN_FRAC) + SHIP_LENGTH;
+    const minR = softStopRadius(body.renderRadius);
     const ex = pos.position.x - bpos.x;
     const ey = pos.position.y - bpos.y;
     const ez = pos.position.z - bpos.z;

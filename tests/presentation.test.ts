@@ -14,7 +14,11 @@ import {
   SHIP_LENGTH,
   orbitInsertionRadius,
   ORBIT_INSERTION_MULT,
+  softStopRadius,
+  MIN_SURFACE_ALTITUDE,
 } from "../src/sim/presentation.ts";
+
+const NEAR_PLANE = 0.0002; // render near plane (render/scene.ts) — kept in sync here
 
 const R_EARTH = 6.371e6;
 const R_SUN = 6.957e8;
@@ -89,6 +93,26 @@ describe("orbitInsertionRadius (low-orbit framing)", () => {
 
   it("clears the surface", () => {
     expect(orbitInsertionRadius(0.0085)).toBeGreaterThan(0.0085);
+  });
+});
+
+describe("softStopRadius (near-plane-safe surface stop)", () => {
+  it("always stays above the surface", () => {
+    expect(softStopRadius(0.0085)).toBeGreaterThan(0.0085);
+    expect(softStopRadius(0.0001)).toBeGreaterThan(0.0001);
+  });
+
+  it("scales proportionally (10% altitude) for large bodies", () => {
+    const R = 0.74; // a star
+    expect(softStopRadius(R)).toBeCloseTo(R * 1.1, 10); // floor doesn't bind
+  });
+
+  it("applies an absolute altitude floor for tiny bodies (no near-plane clip)", () => {
+    const R = 0.001; // a small moon: 10% = 0.0001 < the floor
+    const altitude = softStopRadius(R) - R;
+    expect(altitude).toBeCloseTo(MIN_SURFACE_ALTITUDE, 10);
+    // The floor keeps the camera clear of the near plane (it is several × larger).
+    expect(altitude).toBeGreaterThan(NEAR_PLANE * 3);
   });
 });
 

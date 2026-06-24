@@ -96,6 +96,19 @@ export function orbitInsertionRadius(renderRadius: number): number {
 // slow enough to admire, not a spin. 0.042 ≈ one full orbit every ~150 s.
 export const ORBIT_RATE = 0.042;
 
+// --- Soft-surface stop (Session 20 fix) --------------------------------------
+// Manual flight is stopped this far from a body's centre. Proportional to the
+// real radius (10% altitude) with an ABSOLUTE altitude floor so the render near
+// plane (0.0002 u) can never cut into the surface and make it look transparent —
+// even for tiny bodies where 10% of the radius would be sub-near-plane. The
+// floor (0.0008 u) is ~4× the near plane, covering the cockpit camera offset too.
+// Autopilot orbit-hold bypasses this (it holds the insertion altitude directly).
+export const SURFACE_MARGIN_FRAC = 0.1;
+export const MIN_SURFACE_ALTITUDE = 0.0008;
+export function softStopRadius(renderRadius: number): number {
+  return renderRadius + Math.max(renderRadius * SURFACE_MARGIN_FRAC, MIN_SURFACE_ALTITUDE);
+}
+
 // --- Ship (a player AVATAR, not a physical body) -----------------------------
 // A literally-to-scale ship would be ~1e-7 u (sub-near-plane, unrenderable in one
 // camera). It stays a small but visible mote, sized WELL UNDER the body radius so
