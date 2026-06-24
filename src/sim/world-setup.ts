@@ -16,86 +16,22 @@
 // semi-major axes come from sceneDistance() in presentation.ts.
 
 import { createWorld, createEntity, type World } from "./ecs/world.ts";
-import { sceneDistance } from "./presentation.ts";
 import { generateSystem } from "./gen/system.ts";
 import { starById } from "./gen/catalog.ts";
 import { realSystemFor, TAU_CETI_HYG_ID } from "./data/real-planets.ts";
-import type { GeneratedBody } from "./gen/types.ts";
-
-// Mira's reference orbital parameters. This sets the RELATIVE speeds of the
-// star-orbiting planets; the global orbital clock is slowed by ORBITAL_TIME_RATE
-// (orbital.ts) so planets are nearly stationary during a flight.
-const MIRA_N = 0.08; // rad / sim-sec — relative mean motion reference
-const MIRA_AU = 0.65;
-
-// Scale mean motion by Kepler's third law: n(a) = MIRA_N * (MIRA_AU / a)^1.5
-function keplerN(realAu: number): number {
-  return MIRA_N * Math.pow(MIRA_AU / realAu, 1.5);
-}
-
-// Moons orbit their planet on a fixed modest rate (their physical AU is tiny and
-// not visually meaningful at our scene scale; they're placed just outside the
-// planet's render radius). Faster than planets so they visibly circle.
-const MOON_N = MIRA_N * 5;
+import { instantiateSystem } from "./instantiate.ts";
 
 export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): World {
   const world = createWorld({ seed });
-  const { celestialBody, orbit } = world.components;
 
-  // --- Generate the home system through the content engine ---
+  // --- Generate the home system through the content engine, then instantiate ---
   const star = starById(TAU_CETI_HYG_ID);
   if (!star) throw new Error(`Tau Ceti (HYG ${TAU_CETI_HYG_ID}) missing from bundled catalog`);
   const system = generateSystem(seed, star, realSystemFor(TAU_CETI_HYG_ID));
   // The home system is the initially active + discovered system (Step 1B).
   world.activeSystemId = system.systemId;
   world.discovered = [system.systemId];
-
-  // Insert bodies. They are structuredClone'd so the sim can mutate body fields
-  // (terraforming shifts temp/pressure/hydrosphere + rewrites habitability)
-  // without leaking into the shared catalog/real-planet constants (Session 14).
-  // Parents are emitted before their moons, so a key→id map resolves moon parents.
-  const keyToId = new Map<string, number>();
-
-  const starId = createEntity(world);
-  celestialBody.set(starId, structuredClone(system.star.body));
-  keyToId.set(system.star.bodyKey, starId);
-
-  for (const gb of system.bodies) {
-    const id = createEntity(world);
-    celestialBody.set(id, structuredClone(gb.body));
-    keyToId.set(gb.bodyKey, id);
-    if (!gb.orbit) continue;
-
-    if (gb.parentKey) {
-      // Moon: orbit the parent planet, placed in scene units just outside it.
-      const parentId = keyToId.get(gb.parentKey) ?? starId;
-      const parentBody = celestialBody.get(parentId)!;
-      const moonIndex = Number(gb.bodyKey.split(".")[1] ?? 0);
-      orbit.set(id, {
-        parent: parentId,
-        elements: {
-          semiMajorAxis: parentBody.renderRadius * (1.8 + 0.9 * moonIndex),
-          eccentricity: gb.orbit.eccentricity,
-          meanMotion: MOON_N * (1 - 0.15 * moonIndex),
-          meanAnomalyAtEpoch: gb.orbit.meanAnomalyAtEpoch,
-          argumentOfPeriapsis: gb.orbit.argumentOfPeriapsis,
-        },
-      });
-    } else {
-      // Star-orbiting body: real-AU scene distance + Kepler-scaled mean motion.
-      const au = gb.orbit.semiMajorAxisAu;
-      orbit.set(id, {
-        parent: starId,
-        elements: {
-          semiMajorAxis: sceneDistance(au),
-          eccentricity: gb.orbit.eccentricity,
-          meanMotion: keplerN(au),
-          meanAnomalyAtEpoch: gb.orbit.meanAnomalyAtEpoch,
-          argumentOfPeriapsis: gb.orbit.argumentOfPeriapsis,
-        },
-      });
-    }
-  }
+  instantiateSystem(world, system);
 
   // --- Ship entity: ISS Prometheus (stranded) ---
   const shipId = createEntity(world);
@@ -179,6 +115,3 @@ export function createStartingSystem(seed: string | number = "tau-ceti-alpha"): 
 
   return world;
 }
-
-/** Re-export for callers that want the generated form without instantiating a world. */
-export type { GeneratedBody };

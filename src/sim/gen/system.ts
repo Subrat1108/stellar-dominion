@@ -15,7 +15,7 @@ import type { CelestialBody } from "../ecs/components.ts";
 import { computeHabitability } from "../math/habitability.ts";
 import { surfaceGravity, insolation as insolationOf } from "../math/physics.ts";
 import {
-  STAR_RENDER_RADIUS,
+  starRenderRadius,
   planetRenderRadius,
   gasGiantRenderRadius,
 } from "../presentation.ts";
@@ -42,7 +42,8 @@ import {
 } from "./spacing.ts";
 import { deriveSurface, starColor, gasGiantColor } from "./archetype.ts";
 import { generateBodyName, moonName } from "./names.ts";
-import type { CatalogStar } from "./catalog.ts";
+import { starById, type CatalogStar } from "./catalog.ts";
+import { realSystemFor } from "../data/real-planets.ts";
 import type {
   GeneratedBody,
   GeneratedSystem,
@@ -61,7 +62,7 @@ function buildStar(star: CatalogStar, realDef?: RealSystemDef): GeneratedBody {
     const body: CelestialBody = {
       kind: "star",
       name: s.name,
-      renderRadius: STAR_RENDER_RADIUS,
+      renderRadius: starRenderRadius(s.radiusM),
       color: s.color,
       dataTag: "real",
       description: s.description,
@@ -80,15 +81,16 @@ function buildStar(star: CatalogStar, realDef?: RealSystemDef): GeneratedBody {
   const tempK = stellarTempK(cls);
   const lum = star.lum ?? stellarLuminositySol(cls);
   const massKg = stellarMassSol(cls) * M_SUN_KG;
+  const radiusM = stellarMassSol(cls) ** 0.8 * R_SUN_M;
   const body: CelestialBody = {
     kind: "star",
     name: star.name ?? `HYG ${star.id}`,
-    renderRadius: STAR_RENDER_RADIUS,
+    renderRadius: starRenderRadius(radiusM),
     color: starColor(tempK),
     dataTag: "derived",
     description: `A ${star.spect ?? cls}-type star ${star.distPc.toFixed(1)} pc away.`,
     massKg,
-    radiusM: stellarMassSol(cls) ** 0.8 * R_SUN_M,
+    radiusM,
     spectralType: star.spect ?? cls,
     luminositySol: lum,
     tempK,
@@ -293,5 +295,24 @@ export function generateSystem(
     nextIndex++;
   }
 
-  return { systemId, star: starBody, bodies };
+  // System-wide hazard trait (e.g. YZ Ceti's SPI), centred on the innermost body.
+  const hazard = realDef?.hazard
+    ? { ...realDef.hazard, bodyKey: bodies[0]?.bodyKey ?? `${systemId}:0` }
+    : undefined;
+
+  return hazard
+    ? { systemId, star: starBody, bodies, hazard }
+    : { systemId, star: starBody, bodies };
+}
+
+/**
+ * Resolve a system by HYG id and generate it deterministically (real def applied
+ * where one exists). The single entry point arrival + scan both go through, so
+ * generation is identical whether previewing or materialising. Throws if the id
+ * is not in the bundled catalog.
+ */
+export function generateSystemById(universeSeed: string | number, hygId: number): GeneratedSystem {
+  const star = starById(hygId);
+  if (!star) throw new Error(`generateSystemById: HYG ${hygId} not in catalog`);
+  return generateSystem(universeSeed, star, realSystemFor(hygId));
 }

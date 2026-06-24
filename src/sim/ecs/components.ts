@@ -262,6 +262,47 @@ export interface Terraforming {
 }
 
 // ---------------------------------------------------------------------------
+// Warp + multi-system state (Step 1B)
+// ---------------------------------------------------------------------------
+
+/** Phase of the warp state machine (docs/12). `idle` = not warping. */
+export type WarpPhase = "idle" | "scan" | "spool" | "transit";
+
+/**
+ * Warp FSM state, held on the world (one warp in flight at a time). Phase
+ * transitions are tick-counted in `warpSystem`, so warp is fully deterministic.
+ */
+export interface WarpState {
+  phase: WarpPhase;
+  /** Target system id (`hyg:<id>`) once a destination is selected; else null. */
+  destinationSystemId: string | null;
+  /** Ticks left in the current timed phase (spool / transit). */
+  ticksRemaining: number;
+}
+
+/** The mutable body fields terraforming changes — the per-body save/stash delta. */
+export interface BodyOverride {
+  surfaceTempK?: number;
+  pressurePa?: number;
+  hydrosphere?: number;
+  hasLiquidWater?: boolean;
+  habitability?: number;
+}
+
+/**
+ * Stashed player-deltas for a system that is not currently active (Step 1B).
+ * Keyed by stable bodyKey so they survive the per-visit entity-id reallocation.
+ * `lastSimTick` is the world tick when the system was stashed — the re-entry
+ * catch-up advances its economy by the elapsed ticks from here.
+ */
+export interface SystemStash {
+  colonies: [string, Colony][];
+  terraforming: [string, Terraforming][];
+  bodyOverrides: [string, BodyOverride][];
+  lastSimTick: number;
+}
+
+// ---------------------------------------------------------------------------
 // ECS component registry
 // ---------------------------------------------------------------------------
 

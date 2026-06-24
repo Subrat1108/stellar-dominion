@@ -58,6 +58,18 @@ export function hygIdFromSystemId(systemId: string): number | undefined {
   return m ? Number(m[1]) : undefined;
 }
 
+/** The sector role of a systemId, or undefined if it is not a curated node. */
+export function sectorRoleOf(systemId: string): SectorRole | undefined {
+  const hygId = hygIdFromSystemId(systemId);
+  return SECTOR_STARS.find((s) => s.hygId === hygId)?.role;
+}
+
+/** Whether a systemId is an interactable warp destination this phase. */
+export function isReachableSystem(systemId: string): boolean {
+  const role = sectorRoleOf(systemId);
+  return role === "reachable" || role === "home";
+}
+
 /** Light-year distance between two catalog stars (Euclidean on parsec coords). */
 export function distanceLy(a: CatalogStar, b: CatalogStar): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) * LY_PER_PARSEC;

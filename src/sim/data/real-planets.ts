@@ -11,11 +11,14 @@
 // the system looks and plays identically after moving behind the engine.
 
 import { ferrum, caldor, mira, glacius, tauCetiStar } from "./tau-ceti.ts";
+import { yzCetiStar, yzCetiPlanets } from "./yz-ceti.ts";
 import type { RealSystemDef } from "../gen/types.ts";
 
 // Tau Ceti's HYG record id (HD 10700 / HIP 8102). Confirmed against the bundled
 // neighborhood subset: G8V, 3.65 pc.
 export const TAU_CETI_HYG_ID = 8087;
+// YZ Ceti's HYG record id (Gl 54.1). M5.5Ve, 1.60 ly from Tau Ceti.
+export const YZ_CETI_HYG_ID = 5632;
 
 const TAU_CETI: RealSystemDef = {
   hygId: TAU_CETI_HYG_ID,
@@ -43,8 +46,33 @@ const TAU_CETI: RealSystemDef = {
   gasGiantMoons: [2, 3],
 };
 
+// YZ Ceti — three real, tidally-locked terrestrial candidates verbatim; no gas
+// giant. The Star-Planet Interaction (SPI) radio hazard is surfaced as a system
+// trait (flavour + indicator, not a mechanic — docs/09, Session 18).
+const YZ_CETI: RealSystemDef = {
+  hygId: YZ_CETI_HYG_ID,
+  systemName: "YZ Ceti",
+  star: yzCetiStar,
+  planets: yzCetiPlanets.map((p) => ({
+    body: p.body,
+    orbit: p.orbit,
+    provenance: "derived" as const,
+  })),
+  generateGasGiant: false,
+  gasGiantMoons: [0, 0],
+  hazard: {
+    kind: "spi-radio",
+    label: "Star–Planet Radio Interaction",
+    description:
+      "The innermost planet's magnetic field couples to the stellar corona, " +
+      "driving periodic radio bursts and electrical surges across the inner " +
+      "system — hostile to unshielded orbital infrastructure.",
+  },
+};
+
 export const REAL_SYSTEMS: Record<number, RealSystemDef> = {
   [TAU_CETI_HYG_ID]: TAU_CETI,
+  [YZ_CETI_HYG_ID]: YZ_CETI,
 };
 
 /** Real-system definition for a star, or undefined if it is generated whole. */

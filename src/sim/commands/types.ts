@@ -16,7 +16,11 @@ export type Command =
   | { kind: "TakeOff" }
   | { kind: "FoundColony"; bodyId: number }
   | { kind: "BuildStructure"; bodyId: number; building: BuildingType }
-  | { kind: "SetTerraformAllocation"; bodyId: number; lever: TerraformLever; fraction: number };
+  | { kind: "SetTerraformAllocation"; bodyId: number; lever: TerraformLever; fraction: number }
+  // Warp (Step 1B): select + preview a destination, commit the jump, or abort.
+  | { kind: "BeginWarpScan"; systemId: string }
+  | { kind: "CommitWarp" }
+  | { kind: "CancelWarp" };
 
 /** Result of applying a command (events emitted on success; reason on reject). */
 export type GameEvent =
@@ -27,6 +31,12 @@ export type GameEvent =
   | { kind: "ColonyFounded"; bodyId: number; tick: number }
   | { kind: "StructureBuilt"; bodyId: number; building: BuildingType; tick: number }
   | { kind: "TerraformAllocationSet"; bodyId: number; lever: TerraformLever; fraction: number; tick: number }
+  // Warp (Step 1B). WarpPhaseChanged also fires from warpSystem on timed transitions.
+  | { kind: "WarpScanStarted"; systemId: string; tick: number }
+  | { kind: "WarpCommitted"; systemId: string; tick: number }
+  | { kind: "WarpCancelled"; tick: number }
+  | { kind: "WarpPhaseChanged"; phase: "idle" | "scan" | "spool" | "transit"; systemId: string | null; tick: number }
+  | { kind: "ArrivedAtSystem"; systemId: string; tick: number }
   | { kind: "CommandRejected"; command: Command; reason: string; tick: number };
 
 /** Outcome of validating + applying one command. */

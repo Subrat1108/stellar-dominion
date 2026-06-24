@@ -38,6 +38,8 @@ export interface Renderer {
   cycleView(): void;
   toggleMap(): void;
   getView(): CameraView;
+  /** Rebuild the in-system scene graph after a warp arrival (system swapped). */
+  rebuildSystem(world: World): void;
 }
 
 // Chase camera constants — tuned to the ship length (presentation.ts).
@@ -99,30 +101,54 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
   worldRoot.add(makeStarfield(world));
 
-  // Find the star entity so orbit rings are drawn only for star-orbiting bodies
-  // (moons orbit a planet; their ring would otherwise be drawn around the origin).
-  let starEntity = -1;
-  for (const [entity, body] of world.components.celestialBody) {
-    if (body.kind === "star") { starEntity = entity; break; }
-  }
-
   // Procedural-surface materials (planets + gas giants), updated each frame from
-  // live body state so the globe transforms as terraforming runs.
+  // live body state so the globe transforms as terraforming runs. These are
+  // rebuilt on a warp arrival (the active system's bodies are swapped out).
   const bodyMeshes = new Map<number, THREE.Mesh>();
   const planetMaterials = new Map<number, THREE.ShaderMaterial>();
-  for (const [entity, body] of world.components.celestialBody) {
-    const mesh = buildBodyMesh(body);
-    worldRoot.add(mesh);
-    bodyMeshes.set(entity, mesh);
-    if (body.kind === "planet" || body.kind === "gas-giant") {
-      planetMaterials.set(entity, mesh.material as THREE.ShaderMaterial);
-    }
+  const orbitLines: THREE.LineLoop[] = [];
+  let starEntity = -1;
+
+  function disposeMesh(mesh: THREE.Object3D): void {
+    mesh.traverse((o) => {
+      const m = o as THREE.Mesh;
+      m.geometry?.dispose?.();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+      else mat?.dispose?.();
+    });
   }
 
-  for (const [, orb] of world.components.orbit) {
-    if (orb.parent !== starEntity) continue; // skip moon rings (drawn at origin)
-    worldRoot.add(makeOrbitLine(orb.elements));
+  // (Re)build the in-system scene graph (bodies + orbit rings) from the world.
+  function buildSystemGraph(w: World): void {
+    for (const mesh of bodyMeshes.values()) { worldRoot.remove(mesh); disposeMesh(mesh); }
+    bodyMeshes.clear();
+    planetMaterials.clear();
+    for (const line of orbitLines) { worldRoot.remove(line); line.geometry.dispose(); }
+    orbitLines.length = 0;
+
+    // The star entity — orbit rings are drawn only for star-orbiting bodies
+    // (a moon's ring would otherwise be drawn around the origin).
+    starEntity = -1;
+    for (const [entity, body] of w.components.celestialBody) {
+      if (body.kind === "star") { starEntity = entity; break; }
+    }
+    for (const [entity, body] of w.components.celestialBody) {
+      const mesh = buildBodyMesh(body);
+      worldRoot.add(mesh);
+      bodyMeshes.set(entity, mesh);
+      if (body.kind === "planet" || body.kind === "gas-giant") {
+        planetMaterials.set(entity, mesh.material as THREE.ShaderMaterial);
+      }
+    }
+    for (const [, orb] of w.components.orbit) {
+      if (orb.parent !== starEntity) continue;
+      const line = makeOrbitLine(orb.elements);
+      worldRoot.add(line);
+      orbitLines.push(line);
+    }
   }
+  buildSystemGraph(world);
 
   // --- Ship mesh lives in the scene (NOT worldRoot) so it stays near origin ---
   const shipMesh = buildShipMesh();
@@ -290,6 +316,11 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     },
 
     getView() { return viewState.view; },
+
+    rebuildSystem(w: World) {
+      buildSystemGraph(w);
+      sectorView.setActiveSystem(w.activeSystemId);
+    },
   };
 }
 

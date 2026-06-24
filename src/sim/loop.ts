@@ -10,6 +10,7 @@ import { orbitalSystem } from "./systems/orbital.ts";
 import { lifeSupportSystem } from "./systems/life-support.ts";
 import { shipMovementSystem } from "./systems/ship-movement.ts";
 import { colonySystem } from "./systems/colony.ts";
+import { warpSystem } from "./systems/warp.ts";
 import { applyCommand } from "./commands/apply.ts";
 import type { GameEvent } from "./commands/types.ts";
 import { FIXED_DT } from "./constants.ts";
@@ -63,6 +64,11 @@ export function step(world: World, input: Input = ZERO_INPUT): GameEvent[] {
       }
     }
   }
+
+  // Warp runs first: an ARRIVE this tick swaps the active system (new bodies),
+  // so the systems below operate on the destination this same tick. It emits its
+  // own events (phase changes, arrival) alongside any command events.
+  events.push(...warpSystem(world));
 
   // Systems run in a fixed, deterministic order every tick. colonySystem runs
   // on its own slower cadence (gated inside) but is sequenced here before

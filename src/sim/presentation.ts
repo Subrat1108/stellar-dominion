@@ -45,12 +45,49 @@ const PLANET_RADIUS_SCALE = 6.0; // 1 Earth-radius ≈ 6 scene units
 const PLANET_RADIUS_MIN = 4.0;   // floor so small worlds stay visible
 const GAS_GIANT_SCALE = 1.5;     // Titan's Eye (9 R⊕) ≈ 13.5 u
 
+// Star render radius scales with PHYSICAL size, anchored so a Tau-Ceti-class
+// star (0.793 R⊙) stays at the legacy STAR_RENDER_RADIUS (12). Small red dwarfs
+// (YZ Ceti ≈ 0.16 R⊙) render genuinely small — which both sells "a different,
+// dim star" and lets their ultra-tight orbits clear the star's sphere.
+const R_SUN = 6.957e8; // m
+const TAU_CETI_RADIUS_M = 0.793 * R_SUN; // the anchor (renders at 12)
+const STAR_RADIUS_MIN = 3.0;
+const STAR_RADIUS_MAX = 16.0;
+
+export function starRenderRadius(radiusM: number): number {
+  const scaled = (radiusM / TAU_CETI_RADIUS_M) * STAR_RENDER_RADIUS;
+  return Math.max(STAR_RADIUS_MIN, Math.min(STAR_RADIUS_MAX, scaled));
+}
+
 export function planetRenderRadius(radiusM: number): number {
   return Math.max(PLANET_RADIUS_MIN, (radiusM / R_EARTH) * PLANET_RADIUS_SCALE);
 }
 
 export function gasGiantRenderRadius(radiusM: number): number {
   return (radiusM / R_EARTH) * GAS_GIANT_SCALE;
+}
+
+// --- Orbit placement floors --------------------------------------------------
+// A body's scene-unit orbit is normally sceneDistance(au), but ultra-tight real
+// systems (e.g. YZ Ceti's planets at 0.016–0.028 AU) would otherwise render
+// inside the star or on top of each other. These floors push such orbits out to
+// a legible minimum WITHOUT touching well-spaced systems: for Tau Ceti the raw
+// sceneDistance always already exceeds them, so its layout is unchanged.
+export const STAR_SURFACE_CLEAR = 6; // min scene gap between star surface and innermost orbit
+export const MIN_ORBIT_GAP = 16;     // min scene gap between successive orbits
+
+/**
+ * Scene-unit semi-major axis for a star-orbiting body, applying the floors:
+ * at least sceneDistance(au), clear of the star, and spaced from the previous
+ * orbit. `prevSceneRadius` is the placed radius of the next-inner body (0 = none).
+ */
+export function orbitSceneRadius(
+  au: number,
+  starRender: number,
+  prevSceneRadius: number,
+): number {
+  const floor = Math.max(starRender + STAR_SURFACE_CLEAR, prevSceneRadius + MIN_ORBIT_GAP);
+  return Math.max(sceneDistance(au), floor);
 }
 
 // --- Approach / parking ------------------------------------------------------

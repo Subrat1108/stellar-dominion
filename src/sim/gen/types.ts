@@ -33,6 +33,19 @@ export interface GeneratedBody {
   parentKey?: string;
 }
 
+/**
+ * A system-wide environmental trait surfaced to the player (docs/12). Flavour +
+ * a legible indicator only this phase — NOT a damage/shielding mechanic.
+ */
+export interface SystemHazard {
+  kind: "spi-radio";
+  /** Short label for the scan/arrival UI, e.g. "Star-Planet Radio Interaction". */
+  label: string;
+  description: string;
+  /** bodyKey the hazard centres on (e.g. the innermost planet). */
+  bodyKey?: string;
+}
+
 /** A fully-generated star system, in stable order (star, then bodies outward). */
 export interface GeneratedSystem {
   /** "hyg:<id>" — the system's stable identity. */
@@ -40,6 +53,8 @@ export interface GeneratedSystem {
   star: GeneratedBody;
   /** Planets + gas giants + moons, in deterministic order. */
   bodies: GeneratedBody[];
+  /** Optional system-wide environmental trait (surfaced in the UI). */
+  hazard?: SystemHazard;
 }
 
 // --- Real-system overrides ---------------------------------------------------
@@ -78,4 +93,6 @@ export interface RealSystemDef {
   generateGasGiant: boolean;
   /** Inclusive [min, max] moons to generate for the gas giant. */
   gasGiantMoons: [number, number];
+  /** Optional system-wide hazard trait surfaced in the UI (e.g. YZ Ceti's SPI). */
+  hazard?: SystemHazard;
 }

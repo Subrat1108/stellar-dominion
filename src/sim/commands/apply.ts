@@ -12,6 +12,7 @@ import type { World } from "../ecs/world.ts";
 import { parkDistance } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
 import { foundColony, buildStructure, setTerraformAllocation } from "./colony.ts";
+import { beginWarpScan, commitWarp, cancelWarp } from "./warp.ts";
 
 /** Distance (scene units) from the ship to a body's centre, ∞ if unavailable. */
 function distanceToBody(world: World, bodyId: number): number {
@@ -85,5 +86,14 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
 
     case "SetTerraformAllocation":
       return setTerraformAllocation(world, cmd.bodyId, cmd.lever, cmd.fraction);
+
+    case "BeginWarpScan":
+      return beginWarpScan(world, cmd.systemId);
+
+    case "CommitWarp":
+      return commitWarp(world);
+
+    case "CancelWarp":
+      return cancelWarp(world);
   }
 }

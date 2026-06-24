@@ -24,6 +24,8 @@ import {
   type ShipControl,
   type Colony,
   type Terraforming,
+  type WarpState,
+  type SystemStash,
 } from "./components.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
 import type { Command } from "../commands/types.ts";
@@ -51,6 +53,13 @@ export interface World {
   activeSystemId: string;
   /** Stable ids of systems whose fog of war has been permanently lifted. */
   discovered: string[];
+  /** Warp FSM state (Step 1B); `phase: "idle"` when not warping. */
+  warp: WarpState;
+  /**
+   * Player-deltas for systems that are not currently active (Step 1B). Keyed by
+   * systemId; populated when warping away, consumed (with catch-up) on re-entry.
+   */
+  systemDeltas: Map<string, SystemStash>;
   components: Components;
   /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
   shipId: number;
@@ -75,6 +84,8 @@ export function createWorld(init: WorldInit): World {
     universeSeed: init.seed,
     activeSystemId: "",
     discovered: [],
+    warp: { phase: "idle", destinationSystemId: null, ticksRemaining: 0 },
+    systemDeltas: new Map(),
     components: createComponents(),
     shipId: 0,
     commandQueue: [],

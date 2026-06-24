@@ -24,6 +24,11 @@ const renderer = createRenderer(world, document.body);
 bus.onEvent((event) => {
   if (event.kind === "Landed") landingState.landedBodyId = event.bodyId;
   else if (event.kind === "TookOff") landingState.landedBodyId = null;
+  // On warp arrival the active system's bodies were swapped — rebuild the scene.
+  else if (event.kind === "ArrivedAtSystem") {
+    landingState.landedBodyId = null;
+    renderer.rebuildSystem(world);
+  }
 });
 
 // Mount the React UI overlay.
