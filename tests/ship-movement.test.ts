@@ -103,15 +103,16 @@ describe("ship movement system", () => {
     expect(p).toBeGreaterThan(Math.PI / 2 - 0.1);
   });
 
-  it("velocity is capped at maxSpeed (scaled by throttle)", () => {
+  it("velocity is capped at the throttle's max speed (u/s)", () => {
+    // Exploration-polish A: input.throttle now carries the gear's ABSOLUTE max
+    // speed (u/s), not a multiplier on the component's base speed.
     const world = createStartingSystem();
-    const maxSpeed = world.components.shipVelocity.get(world.shipId)!.maxSpeed;
-
-    for (let i = 0; i < 600; i++) step(world, mk({ thrust: 1 }));
-    expect(speed(world)).toBeLessThanOrEqual(maxSpeed + 0.0001);
+    const cap = 2; // u/s
+    for (let i = 0; i < 600; i++) step(world, mk({ thrust: 1, throttle: cap }));
+    expect(speed(world)).toBeLessThanOrEqual(cap + 0.0001);
   });
 
-  it("throttle multiplier raises the effective top speed", () => {
+  it("a higher throttle (gear max speed) raises the effective top speed", () => {
     const slow = createStartingSystem("throttle-a");
     const fast = createStartingSystem("throttle-a");
     for (let i = 0; i < 600; i++) step(slow, mk({ thrust: 1, throttle: 1 }));

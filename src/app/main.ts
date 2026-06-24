@@ -9,6 +9,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { createStartingSystem } from "../sim/world-setup.ts";
 import { step, FIXED_DT } from "../sim/loop.ts";
+import { maxSpeedForGear } from "../sim/presentation.ts";
 import { createRenderer } from "../render/scene.ts";
 import { GameBus } from "./game-bus.ts";
 import { speedState } from "./speed-state.ts";
@@ -51,9 +52,9 @@ function frame(now: number): void {
   if (consumeViewCycle()) renderer.cycleView();
   if (consumeMapToggle()) renderer.toggleMap();
 
-  // Throttle (speed lever) scales ship acceleration via the input.
+  // Throttle (speed lever): the gear's max speed (u/s) feeds the sim as throttle.
   const input = getSimInput();
-  input.throttle = speedState.value;
+  input.throttle = maxSpeedForGear(speedState.value);
 
   let steps = 0;
   while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {

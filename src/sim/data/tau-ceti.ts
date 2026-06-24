@@ -12,7 +12,7 @@
 import type { CelestialBody } from "../ecs/components.ts";
 import { computeHabitability } from "../math/habitability.ts";
 import {
-  STAR_RENDER_RADIUS,
+  starRenderRadius,
   planetRenderRadius,
   gasGiantRenderRadius,
 } from "../presentation.ts";
@@ -39,7 +39,7 @@ export const TAU_CETI_LUMINOSITY_SOL = 0.488;
 export const tauCetiStar: CelestialBody = {
   kind: "star",
   name: "Tau Ceti",
-  renderRadius: STAR_RENDER_RADIUS,
+  renderRadius: starRenderRadius(0.793 * R_SOL),
   color: 0xffd493,  // G8V — warm yellow-orange
   dataTag: "real",
   description:

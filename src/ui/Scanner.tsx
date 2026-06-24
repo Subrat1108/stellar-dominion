@@ -16,9 +16,6 @@ interface ScannerProps {
   bus: GameBus;
 }
 
-// Bodies further than this are not shown in the scanner.
-const SCANNER_RANGE = 100; // scene units
-
 const KIND_LABEL: Record<string, string> = {
   star: "Star",
   planet: "Rocky Planet",
@@ -34,9 +31,10 @@ export default function Scanner({ world, bus }: ScannerProps) {
   const shipPos = world.components.transform.get(world.shipId)?.position;
   if (!shipPos) return null;
 
-  // Find the nearest body within range.
+  // Always report the nearest body — at honest scale a fixed detection range is
+  // meaningless (bodies are tiny dots), so the scanner is a constant nav aid.
   let nearestId: number | null = null;
-  let nearestDist = SCANNER_RANGE;
+  let nearestDist = Infinity;
   let nearestBody: CelestialBody | null = null;
 
   for (const [id, body] of world.components.celestialBody) {

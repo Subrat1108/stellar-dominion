@@ -4,7 +4,7 @@
 
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
-import type { SpeedMultiplier } from "../app/speed-state.ts";
+import type { SpeedGear } from "../app/speed-state.ts";
 import { viewState } from "../app/view-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import HUD from "./HUD.tsx";
@@ -18,7 +18,7 @@ import SurfaceView from "./SurfaceView.tsx";
 interface AppProps {
   world: World;
   bus: GameBus;
-  speedState: { value: SpeedMultiplier };
+  speedState: { value: SpeedGear };
 }
 
 export default function App({ world, bus, speedState }: AppProps) {

@@ -6,18 +6,19 @@
 import { useState } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
-import type { SpeedMultiplier } from "../app/speed-state.ts";
+import type { SpeedGear } from "../app/speed-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { lifeSupportFraction, ticksRemaining } from "../sim/systems/life-support.ts";
 import { FIXED_DT } from "../sim/loop.ts";
+import { SPEED_GEAR_LABELS } from "../sim/presentation.ts";
 
-const SPEEDS: SpeedMultiplier[] = [1, 10, 100, 1000];
+const GEARS: SpeedGear[] = [0, 1, 2, 3, 4];
 
 interface HUDProps {
   world: World;
   bus: GameBus;
-  speedState: { value: SpeedMultiplier };
+  speedState: { value: SpeedGear };
 }
 
 /** Format a tick count as MM:SS of real time at 60 ticks/sec. */
@@ -59,7 +60,7 @@ function LifeSupportBar({ fraction }: { fraction: number }) {
 
 export default function HUD({ world, bus, speedState }: HUDProps) {
   useGameTick(bus, 6);
-  const [speed, setSpeed] = useState<SpeedMultiplier>(speedState.value);
+  const [speed, setSpeed] = useState<SpeedGear>(speedState.value);
 
   const ctrl = world.components.shipControl.get(world.shipId);
   const autopilotActive = ctrl?.autopilotActive ?? false;
@@ -165,25 +166,25 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
         }}
       >
         <span style={{ color: "#585b70", fontSize: 11, marginRight: 4 }}>THROTTLE</span>
-        {SPEEDS.map((s) => (
+        {GEARS.map((g) => (
           <button
-            key={s}
+            key={g}
             onClick={() => {
-              speedState.value = s;
-              setSpeed(s);
+              speedState.value = g;
+              setSpeed(g);
             }}
             style={{
               padding: "1px 7px",
               fontSize: 11,
               fontFamily: "inherit",
               cursor: "pointer",
-              background: speed === s ? "#313244" : "transparent",
-              color: speed === s ? "#cdd6f4" : "#585b70",
-              border: speed === s ? "1px solid #45475a" : "1px solid transparent",
+              background: speed === g ? "#313244" : "transparent",
+              color: speed === g ? "#cdd6f4" : "#585b70",
+              border: speed === g ? "1px solid #45475a" : "1px solid transparent",
               borderRadius: 3,
             }}
           >
-            {s}×
+            {SPEED_GEAR_LABELS[g]}
           </button>
         ))}
       </div>

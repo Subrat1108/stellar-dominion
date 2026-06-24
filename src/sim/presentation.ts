@@ -11,8 +11,6 @@
 // sim data at world setup, and the renderer also imports these. The sim never
 // imports from render/, so this neutral module keeps that boundary intact.
 
-const R_EARTH = 6.371e6; // m — used only to normalise physical radii to "Earths"
-
 // --- Distances: AU → scene units ---------------------------------------------
 // A planet at `au` sits `STAR_CLEARANCE + au * AU_TO_SCENE` scene units from the
 // star at the origin. STAR_CLEARANCE keeps the innermost planet clear of the
@@ -29,43 +27,25 @@ export function sceneDistance(au: number): number {
 }
 
 // --- Body render radii (scene units) -----------------------------------------
-// Physical radii span a huge range (a rocky planet vs this star is ~1 : 86) —
-// far too wide to render legibly in one view. We use a compressed mapping:
-// rocky planets scale ~linearly in Earth-radii; the gas giant and the star are
-// compressed so they still dominate without filling the screen.
-// Scaled up substantially (Session 9) so a planet fills most of the view on
-// approach: at 6 u per Earth-radius, Mira ≈ 5.9 u and the autopilot parks at
-// ~9 u from centre, giving a ~66° apparent diameter in the 60° FOV.
-// Orbit gaps stay healthy — tightest pair (Ferrum/Caldor, 34 u apart) has ~22 u
-// clearance between surfaces. GAS_GIANT_SCALE raised proportionally so Titan's
-// Eye (9 R⊕ ≈ 13.5 u) stays bigger than any rocky planet. Star bumped to 12 to
-// remain visually dominant over the larger planets.
-export const STAR_RENDER_RADIUS = 12;
-const PLANET_RADIUS_SCALE = 6.0; // 1 Earth-radius ≈ 6 scene units
-const PLANET_RADIUS_MIN = 4.0;   // floor so small worlds stay visible
-const GAS_GIANT_SCALE = 1.5;     // Titan's Eye (9 R⊕) ≈ 13.5 u
+// Exploration-polish A (docs/09 governing principle): bodies render at their TRUE
+// physical radius, using the SAME AU→scene mapping as distances. So planet /
+// gas-giant / star sizes are honestly proportioned against each other AND against
+// the real-AU spacing — a world is a small dot until you close on it (Earth-radius
+// ≈ 0.0085 u; Tau Ceti's 0.793 R⊙ ≈ 0.74 u; a 9 R⊕ gas giant ≈ 0.077 u). There is
+// no per-class inflation: navigability comes from the speed curve + the target
+// marker + the map, not from making bodies bigger than they are. The ship and the
+// camera rig are the only non-physical avatars (see SHIP_* below + render/scene.ts).
+const AU_METERS = 1.495978707e11; // m per AU — anchors the physical body scale
 
-// Star render radius scales with PHYSICAL size, anchored so a Tau-Ceti-class
-// star (0.793 R⊙) stays at the legacy STAR_RENDER_RADIUS (12). Small red dwarfs
-// (YZ Ceti ≈ 0.16 R⊙) render genuinely small — which both sells "a different,
-// dim star" and lets their ultra-tight orbits clear the star's sphere.
-const R_SUN = 6.957e8; // m
-const TAU_CETI_RADIUS_M = 0.793 * R_SUN; // the anchor (renders at 12)
-const STAR_RADIUS_MIN = 3.0;
-const STAR_RADIUS_MAX = 16.0;
-
-export function starRenderRadius(radiusM: number): number {
-  const scaled = (radiusM / TAU_CETI_RADIUS_M) * STAR_RENDER_RADIUS;
-  return Math.max(STAR_RADIUS_MIN, Math.min(STAR_RADIUS_MAX, scaled));
+/** Convert a physical radius (metres) to scene units, honest to AU_TO_SCENE. */
+export function physicalRadiusToScene(radiusM: number): number {
+  return (radiusM * AU_TO_SCENE) / AU_METERS;
 }
 
-export function planetRenderRadius(radiusM: number): number {
-  return Math.max(PLANET_RADIUS_MIN, (radiusM / R_EARTH) * PLANET_RADIUS_SCALE);
-}
-
-export function gasGiantRenderRadius(radiusM: number): number {
-  return (radiusM / R_EARTH) * GAS_GIANT_SCALE;
-}
+// All body classes share the one honest factor (no inflation, no floor).
+export const planetRenderRadius = physicalRadiusToScene;
+export const gasGiantRenderRadius = physicalRadiusToScene;
+export const starRenderRadius = physicalRadiusToScene;
 
 // --- Orbit placement floors --------------------------------------------------
 // A body's scene-unit orbit is normally sceneDistance(au), but ultra-tight real
@@ -92,16 +72,39 @@ export function orbitSceneRadius(
 
 // --- Approach / parking ------------------------------------------------------
 // Distance (scene units, from a body's centre) at which the autopilot parks and
-// at which landing becomes available: far enough to clear the surface, close
-// enough that the body fills the view. Shared by the autopilot (ship-movement)
-// and landing validation (commands/apply) so "parked" means one thing.
+// at which landing becomes available. Now a pure multiple of the (real) render
+// radius, so a body fills the SAME fraction of the FOV on arrival regardless of
+// its physical size — honest "body fills the view" framing. No additive floor:
+// the old +3 u floor dominated once radii became physical. Shared by the
+// autopilot (ship-movement) and landing validation (commands/apply) so "parked"
+// means one thing. 2.75 ≈ 1/tan(20°): a ~40° apparent diameter in the 60° FOV.
+export const PARK_RADIUS_MULT = 2.75;
 export function parkDistance(renderRadius: number): number {
-  return Math.max(renderRadius * 1.5, renderRadius + 3);
+  return renderRadius * PARK_RADIUS_MULT;
 }
 
-// --- Ship --------------------------------------------------------------------
-// The player's craft — deliberately tiny next to a planet (≈ 1/6 of a planet's
-// diameter). The chase/cockpit camera offsets in the renderer are tuned to this
-// length, so retune those if you change it.
-export const SHIP_RADIUS = 0.07;
-export const SHIP_LENGTH = 0.32;
+// --- Ship (a player AVATAR, not a physical body) -----------------------------
+// A literally-to-scale ship would be ~1e-7 u (invisible). It stays a small but
+// visible mote, shrunk in lock-step with honest bodies so the ordering
+// ship ≪ planet ≪ star is physically true (an Earth-radius world ≈ 0.0085 u; the
+// ship is a fraction of that). The chase/cockpit camera offsets in render/scene.ts
+// scale with this length, so retune those together if you change it.
+export const SHIP_RADIUS = 0.00033;
+export const SHIP_LENGTH = 0.0015;
+
+// --- Throttle / speed (exploration-polish A) ---------------------------------
+// Honest distances are large (the inner system spans ~700 u), so the throttle
+// spans a wide dynamic range: very fine control onto a ~0.0085 u body up to a
+// fast open-space cruise. Five exponential gears; input.throttle carries the
+// chosen gear's MAX SPEED (scene u / sim-sec) — see systems/ship-movement.ts.
+export const SPEED_GEAR_LABELS = ["DOCK", "SLOW", "CRUISE", "FAST", "MAX"] as const;
+export type SpeedGear = 0 | 1 | 2 | 3 | 4;
+const GEAR_MIN_SPEED = 0.004; // u/s at DOCK — nudge onto a small body
+const GEAR_MAX_SPEED = 120;   // u/s at MAX — cross the ~700 u system in ~6 s
+
+/** Max speed (scene u / sim-sec) for a throttle gear index. Pure, exponential. */
+export function maxSpeedForGear(gear: number): number {
+  const last = SPEED_GEAR_LABELS.length - 1;
+  const t = Math.max(0, Math.min(last, gear)) / last;
+  return GEAR_MIN_SPEED * Math.pow(GEAR_MAX_SPEED / GEAR_MIN_SPEED, t);
+}

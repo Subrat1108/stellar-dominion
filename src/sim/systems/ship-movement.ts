@@ -8,15 +8,17 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
-import { STAR_RENDER_RADIUS, parkDistance } from "../presentation.ts";
+import { parkDistance, SHIP_LENGTH } from "../presentation.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
-// Kept a small multiple of maxSpeed (0.01 u/s at 1×) so there's a visible
-// acceleration ramp instead of the ship snapping to the speed cap in one tick.
-// Scales with throttle alongside maxSpeed, so the ramp feel is constant.
-const BASE_ACCEL    = 0.03;              // scene units / sim-sec² at throttle 1×
+// Acceleration is a fixed multiple of the current max speed, so the ramp-up feel
+// stays gear-independent (the legacy ratio was BASE_ACCEL/maxSpeed = 0.03/0.01 = 3).
+const ACCEL_RATIO   = 3;
 const DRAG          = 0.98;              // velocity multiplied each tick
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
+// Soft-surface stop: stop a hair above the body's REAL surface (proportional, so
+// it works at honest scale) plus the ship's own length so the hull doesn't clip.
+const SURFACE_MARGIN_FRAC = 0.1;
 
 /** Unit nose vector for a given yaw (heading) and pitch. */
 export function noseVector(heading: number, pitch: number): { x: number; y: number; z: number } {
@@ -45,15 +47,19 @@ export function shipMovementSystem(world: World, input: Input): void {
   }
 
   let { thrust, yaw, pitch } = input;
-  const throttle = input.throttle > 0 ? input.throttle : 1;
+  // input.throttle carries the selected gear's MAX SPEED in scene-u/sim-sec
+  // (presentation.maxSpeedForGear). Acceleration tracks it so the ramp feel is
+  // gear-independent. Falls back to the component's base speed if unset.
+  const maxSpeed = input.throttle > 0 ? input.throttle : vel.maxSpeed;
+  const accel = maxSpeed * ACCEL_RATIO;
 
   // Manual input overrides autopilot.
   if (Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01) {
     ctrl.autopilotActive = false;
   }
 
-  // Autopilot: steer the nose toward the target entity in 3D, parking at
-  // 1.5× the body's render radius so the planet dominates the view on arrival.
+  // Autopilot: steer the nose toward the target entity in 3D, parking at the
+  // real-radius park distance so the body fills the view on arrival.
   if (ctrl.autopilotActive && ctrl.autopilotTargetId !== undefined) {
     const tgt = transform.get(ctrl.autopilotTargetId);
     if (tgt) {
@@ -65,7 +71,7 @@ export function shipMovementSystem(world: World, input: Input): void {
       // Park at 1.5× render radius (min 3 u above surface) so the ship arrives
       // facing the body with it filling much of the view.
       const targetBody = world.components.celestialBody.get(ctrl.autopilotTargetId);
-      const bodyR = targetBody?.renderRadius ?? 6;
+      const bodyR = targetBody?.renderRadius ?? 0.01;
       const parkDist = parkDistance(bodyR);
 
       if (dist > parkDist) {
@@ -83,7 +89,6 @@ export function shipMovementSystem(world: World, input: Input): void {
         pitch = Math.sign(pitchDiff) * Math.min(1, Math.abs(pitchDiff) / 0.2);
 
         const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
-        const accel = BASE_ACCEL * throttle;
         const brakingDist = (speed * speed) / (2 * accel) * 1.5;
         thrust = Math.abs(yawDiff) < Math.PI / 4
           ? (dist < brakingDist ? -1 : 1)
@@ -103,15 +108,13 @@ export function shipMovementSystem(world: World, input: Input): void {
   ctrl.pitch    = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, ctrl.pitch + pitch * TURN_RATE * FIXED_DT));
 
   // Apply thrust along the nose, then drag.
-  const accel = BASE_ACCEL * throttle;
   const nose  = noseVector(ctrl.heading, ctrl.pitch);
 
   vel.vx = (vel.vx + thrust * accel * nose.x * FIXED_DT) * DRAG;
   vel.vy = (vel.vy + thrust * accel * nose.y * FIXED_DT) * DRAG;
   vel.vz = (vel.vz + thrust * accel * nose.z * FIXED_DT) * DRAG;
 
-  // Clamp to maxSpeed (scaled by throttle).
-  const maxSpeed = vel.maxSpeed * throttle;
+  // Clamp to the gear's max speed.
   const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
   if (speed > maxSpeed) {
     const s = maxSpeed / speed;
@@ -124,13 +127,12 @@ export function shipMovementSystem(world: World, input: Input): void {
   pos.position.z += vel.vz * FIXED_DT;
 
   // Soft surface stop: push the ship back if it penetrates a body's surface.
-  // Planets have a Transform; the star sits at the world origin with no
-  // Transform, so it is checked explicitly via STAR_RENDER_RADIUS.
-  const SURFACE_MARGIN = 0.3; // scene units of clearance above the render radius
+  // Bodies (incl. the star) carry a real renderRadius; the star sits at the world
+  // origin with no Transform, so it defaults to (0,0,0) below.
   const bodies = world.components.celestialBody;
   for (const [entity, body] of bodies) {
     const bpos = transform.get(entity)?.position ?? { x: 0, y: 0, z: 0 };
-    const minR = (body.kind === "star" ? STAR_RENDER_RADIUS : body.renderRadius) + SURFACE_MARGIN;
+    const minR = body.renderRadius * (1 + SURFACE_MARGIN_FRAC) + SHIP_LENGTH;
     const ex = pos.position.x - bpos.x;
     const ey = pos.position.y - bpos.y;
     const ez = pos.position.z - bpos.z;

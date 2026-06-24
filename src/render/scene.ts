@@ -23,6 +23,7 @@ import { positionAt } from "../sim/math/kepler.ts";
 import { noseVector } from "../sim/systems/ship-movement.ts";
 import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
+import { nearestBodyId, markerScreenPosition } from "../app/nav.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
 import { buildSectorScene } from "./sector-scene.ts";
 import {
@@ -42,11 +43,16 @@ export interface Renderer {
   rebuildSystem(world: World): void;
 }
 
-// Chase camera constants — tuned to the ship length (presentation.ts).
-const CHASE_DIST   = 1.7;  // scene units behind ship (≈ 5 ship-lengths)
-const CHASE_HEIGHT = 0.7;  // scene units above ship
-const COCKPIT_FWD  = 0.22; // camera sits just ahead of the cone tip
-const MAP_MARKER_SCALE = 40; // enlarge the ship in map view so it reads as a marker
+// Chase/cockpit camera constants — scaled with the ship avatar (presentation.ts).
+// All offsets shrank in lock-step with honest body radii (exploration-polish A),
+// so the framing behaviour is unchanged while the rig now lives at the body scale.
+const CHASE_DIST   = 0.008;  // scene units behind ship (≈ 5 ship-lengths)
+const CHASE_HEIGHT = 0.0033; // scene units above ship
+const COCKPIT_FWD  = 0.001;  // camera sits just ahead of the cone tip
+const CHASE_LOOK_AHEAD = 0.0094; // chase look-at point ahead of the ship
+const CHASE_LOOK_UP    = 0.0014; // chase look-at point raised slightly
+const MAP_MARKER_SCALE = 5000; // enlarge the tiny ship in map view (~7.5 u marker)
+const MARKER_EDGE_MARGIN = 28; // px inset for the off-screen target chevron
 const TRANSITION_SECS = 0.45; // eased cross-fade duration on a map-tier flip
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z
 
@@ -57,14 +63,30 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
-    0.05,
+    // Honest scale spans ~0.001 u (ship) → 12000 u (starfield): a tiny near plane
+    // plus a logarithmic depth buffer (below) keeps that huge range from z-fighting.
+    0.0002,
     12000, // far plane clears the ~700 u system + the distant starfield
   );
 
-  const webgl = new THREE.WebGLRenderer({ antialias: true });
+  const webgl = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
   webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   webgl.setSize(window.innerWidth, window.innerHeight);
   canvasParent.appendChild(webgl.domElement);
+
+  // Flight-HUD target marker (exploration-polish A): at honest scale bodies are
+  // tiny dots, so a directional marker — a reticle when the target is on-screen,
+  // an edge chevron when it's off-screen/behind — makes free-flight navigable.
+  // Driven by the renderer each frame (smooth, decoupled from React).
+  const targetMarker = document.createElement("div");
+  targetMarker.style.cssText =
+    "position:absolute;left:0;top:0;pointer-events:none;color:#89dceb;" +
+    "font:16px/1 ui-monospace,monospace;text-shadow:0 0 3px #000,0 0 6px #000;" +
+    "z-index:5;display:none;will-change:left,top,transform;";
+  if (getComputedStyle(canvasParent).position === "static") {
+    canvasParent.style.position = "relative";
+  }
+  canvasParent.appendChild(targetMarker);
 
   const controls = new OrbitControls(camera, webgl.domElement);
   controls.enableDamping = true;
@@ -167,6 +189,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const _lookAt = new THREE.Vector3();
   const _offset = new THREE.Vector3();
   const _lightDir = new THREE.Vector3();
+  const _targetWorld = new THREE.Vector3();
+  const _targetCam   = new THREE.Vector3();
   const _up     = new THREE.Vector3(0, 1, 0);
   const _qLook  = new THREE.Quaternion();
   const _qShip  = new THREE.Quaternion();
@@ -198,6 +222,9 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
   return {
     sync(w: World) {
+      // Hidden by default; the flight path below re-shows it when a target exists.
+      targetMarker.style.display = "none";
+
       // Decay the map-tier cross-fade overlay (eased; viewState.transitionT).
       const nowMs = performance.now();
       const dt = (nowMs - lastSyncMs) / 1000;
@@ -286,10 +313,44 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         _offset.copy(_nose).multiplyScalar(-CHASE_DIST).setY(CHASE_HEIGHT);
         _offset.applyQuaternion(_qLook);
         _camPos.set(0, 0, 0).add(_offset);
-        _lookAt.copy(_nose).multiplyScalar(2).setY(0.3);
+        _lookAt.copy(_nose).multiplyScalar(CHASE_LOOK_AHEAD).setY(CHASE_LOOK_UP);
         camera.position.copy(_camPos);
         camera.up.copy(_up);
         camera.lookAt(_lookAt);
+      }
+
+      // --- Target marker: point to the selected (autopilot) or nearest body ---
+      let targetId = shipCtrl.autopilotTargetId;
+      if (targetId === undefined || !bodyMeshes.has(targetId)) {
+        const positions: [number, { x: number; y: number; z: number }][] = [];
+        for (const [id] of bodyMeshes) {
+          const t = w.components.transform.get(id);
+          positions.push([id, t ? t.position : { x: 0, y: 0, z: 0 }]);
+        }
+        targetId = nearestBodyId(positions, { x: sx, y: sy, z: sz })?.id;
+      }
+      const targetMesh = targetId !== undefined ? bodyMeshes.get(targetId) : undefined;
+      if (targetMesh) {
+        camera.updateMatrixWorld();
+        targetMesh.getWorldPosition(_targetWorld);
+        _targetCam.copy(_targetWorld).applyMatrix4(camera.matrixWorldInverse);
+        const behind = _targetCam.z >= 0; // camera looks down -z
+        _targetWorld.project(camera);     // mutate into NDC
+        const el = webgl.domElement;
+        const place = markerScreenPosition(
+          _targetWorld.x, _targetWorld.y, behind,
+          el.clientWidth, el.clientHeight, MARKER_EDGE_MARGIN,
+        );
+        targetMarker.style.display = "block";
+        targetMarker.style.left = `${place.x}px`;
+        targetMarker.style.top = `${place.y}px`;
+        if (place.offscreen) {
+          targetMarker.textContent = "➤";
+          targetMarker.style.transform = `translate(-50%,-50%) rotate(${place.angle}rad)`;
+        } else {
+          targetMarker.textContent = "⊕";
+          targetMarker.style.transform = "translate(-50%,-50%)";
+        }
       }
     },
 

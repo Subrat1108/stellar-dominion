@@ -1,9 +1,12 @@
-// Shared mutable throttle multiplier — scales the ship's acceleration and max
-// speed (passed to the sim as Input.throttle). 1× = base thrust; 1000× = fast
-// in-system cruising. The sim still ticks in real time; this is NOT time
-// compression (that lever is deferred — see docs/08 / Session 6).
-// The object is mutated by the HUD; the frame loop reads it each frame.
+// Shared mutable throttle GEAR — an index into the exponential speed curve
+// (presentation.maxSpeedForGear). The frame loop reads it each frame and passes
+// the gear's MAX SPEED (u/s) to the sim as Input.throttle. The sim still ticks in
+// real time; this is NOT time compression (that lever is deferred — docs/08).
+// The object is mutated by the HUD; the frame loop reads it.
 
-export type SpeedMultiplier = 1 | 10 | 100 | 1000;
+import type { SpeedGear } from "../sim/presentation.ts";
 
-export const speedState: { value: SpeedMultiplier } = { value: 1 };
+export type { SpeedGear };
+
+// Default to CRUISE — meaningful open-space motion, still controllable.
+export const speedState: { value: SpeedGear } = { value: 2 };
