@@ -1,4 +1,5 @@
 > **Step 1B reference.** Reconcile with repo decisions: warp ungated for now (gate later); anti-snowball economics deferred; use existing habitability score, ESI only as a UI tier label.
+> **Distance note (Session 18):** the bundled HYG catalog measures Tau Ceti→Luyten 726-8 (Gliese 65) at **3.36 ly**, which supersedes the ~3.1 ly quoted below; Tau Ceti→YZ Ceti is 1.60 ly as stated. The catalog is the source of truth (`docs/09`).
 
 # **Interstellar Exploration and Expansion Framework: Sector Topography and Mechanics**
 

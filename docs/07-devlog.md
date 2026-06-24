@@ -14,6 +14,23 @@ Entry template:
 
 ---
 
+> **Resume point (Session 18, in progress):** Step 1B exploration / warp layer.
+> Done: docs/05 (1A complete, 1B active), docs/09 decision cluster, docs/12 Luyten distance note.
+> Next: (commit 2) curated neighbour table + dedicated `SectorView` scene with eased cross-fade + SectorPanel + pure zoom-tier/node-placement logic + tests; then (commit 3) `instantiateSystem` refactor + `setActiveSystem` swap + warp FSM (`BeginWarpScan`/`CommitWarp`/`CancelWarp`, `warpSystem`) + arrival generation + YZ Ceti RealSystemDef + coarse SCAN tally; then (commit 4) off-view lazy catch-up (clamped, allocation-free, logged) + save extension (activeSystemId/discovered/per-system stash+lastSimTick/ship) + SPI hazard + ESI label + multi-system save round-trip test.
+> Guardrails: catch-up clamped to a ceiling (log on clamp); SCAN never retains/saves the full destination; all 129 existing tests stay green.
+
+## Session 18 — 2026-06-24 — Step 1B exploration / warp layer *(in progress)*
+- **Goal:** Turn the 167-star catalog into places the player can fly to: a dedicated sector map, a four-phase warp FSM (ungated), single-active-system swap with deterministic lazy catch-up for off-view systems, arrival generation reusing the 1A engine (YZ Ceti via a RealSystemDef), and the save extended with active-system + discovered + ship position. Determinism + all existing tests green.
+- **Did (so far):**
+  - **docs/05** — Step 1A marked complete, **Step 1B active** with scope + out-of-scope spelled out.
+  - **docs/09** — Session-18 decision cluster: warp ungated; single persistent world + content-swap with **lazy clamped catch-up** for off-view systems; **SCAN coarse-only / never persisted**; discovered + active-system + ship in the save; YZ Ceti + Luyten 726-8 as 1B destinations (Epsilon Eridani → 1C); YZ Ceti via RealSystemDef + SPI as a surfaced trait; ESI as a UI label.
+  - **docs/12** — noted the catalog Tau Ceti→Luyten 726-8 distance (**3.36 ly**) supersedes the doc's ~3.1 ly.
+- **Decisions:** see `docs/09` 2026-06-24 cluster.
+- **Next:** sector scene → active-system swap + warp FSM → catch-up + save extension (see resume point).
+- **Open questions:** none yet.
+
+---
+
 ## Session 17 — 2026-06-16 — Step 1A content engine + procedural surfaces
 - **Goal:** Build the deterministic seeded content engine (Step 1A) so the universe is generated from a seed rather than hand-authored, regenerate the home system through it, and add first-pass procedural planet surfaces. Determinism + all existing tests green.
 - **Did:**

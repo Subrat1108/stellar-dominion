@@ -39,7 +39,7 @@ Built as **vertical slices**: each phase produces something playable end-to-end,
 
 After Phase 3A the build pivots to **exploration-first sequencing**: before deepening any single system (3B feedback, multi-colony logistics) we lay the universe foundation so there is somewhere to explore. This interlude precedes the original Phase 4/5 work, which is folded into it.
 
-### Step 1A — the content engine *(current)*
+### Step 1A — the content engine *(complete — Session 17)*
 - Deterministic, seeded universe generation: real stars from a bundled HYG subset + procedurally-filled planets/moons (xxHash-seeded, Chen & Kipping mass–radius, "peas in a pod" spacing). See `docs/13`.
 - Scope: the **local neighborhood only**. No sector/galaxy map, no warp UI, no tech tree, no economy changes — those are later steps.
 - Generated bodies keep the exact `CelestialBody` shape the colony/terraforming/population/save systems already consume; each body tagged real / derived / fictional.
@@ -48,12 +48,16 @@ After Phase 3A the build pivots to **exploration-first sequencing**: before deep
 
 **Slice goal:** the engine can generate a large, varied, grounded neighborhood from a seed — no hand-authoring per body — and the home system is itself produced through it.
 
-### Step 1B — exploration & expansion (warp layer)
-- Multi-scale map tiers (system → sector → galaxy) + warp/sub-light travel. See `docs/12`.
-- Warp is **temporarily ungated** ("god mode") during the build phase; tech-tree gating and the economy/purpose of travel are deferred.
-- The second star system is reachable and worth reaching.
+### Step 1B — exploration & expansion (warp layer) *(active)*
+- A dedicated **SectorView** scene (separate from the system map, entered by an eased zoom-out cross-fade) showing three real, catalog-placed star nodes: **Tau Ceti** (home), **YZ Ceti** (1.60 ly), **Luyten 726-8** (3.36 ly, the Gliese 65 binary); Epsilon Eridani + the rest are dim, locked background nodes (Step 1C). See `docs/12`.
+- **Warp** is **ungated** ("god mode") this phase — no tech prerequisite, no resource cost. Four phases: **SCAN** (coarse probabilistic preview only) → **SPOOL** (committed countdown) → **TRANSIT** (locked sector crossing) → **ARRIVE** (destination generated via the 1A `generateSystem`, fog lifted, drop into the new system).
+- **One active system** is fully simulated at a time (single persistent world, content swapped on warp; the ship entity persists). Off-view systems are **paused and lazily caught up** on re-entry (deterministic batch of the existing economy, clamped) — not ticked per-frame.
+- Save extends the 1A seed+deltas model with **active-system id + discovered set + per-system deltas (keyed by stable systemId/bodyKey) + ship position**.
+- **YZ Ceti** is generated through the engine via a RealSystemDef (its three real tidally-locked terrestrial candidates + seeded fill); its Star-Planet-Interaction radio hazard is surfaced as a **legible system trait** (scan + arrival UI), not a mechanic. ESI is a **UI tier label only**; `computeHabitability` stands.
 
-**Slice goal:** fly to a neighboring real star and explore a freshly-generated system.
+**Slice goal:** fly to a neighboring real star (YZ Ceti) and explore a freshly-generated, genuinely-different system; warp home to your colony.
+
+**Out of scope (deferred):** tech tree + warp gating/cost; the economy/anti-snowball systems (admin latency, courier upkeep, gravity-well tax, interstellar freight); sub-light interstellar probes; Epsilon Eridani; galaxy/universe tiers; any shielding-research / hazard-damage mechanic.
 
 ### Deferred / parked (so nothing falls off)
 Explicitly held back during the exploration-first interlude, to be picked up in their own slices:
