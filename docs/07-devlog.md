@@ -14,20 +14,20 @@ Entry template:
 
 ---
 
-> **Resume point (Session 18, in progress):** Step 1B exploration / warp layer.
-> Done: docs/05 (1A complete, 1B active), docs/09 decision cluster, docs/12 Luyten distance note.
-> Next: (commit 2) curated neighbour table + dedicated `SectorView` scene with eased cross-fade + SectorPanel + pure zoom-tier/node-placement logic + tests; then (commit 3) `instantiateSystem` refactor + `setActiveSystem` swap + warp FSM (`BeginWarpScan`/`CommitWarp`/`CancelWarp`, `warpSystem`) + arrival generation + YZ Ceti RealSystemDef + coarse SCAN tally; then (commit 4) off-view lazy catch-up (clamped, allocation-free, logged) + save extension (activeSystemId/discovered/per-system stash+lastSimTick/ship) + SPI hazard + ESI label + multi-system save round-trip test.
-> Guardrails: catch-up clamped to a ceiling (log on clamp); SCAN never retains/saves the full destination; all 129 existing tests stay green.
-
-## Session 18 — 2026-06-24 — Step 1B exploration / warp layer *(in progress)*
-- **Goal:** Turn the 167-star catalog into places the player can fly to: a dedicated sector map, a four-phase warp FSM (ungated), single-active-system swap with deterministic lazy catch-up for off-view systems, arrival generation reusing the 1A engine (YZ Ceti via a RealSystemDef), and the save extended with active-system + discovered + ship position. Determinism + all existing tests green.
-- **Did (so far):**
-  - **docs/05** — Step 1A marked complete, **Step 1B active** with scope + out-of-scope spelled out.
-  - **docs/09** — Session-18 decision cluster: warp ungated; single persistent world + content-swap with **lazy clamped catch-up** for off-view systems; **SCAN coarse-only / never persisted**; discovered + active-system + ship in the save; YZ Ceti + Luyten 726-8 as 1B destinations (Epsilon Eridani → 1C); YZ Ceti via RealSystemDef + SPI as a surfaced trait; ESI as a UI label.
-  - **docs/12** — noted the catalog Tau Ceti→Luyten 726-8 distance (**3.36 ly**) supersedes the doc's ~3.1 ly.
+## Session 18 — 2026-06-24 — Step 1B exploration / warp layer
+- **Goal:** Turn the 167-star catalog into places the player can fly to: a dedicated sector map, a four-phase ungated warp FSM, single-active-system swap with deterministic lazy catch-up for off-view systems, arrival generation reusing the 1A engine (YZ Ceti via a RealSystemDef), and the save extended with active-system + discovered + ship. Determinism + all existing tests green.
+- **Did:**
+  - **Docs/decisions:** `docs/05` 1A complete / 1B active (scope + out-of-scope); `docs/09` Session-18 cluster; `docs/12` Luyten 726-8 = 3.36 ly note.
+  - **Sector map** (`data/sector.ts`, `render/sector-layout.ts` + `sector-scene.ts`): curated neighbour table (Tau Ceti home; YZ Ceti + Luyten 726-8 reachable; Epsilon Eridani locked) with catalog-honest distances (verified YZ 1.60 ly, Luyten 3.36 ly); a **dedicated SectorView scene** (colour-by-spectral-type nodes, full-catalog background, "you are here" ring) entered from the map view by a zoom-out threshold with an eased cross-fade (`viewState.mapTier`/`transitionT`); **pure** zoom-tier hysteresis + node placement (tested). `SectorPanel` lists systems + drives warp.
+  - **Active-system swap** (`galaxy.ts`, `instantiate.ts`): single persistent world; `setActiveSystem` stashes the departed system's deltas (keyed by stable `bodyKey` + `lastSimTick`), clears bodies (ship entity persists), regenerates+instantiates the destination via the 1A engine, re-applies any prior stash, repositions the ship. Shared `instantiateSystem` adds an orbit-spacing floor + physical-scaled star radius (`presentation.ts`) so YZ Ceti's 0.016–0.028 AU planets render legibly — **Tau Ceti's layout stays byte-identical** (floors never bind).
+  - **Warp FSM** (`systems/warp.ts`, `commands/warp.ts`): tick-counted scan→spool→transit→arrive, deterministic; `warpSystem` runs first in the loop + emits `ArrivedAtSystem`; transit is locked. `gen/scan.ts` returns a **coarse, never-persisted** preview. Renderer `rebuildSystem` swaps the scene graph on arrival.
+  - **YZ Ceti** (`data/yz-ceti.ts`): three real tidally-locked terrestrial candidates verbatim + the **SPI radio hazard** as a system trait (`GeneratedSystem.hazard`, surfaced by `HazardBanner`); no gas giant. `esiTierLabel` (display-only) shown in SurfaceView.
+  - **Off-view catch-up** (`catch-up.ts`): on re-entry, the colony economy is batch-run for the elapsed economy-ticks (`runColonyEconomy` extracted from `colonySystem`), **clamped** to `MAX_CATCHUP_ECON_TICKS` (logs on clamp), deterministic.
+  - **Save** (`save/serialize.ts` v2): universe seed + activeSystemId + discovered + per-system stash map (every visited system) + ship; `reconstructWorld` restores stashes, makes the saved system active (in-place for home → byte-identical; swap otherwise). SCAN data never enters the save.
+  - **Tests** (+28 → **157**): `sector` (table/distances/geometry/zoom hysteresis), `warp` (FSM, reject/cancel, deterministic arrival, ship-persists swap, active/discovered, stash restore, coarse scan, loop integration), `save` multi-system (active/discovered, semantic warped round-trip, no pre-arrival data), `catch-up` (equals staying, count, clamp, deterministic away-and-back). Typecheck + build clean.
 - **Decisions:** see `docs/09` 2026-06-24 cluster.
-- **Next:** sector scene → active-system swap + warp FSM → catch-up + save extension (see resume point).
-- **Open questions:** none yet.
+- **Next:** confirm in-browser (zoom out to sector → scan YZ Ceti → warp → arrive in the scorched red-dwarf system with the SPI banner → warp home to a caught-up colony), then **Step 1C** — Epsilon Eridani + sub-light probes / the economy/tech layer that gates warp.
+- **Open questions:** warp transit currently has no in-flight visual (the ship just leaves the system view); a sector-map transit animation is a polish follow-up. Multi-warp histories reconstruct **semantically** (not byte-identically) since entity ids are per-visit — the documented save guarantee.
 
 ---
 
