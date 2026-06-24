@@ -43,15 +43,17 @@ export interface Renderer {
   rebuildSystem(world: World): void;
 }
 
-// Chase/cockpit camera constants — scaled with the ship avatar (presentation.ts).
-// All offsets shrank in lock-step with honest body radii (exploration-polish A),
-// so the framing behaviour is unchanged while the rig now lives at the body scale.
-const CHASE_DIST   = 0.008;  // scene units behind ship (≈ 5 ship-lengths)
-const CHASE_HEIGHT = 0.0033; // scene units above ship
-const COCKPIT_FWD  = 0.001;  // camera sits just ahead of the cone tip
-const CHASE_LOOK_AHEAD = 0.0094; // chase look-at point ahead of the ship
-const CHASE_LOOK_UP    = 0.0014; // chase look-at point raised slightly
-const MAP_MARKER_SCALE = 5000; // enlarge the tiny ship in map view (~7.5 u marker)
+// Chase/cockpit camera constants (scene units). The camera sits ~20 ship-lengths
+// back (CHASE_DIST : SHIP_LENGTH ≈ 0.001 : 0.00005) so the ship reads as a tiny
+// speck, while CHASE_DIST stays ≪ a body radius so the body fills the view as a
+// wall on arrival, and ≥ 5× the near plane (0.0002) so the ship doesn't clip
+// (Session 20 fix). The look-at offsets keep the same framing angle.
+const CHASE_DIST   = 0.001;    // scene units behind ship
+const CHASE_HEIGHT = 0.0004;   // scene units above ship
+const COCKPIT_FWD  = 0.000125; // camera sits just ahead of the cone tip
+const CHASE_LOOK_AHEAD = 0.00118; // chase look-at point ahead of the ship
+const CHASE_LOOK_UP    = 0.000175; // chase look-at point raised slightly
+const MAP_MARKER_SCALE = 150000; // enlarge the tiny ship in map view (~7.5 u marker)
 const MARKER_EDGE_MARGIN = 28; // px inset for the off-screen target chevron
 const TRANSITION_SECS = 0.45; // eased cross-fade duration on a map-tier flip
 const FORWARD_AXIS = new THREE.Vector3(0, 0, 1); // cone points +Z

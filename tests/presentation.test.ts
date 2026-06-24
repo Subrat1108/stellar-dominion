@@ -11,6 +11,7 @@ import {
   PARK_RADIUS_MULT,
   maxSpeedForGear,
   SPEED_GEAR_LABELS,
+  SHIP_LENGTH,
 } from "../src/sim/presentation.ts";
 
 const R_EARTH = 6.371e6;
@@ -45,6 +46,15 @@ describe("physical body radii (honest scale)", () => {
       2 * physicalRadiusToScene(R_EARTH),
       10,
     );
+  });
+});
+
+describe("ship avatar scale (Session 20 fix)", () => {
+  it("is a small fraction of an Earth-radius body (well under 1:10)", () => {
+    const bodyR = planetRenderRadius(R_EARTH); // ~0.00835 u
+    const ratio = SHIP_LENGTH / bodyR;         // length : radius
+    expect(ratio).toBeLessThan(0.1); // well under 1:10
+    expect(ratio).toBeGreaterThan(1 / 300); // not below the near-plane regime
   });
 });
 

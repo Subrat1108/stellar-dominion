@@ -84,13 +84,16 @@ export function parkDistance(renderRadius: number): number {
 }
 
 // --- Ship (a player AVATAR, not a physical body) -----------------------------
-// A literally-to-scale ship would be ~1e-7 u (invisible). It stays a small but
-// visible mote, shrunk in lock-step with honest bodies so the ordering
-// ship ≪ planet ≪ star is physically true (an Earth-radius world ≈ 0.0085 u; the
-// ship is a fraction of that). The chase/cockpit camera offsets in render/scene.ts
-// scale with this length, so retune those together if you change it.
-export const SHIP_RADIUS = 0.00033;
-export const SHIP_LENGTH = 0.0015;
+// A literally-to-scale ship would be ~1e-7 u (sub-near-plane, unrenderable in one
+// camera). It stays a small but visible mote, sized WELL UNDER the body radius so
+// it reads as a tiny craft, not a co-equal object (Session 20 fix): at 0.00005 u
+// it is ~1:167 of an Earth-radius world (0.00835 u). Its apparent on-screen size
+// is set by SHIP_LENGTH : CHASE_DIST (render/scene.ts), not by absolute size, so
+// the camera sits ~20 ship-lengths back while staying ≪ a body radius (the body
+// still fills the view as a wall on arrival). Going smaller than ~1:300 would put
+// the ship below the near plane → a dedicated ship near-camera layer (deferred).
+export const SHIP_RADIUS = 0.000011;
+export const SHIP_LENGTH = 0.00005;
 
 // --- Throttle / speed (exploration-polish A) ---------------------------------
 // Honest distances are large (the inner system spans ~700 u), so the throttle

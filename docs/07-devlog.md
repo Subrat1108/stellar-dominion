@@ -14,6 +14,13 @@ Entry template:
 
 ---
 
+> **Resume point (Session 20, in progress — Polish A FIX):** Diagnosis done + approved. Numbers (Mira): body R 0.00835 u; ship len 0.0015 u → ship:body 1:11 (too big); park 2.75R=1.75R alt (marble, want 1.2R wall); Mira drifts 0.016 u/s > DOCK 0.004 (so velocity-match needed); transparency = near-plane(0.0002) clip of FrontSide sphere when very close. Three slices: (1) ship/camera scale → SHIP_LENGTH 0.00005, CHASE_DIST 0.001 (target ship:body ~1:167); (2) autopilot low-orbit insertion (1.2R) + velocity-match + slow deterministic orbit (angle=f(tick)); (3) soft-stop floor tied to near plane + reproduce/fix transparency. Keep 177 green + new pure-fn tests. NEXT: start slice 1.
+
+## Session 20 — 2026-06-25 — Exploration polish A FIX (ship scale + orbital insertion) *(in progress)*
+- **Goal:** Fix the still-wrong exploration feel from polish A: ship avatar too big (1:11), autopilot parks too far (full globe not a wall), bodies drift faster than DOCK throttle (no velocity-match → ram/bounce), range-dependent transparency. Render + autopilot-arrival behaviour only; determinism/sim untouched; 177 tests stay green.
+- **Decisions:** (a) slow deterministic orbit on arrival (angle pure fn of tick), not pure hold; (b) accept ship:body ~1:150–1:300 now, flag a dedicated ship near-camera layer as a known follow-up option (don't build).
+- **Checklist:** [ ] slice 1 ship/camera scale · [ ] slice 2 orbital insertion + velocity-match · [ ] slice 3 soft-stop floor + transparency · [ ] devlog/status close + push.
+
 ## Session 19 — 2026-06-24 — Exploration polish A (rendering & flight-feel)
 - **Goal:** Make the exploration leg feel real & navigable without new features. Governing principle (docs/09): true relative proportions + real-AU distances + no inflated bodies, navigable via speed/targeting/(map). Three fixes only — render + input-to-speed; determinism, colony, terraforming, population and the warp FSM untouched.
 - **Did:**
