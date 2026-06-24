@@ -8,7 +8,8 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
-import { parkDistance, SHIP_LENGTH } from "../presentation.ts";
+import { orbitInsertionRadius, ORBIT_RATE, SHIP_LENGTH } from "../presentation.ts";
+import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
 // Acceleration is a fixed multiple of the current max speed, so the ramp-up feel
@@ -53,13 +54,47 @@ export function shipMovementSystem(world: World, input: Input): void {
   const maxSpeed = input.throttle > 0 ? input.throttle : vel.maxSpeed;
   const accel = maxSpeed * ACCEL_RATIO;
 
-  // Manual input overrides autopilot.
+  // Manual input overrides both autopilot and an active orbit.
   if (Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01) {
     ctrl.autopilotActive = false;
+    delete ctrl.orbitingBodyId;
   }
 
-  // Autopilot: steer the nose toward the target entity in 3D, parking at the
-  // real-radius park distance so the body fills the view on arrival.
+  // Orbit hold: once inserted, hold a slow deterministic low orbit around the
+  // body and MATCH its velocity, so the body stops drifting relative to the ship
+  // and fills the view as a curved wall (no ram/bounce). Bodies drift faster than
+  // the DOCK throttle, so this velocity-match is what makes arrival feel right.
+  if (ctrl.orbitingBodyId !== undefined) {
+    const body = world.components.celestialBody.get(ctrl.orbitingBodyId);
+    const bodyPos = transform.get(ctrl.orbitingBodyId)?.position;
+    if (body && bodyPos) {
+      const rIns = orbitInsertionRadius(body.renderRadius);
+      const angle = (ctrl.orbitAngle ?? 0) + ORBIT_RATE * FIXED_DT;
+      ctrl.orbitAngle = angle;
+      // Hold the insertion altitude in the body's local XZ plane.
+      pos.position.x = bodyPos.x + Math.cos(angle) * rIns;
+      pos.position.y = bodyPos.y;
+      pos.position.z = bodyPos.z + Math.sin(angle) * rIns;
+      // Velocity = body's heliocentric velocity (finite-difference of its analytic
+      // position, moon-safe) + the tangential orbit velocity.
+      const T  = world.time * ORBITAL_TIME_RATE;
+      const dT = FIXED_DT * ORBITAL_TIME_RATE;
+      const p1 = bodyWorldPosition(world, ctrl.orbitingBodyId, T);
+      const p0 = bodyWorldPosition(world, ctrl.orbitingBodyId, T - dT);
+      vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
+      vel.vy = (p1.y - p0.y) / FIXED_DT;
+      vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
+      // Face along the orbit tangent (nose = (sin h, 0, cos h) → h = -angle).
+      ctrl.heading = -angle;
+      ctrl.pitch = 0;
+      return;
+    }
+    delete ctrl.orbitingBodyId; // body gone (e.g. warp swap) — drop orbit
+  }
+
+  // Autopilot: steer the nose toward the target in 3D, then INSERT into a low
+  // orbit on arrival (orbitInsertionRadius) instead of stopping dead at a
+  // distance — so the planet fills the view like a wall, not a far marble.
   if (ctrl.autopilotActive && ctrl.autopilotTargetId !== undefined) {
     const tgt = transform.get(ctrl.autopilotTargetId);
     if (tgt) {
@@ -68,13 +103,11 @@ export function shipMovementSystem(world: World, input: Input): void {
       const dz = tgt.position.z - pos.position.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-      // Park at 1.5× render radius (min 3 u above surface) so the ship arrives
-      // facing the body with it filling much of the view.
       const targetBody = world.components.celestialBody.get(ctrl.autopilotTargetId);
       const bodyR = targetBody?.renderRadius ?? 0.01;
-      const parkDist = parkDistance(bodyR);
+      const arriveDist = orbitInsertionRadius(bodyR);
 
-      if (dist > parkDist) {
+      if (dist > arriveDist) {
         const targetHeading = Math.atan2(dx, dz);
         const targetPitch   = Math.asin(Math.max(-1, Math.min(1, dy / dist)));
 
@@ -94,7 +127,16 @@ export function shipMovementSystem(world: World, input: Input): void {
           ? (dist < brakingDist ? -1 : 1)
           : 0;
       } else {
+        // Arrived → insert into orbit. Seed the phase from the current offset so
+        // X/Z don't jump; orbit-hold (above) takes over next tick.
+        ctrl.orbitingBodyId = ctrl.autopilotTargetId;
+        ctrl.orbitAngle = Math.atan2(
+          pos.position.z - tgt.position.z,
+          pos.position.x - tgt.position.x,
+        );
         ctrl.autopilotActive = false;
+        delete ctrl.autopilotTargetId;
+        vel.vx = 0; vel.vy = 0; vel.vz = 0; // no drift-in before orbit-hold
         thrust = 0; yaw = 0; pitch = 0;
       }
     }

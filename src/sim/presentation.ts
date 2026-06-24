@@ -83,6 +83,19 @@ export function parkDistance(renderRadius: number): number {
   return renderRadius * PARK_RADIUS_MULT;
 }
 
+// --- Orbital insertion (Session 20 fix) --------------------------------------
+// On arrival the autopilot settles into a LOW orbit at this multiple of the real
+// radius (centre-distance), so the body fills the view as a curved wall rather
+// than a distant marble. 1.2 → altitude 0.2 R above the surface; tunable 1.1–1.3.
+export const ORBIT_INSERTION_MULT = 1.2;
+export function orbitInsertionRadius(renderRadius: number): number {
+  return renderRadius * ORBIT_INSERTION_MULT;
+}
+
+// Slow, deterministic orbit rate (rad / sim-sec) once inserted — a feel value:
+// slow enough to admire, not a spin. 0.042 ≈ one full orbit every ~150 s.
+export const ORBIT_RATE = 0.042;
+
 // --- Ship (a player AVATAR, not a physical body) -----------------------------
 // A literally-to-scale ship would be ~1e-7 u (sub-near-plane, unrenderable in one
 // camera). It stays a small but visible mote, sized WELL UNDER the body radius so

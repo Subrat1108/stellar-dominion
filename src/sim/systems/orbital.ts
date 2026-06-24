@@ -23,6 +23,28 @@ import { positionAt } from "../math/kepler.ts";
 // few degrees.
 export const ORBITAL_TIME_RATE = 0.0015;
 
+/**
+ * Analytic world position of a body at a given ORBITAL time (already scaled by
+ * ORBITAL_TIME_RATE) — recursing through parents so it is correct for moons too.
+ * Pure: depends only on orbit elements + time, so finite-differencing it gives a
+ * deterministic body velocity for the autopilot's orbital velocity-match.
+ * A body with no orbit (the star) resolves to its transform / the origin.
+ */
+export function bodyWorldPosition(
+  world: World,
+  entity: number,
+  orbitalTime: number,
+): { x: number; y: number; z: number } {
+  const orb = world.components.orbit.get(entity);
+  if (!orb) {
+    const t = world.components.transform.get(entity);
+    return t ? { ...t.position } : { x: 0, y: 0, z: 0 };
+  }
+  const local = positionAt(orb.elements, orbitalTime);
+  const parent = bodyWorldPosition(world, orb.parent, orbitalTime);
+  return { x: parent.x + local.x, y: parent.y + local.y, z: parent.z + local.z };
+}
+
 export function orbitalSystem(world: World): void {
   const { orbit, transform } = world.components;
   const orbitalTime = world.time * ORBITAL_TIME_RATE;

@@ -174,6 +174,14 @@ export interface ShipControl {
    * a TakeOff command clears it. Set/cleared only by the command layer.
    */
   landedBodyId?: number;
+  /**
+   * If set, the autopilot has inserted the ship into a slow low orbit around this
+   * body: it holds the insertion altitude, matches the body's velocity (so the
+   * body stops drifting relative to the ship) and circles deterministically.
+   * Cleared by any manual input. `orbitAngle` is the current orbit phase (rad).
+   */
+  orbitingBodyId?: number;
+  orbitAngle?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,22 @@ import { describe, it, expect } from "vitest";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { step, run, type Input } from "../src/sim/loop.ts";
 import { FIXED_DT } from "../src/sim/constants.ts";
+import { orbitInsertionRadius } from "../src/sim/presentation.ts";
+
+/** First star-orbiting rocky planet in the world, with its entity id + radius. */
+function firstPlanet(world: ReturnType<typeof createStartingSystem>) {
+  for (const [id, body] of world.components.celestialBody) {
+    if (body.kind === "planet") return { id, body };
+  }
+  throw new Error("no planet");
+}
+
+/** Centre-to-centre distance from the ship to a body. */
+function distToBody(world: ReturnType<typeof createStartingSystem>, bodyId: number): number {
+  const s = world.components.transform.get(world.shipId)!.position;
+  const b = world.components.transform.get(bodyId)!.position;
+  return Math.hypot(s.x - b.x, s.y - b.y, s.z - b.z);
+}
 
 /** Build a full Input from a partial, defaulting the rest to neutral. */
 function mk(partial: Partial<Input>): Input {
@@ -137,6 +153,62 @@ describe("ship movement system", () => {
     step(world, mk({ thrust: 1 }));
 
     expect(ctrl.autopilotActive).toBe(false);
+  });
+
+  it("orbit-hold keeps the ship at the insertion radius while the body drifts", () => {
+    // Directly enter the orbit-hold state, then confirm the ship holds the
+    // insertion altitude (velocity-matched) even as the body moves on its orbit.
+    const world = createStartingSystem();
+    const { id, body } = firstPlanet(world);
+    const rIns = orbitInsertionRadius(body.renderRadius);
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.orbitingBodyId = id;
+    ctrl.orbitAngle = 0;
+
+    step(world, mk({}));
+    expect(distToBody(world, id)).toBeCloseTo(rIns, 6);
+
+    // Many ticks later the body has drifted, but the ship still holds the radius
+    // (it would diverge if it weren't matching the body's velocity).
+    for (let i = 0; i < 1200; i++) step(world, mk({}));
+    expect(distToBody(world, id)).toBeCloseTo(rIns, 5);
+    expect(ctrl.orbitAngle).toBeGreaterThan(0); // orbit advanced
+    expect(ctrl.orbitingBodyId).toBe(id);
+  });
+
+  it("manual input breaks orbit-hold", () => {
+    const world = createStartingSystem();
+    const { id } = firstPlanet(world);
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.orbitingBodyId = id;
+    ctrl.orbitAngle = 0;
+    step(world, mk({ thrust: 1 }));
+    expect(ctrl.orbitingBodyId).toBeUndefined();
+  });
+
+  it("autopilot inserts into orbit on arrival instead of stopping short", () => {
+    const world = createStartingSystem();
+    const { id, body } = firstPlanet(world);
+    const rIns = orbitInsertionRadius(body.renderRadius);
+    step(world, mk({})); // populate body transforms (orbitalSystem) before placing
+    const bp = world.components.transform.get(id)!.position;
+    // Park the ship just outside the insertion radius, pointed at the body (+z).
+    const ship = world.components.transform.get(world.shipId)!;
+    ship.position = { x: bp.x, y: bp.y, z: bp.z - rIns * 4 };
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.heading = 0; ctrl.pitch = 0;
+    ctrl.autopilotActive = true;
+    ctrl.autopilotTargetId = id;
+
+    for (let i = 0; i < 1200 && ctrl.orbitingBodyId === undefined; i++) {
+      step(world, mk({ throttle: 0.2 }));
+    }
+    expect(ctrl.orbitingBodyId).toBe(id);
+    expect(ctrl.autopilotActive).toBe(false);
+    // One more tick: orbit-hold snaps the ship to exactly the insertion radius
+    // (a low orbit, not the far park point).
+    step(world, mk({}));
+    expect(distToBody(world, id)).toBeCloseTo(rIns, 6);
   });
 
   it("ship movement is deterministic", () => {

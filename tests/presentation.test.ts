@@ -12,6 +12,8 @@ import {
   maxSpeedForGear,
   SPEED_GEAR_LABELS,
   SHIP_LENGTH,
+  orbitInsertionRadius,
+  ORBIT_INSERTION_MULT,
 } from "../src/sim/presentation.ts";
 
 const R_EARTH = 6.371e6;
@@ -71,6 +73,22 @@ describe("parkDistance (real-radius framing)", () => {
 
   it("parks outside the surface", () => {
     expect(parkDistance(0.0085)).toBeGreaterThan(0.0085);
+  });
+});
+
+describe("orbitInsertionRadius (low-orbit framing)", () => {
+  it("is a low multiple of the radius (a wall, not a marble)", () => {
+    expect(orbitInsertionRadius(0.0085)).toBeCloseTo(0.0085 * ORBIT_INSERTION_MULT, 10);
+    expect(ORBIT_INSERTION_MULT).toBeGreaterThanOrEqual(1.1);
+    expect(ORBIT_INSERTION_MULT).toBeLessThanOrEqual(1.3);
+  });
+
+  it("sits well inside the old park distance (much closer)", () => {
+    expect(orbitInsertionRadius(0.0085)).toBeLessThan(parkDistance(0.0085));
+  });
+
+  it("clears the surface", () => {
+    expect(orbitInsertionRadius(0.0085)).toBeGreaterThan(0.0085);
   });
 });
 
