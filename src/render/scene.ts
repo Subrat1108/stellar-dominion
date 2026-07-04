@@ -26,6 +26,7 @@ import { viewState, type CameraView } from "../app/view-state.ts";
 import { steerState } from "../app/steer-state.ts";
 import { nearestBodyId, markerScreenPosition } from "../app/nav.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
+import { buildGasGiantRing, buildKuiperBelt } from "./debris-field.ts";
 import { buildSectorScene } from "./sector-scene.ts";
 import {
   nextMapTier,
@@ -160,6 +161,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const bodyMeshes = new Map<number, THREE.Mesh>();
   const planetMaterials = new Map<number, THREE.ShaderMaterial>();
   const orbitLines: THREE.LineLoop[] = [];
+  let kuiperBelt: THREE.Group | null = null; // instanced Kuiper belt (worldRoot)
   let starEntity = -1;
 
   function disposeMesh(mesh: THREE.Object3D): void {
@@ -193,12 +195,24 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       if (body.kind === "planet" || body.kind === "gas-giant") {
         planetMaterials.set(entity, mesh.material as THREE.ShaderMaterial);
       }
+      // Gas giants get a flyable icy ring, parented to the body mesh so it tracks
+      // the planet as it orbits (disposed with the mesh on a rebuild).
+      if (body.kind === "gas-giant") mesh.add(buildGasGiantRing(body));
     }
+
+    // Orbit rings for star-orbiters + the system's outer-edge Kuiper belt.
+    let maxOrbit = 0;
     for (const [, orb] of w.components.orbit) {
       if (orb.parent !== starEntity) continue;
+      maxOrbit = Math.max(maxOrbit, orb.elements.semiMajorAxis);
       const line = makeOrbitLine(orb.elements);
       worldRoot.add(line);
       orbitLines.push(line);
+    }
+    if (kuiperBelt) { worldRoot.remove(kuiperBelt); disposeMesh(kuiperBelt); kuiperBelt = null; }
+    if (maxOrbit > 0) {
+      kuiperBelt = buildKuiperBelt(maxOrbit, w.activeSystemId ?? "system");
+      worldRoot.add(kuiperBelt);
     }
   }
   buildSystemGraph(world);
