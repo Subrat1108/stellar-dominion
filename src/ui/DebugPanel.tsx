@@ -7,21 +7,18 @@
 import { useRef } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
-import type { SpeedGear } from "../app/speed-state.ts";
 import { viewState } from "../app/view-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
-import { SPEED_GEAR_LABELS, maxSpeedForGear } from "../sim/presentation.ts";
 
 interface DebugPanelProps {
   world: World;
   bus: GameBus;
-  speedState: { value: SpeedGear };
 }
 
 const DEG = 180 / Math.PI;
 const f = (n: number, d = 2) => n.toFixed(d);
 
-export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) {
+export default function DebugPanel({ world, bus }: DebugPanelProps) {
   useGameTick(bus, 10);
   const lastLog = useRef(0);
 
@@ -54,13 +51,12 @@ export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) 
       `[flight] view=${viewState.view} tick=${world.tick} ` +
       `pos=(${f(pos.x)},${f(pos.y)},${f(pos.z)}) speed=${f(speed)} ` +
       `hdg=${f(heading, 1)}° pitch=${f(pitch, 1)}° distStar=${f(distStar)} ` +
-      `throttle=${SPEED_GEAR_LABELS[speedState.value]} autopilot=${ctrl.autopilotActive}`,
+      `autopilot=${ctrl.autopilotActive}`,
     );
   }
 
   const rows: [string, string][] = [
     ["VIEW", viewState.view.toUpperCase()],
-    ["THROTTLE", `${SPEED_GEAR_LABELS[speedState.value]} (${f(maxSpeedForGear(speedState.value))} u/s)`],
     ["POS", `${f(pos.x)}, ${f(pos.y)}, ${f(pos.z)}`],
     ["VEL", `${f(vel.vx)}, ${f(vel.vy)}, ${f(vel.vz)}`],
     ["SPEED", f(speed)],
@@ -98,7 +94,7 @@ export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) 
         </div>
       ))}
       <div style={{ color: "#585b70", marginTop: 6, fontSize: 10 }}>
-        W/S thrust · A/D steer · ↑↓ pitch · C cockpit/chase · M map
+        W/S accel · A/D strafe · hold-drag to steer · C cockpit/chase · M map
       </div>
     </div>
   );

@@ -3,8 +3,8 @@
 // The renderer (scene.ts) owns the canvas + pointer-lock, so it writes the
 // accumulated pointer delta here; the frame loop (main.ts) reads and clears it
 // each frame, converting the delta into the sim's yaw/pitch Input. Kept as a
-// plain mutable ref (like viewState / speedState) because the renderer and the
-// loop both run outside React.
+// plain mutable ref (like viewState) because the renderer and the loop both run
+// outside React.
 //
 // `freeLook` (held modifier) routes pointer motion to the CAMERA instead of the
 // ship, so steering and looking never fight; `pointerLocked` mirrors the browser

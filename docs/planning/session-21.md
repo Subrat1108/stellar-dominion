@@ -130,6 +130,33 @@ leaves the camera cycle); Polish D (body detail panel); any economy/tech/warp-ga
 change; n-body gravity; a modeled 3D cockpit interior; anything touching the sim
 (colony/terraforming/population), the warp FSM, or the honest-scale body math.
 
+## Control-model redesign (post-tuning, same session) — thrust-strafe + hold-to-steer
+
+Playtest verdict on the Polish-B controls: the gear throttle + yaw-by-keyboard
+model is wrong; the player wants a **thrust/strafe** ship where **the mouse (or a
+trackpad gesture) aims** and the keyboard only translates. Decisions:
+
+- **Speed gears removed.** No more DOCK…MAX buttons / `maxSpeedForGear` /
+  `speedState`. **W accelerates forward, S decelerates then reverses** — the ship
+  builds up speed over time toward a max (thrust + light drag), rather than
+  snapping to a selected gear. One `THRUST_ACCEL` + `MAX_SPEED` in `presentation.ts`.
+- **A/D are STRAFE, not yaw.** `A` = thrust left, `D` = thrust right (along the
+  ship's local right vector, no rotation). **↑/↓ pitch keys removed.** So the four
+  movement keys W/S/A/D only *translate*; the ship's heading is set only by steering.
+- **Steering is HOLD-to-engage** (not click-to-lock). Mouse: hold the **left
+  button** to steer (deltas → yaw/pitch), release to disengage. Trackpad: a
+  **double-tap-and-hold** engages (the OS keeps the "button" down during a
+  drag-lock, so the browser sees a sustained primary-button press — same code
+  path), lifting disengages. Removed the single-click→pointer-lock toggle.
+- **Two-finger scroll = zoom the map scales** (star system ↔ sector/galaxy) when
+  steering is inactive — a `wheel` handler that steps the view/tier out and in.
+- **Why:** this is a standard 6-DOF-lite flight scheme (translate on keys, aim
+  with the pointer) and matches how people expect a trackpad to behave (gesture to
+  aim, two-finger scroll to zoom). Determinism unaffected — the sim `Input` still
+  carries `yaw`/`pitch`; only their *source* (steering, not keys) and the new
+  `strafe` axis change. Feel constants (`THRUST_ACCEL`, `MAX_SPEED`, `DRAG`) tuned
+  in-browser.
+
 ## Fix-pass addendum — the in-browser tuning arc (post-base, same session)
 
 The base slice was mechanically correct but the *feel* took ~6 playtest rounds to

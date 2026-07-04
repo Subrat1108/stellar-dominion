@@ -21,14 +21,23 @@ seamlessly; **solid procedural planets** (fixed the log-depth see-through); and
 **flyable icy planetary rings + a Kuiper belt** for a dramatic sense of scale (tiny
 ship, huge worlds). 221 tests green; typecheck + build + dev-boot clean.
 
+**Control model redesigned (Session 21, latest):** the speed **gears are gone** —
+**W accelerates / S decelerates+reverses / A/D strafe** (four keys, translate only;
+no keyboard steering, no ↑/↓). The ship **builds up speed** over time toward a cap
+(thrust + light drag). **Steering is hold-to-engage** — hold the **left mouse
+button** (or a trackpad **double-tap-and-hold**) and move to aim; release to stop.
+**Two-finger scroll** zooms the map scales when not steering. (Sim `Input` gained a
+`strafe` axis and now sources yaw/pitch only from steering; determinism intact,
+218 tests green.)
+
 ## Active next step
 
-**Final in-browser feel confirmation for Polish B** (the spiral-insertion slide +
-orbit direction are the last things to eyeball; debris + solid bodies already
-confirmed by the user). All feel is user-verified — there's no browser driver in
-this environment. The tuning knobs are listed at the end of the Session 21 devlog
-entry. After confirmation: **Exploration Polish C** — the unified clickable
-multi-scale map (+ promoting the minimap). Design rationale for Session 21 is in
+**In-browser confirmation of the new control model** (accelerate/strafe feel, top
+speed, hold-to-steer on mouse + trackpad double-tap, two-finger-scroll zoom). All
+feel is user-verified — no browser driver here. Feel knobs: `THRUST_ACCEL` /
+`MAX_SPEED` / `DRAG` (thrust) plus the orbit/framing constants from the earlier
+tuning. After confirmation: **Exploration Polish C** — the unified clickable
+multi-scale map (+ promoting the minimap). Design rationale in
 `docs/planning/session-21.md`.
 
 ## Links

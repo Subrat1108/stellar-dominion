@@ -163,19 +163,11 @@ export function softStopRadius(renderRadius: number): number {
 export const SHIP_RADIUS = 0.0000034;
 export const SHIP_LENGTH = 0.000015;
 
-// --- Throttle / speed (exploration-polish A) ---------------------------------
-// Honest distances are large (the inner system spans ~700 u), so the throttle
-// spans a wide dynamic range: very fine control onto a ~0.0085 u body up to a
-// fast open-space cruise. Five exponential gears; input.throttle carries the
-// chosen gear's MAX SPEED (scene u / sim-sec) — see systems/ship-movement.ts.
-export const SPEED_GEAR_LABELS = ["DOCK", "SLOW", "CRUISE", "FAST", "MAX"] as const;
-export type SpeedGear = 0 | 1 | 2 | 3 | 4;
-const GEAR_MIN_SPEED = 0.004; // u/s at DOCK — nudge onto a small body
-const GEAR_MAX_SPEED = 120;   // u/s at MAX — cross the ~700 u system in ~6 s
-
-/** Max speed (scene u / sim-sec) for a throttle gear index. Pure, exponential. */
-export function maxSpeedForGear(gear: number): number {
-  const last = SPEED_GEAR_LABELS.length - 1;
-  const t = Math.max(0, Math.min(last, gear)) / last;
-  return GEAR_MIN_SPEED * Math.pow(GEAR_MAX_SPEED / GEAR_MIN_SPEED, t);
-}
+// --- Thrust / speed (control redesign, Session 21) ---------------------------
+// The speed GEARS are gone: W accelerates and the ship builds up speed over time
+// toward MAX_SPEED (thrust + light drag), S decelerates/reverses, A/D strafe.
+// THRUST_ACCEL sets how fast it builds; with the open-space drag the ship
+// naturally settles near MAX_SPEED after a few seconds of holding W (honest
+// distances are large, so the top speed crosses the ~700 u system in ~7 s).
+export const THRUST_ACCEL = 60; // scene u/s² applied along thrust/strafe
+export const MAX_SPEED = 110;   // scene u/s hard cap (drag settles a touch below)

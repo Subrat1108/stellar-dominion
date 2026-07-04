@@ -3,22 +3,16 @@
 // Reads live from the world ref each render (triggered by useGameTick).
 // Deliberately minimal: dark, monospace, no external CSS framework.
 
-import { useState } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
-import type { SpeedGear } from "../app/speed-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { lifeSupportFraction, ticksRemaining } from "../sim/systems/life-support.ts";
 import { FIXED_DT } from "../sim/loop.ts";
-import { SPEED_GEAR_LABELS } from "../sim/presentation.ts";
-
-const GEARS: SpeedGear[] = [0, 1, 2, 3, 4];
 
 interface HUDProps {
   world: World;
   bus: GameBus;
-  speedState: { value: SpeedGear };
 }
 
 /** Format a tick count as MM:SS of real time at 60 ticks/sec. */
@@ -58,12 +52,13 @@ function LifeSupportBar({ fraction }: { fraction: number }) {
   );
 }
 
-export default function HUD({ world, bus, speedState }: HUDProps) {
+export default function HUD({ world, bus }: HUDProps) {
   useGameTick(bus, 6);
-  const [speed, setSpeed] = useState<SpeedGear>(speedState.value);
 
   const ctrl = world.components.shipControl.get(world.shipId);
   const autopilotActive = ctrl?.autopilotActive ?? false;
+  const vel = world.components.shipVelocity.get(world.shipId);
+  const speedU = vel ? Math.hypot(vel.vx, vel.vy, vel.vz) : 0;
 
   function cancelAutopilot() {
     dispatch(world, { kind: "CancelCourse" });
@@ -156,37 +151,19 @@ export default function HUD({ world, bus, speedState }: HUDProps) {
         </button>
       )}
 
-      {/* Speed multiplier selector — right-aligned */}
+      {/* Speed readout — right-aligned (no throttle gears; W/S accelerate) */}
       <div
         style={{
           marginLeft: "auto",
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: 6,
         }}
       >
-        <span style={{ color: "#585b70", fontSize: 11, marginRight: 4 }}>THROTTLE</span>
-        {GEARS.map((g) => (
-          <button
-            key={g}
-            onClick={() => {
-              speedState.value = g;
-              setSpeed(g);
-            }}
-            style={{
-              padding: "1px 7px",
-              fontSize: 11,
-              fontFamily: "inherit",
-              cursor: "pointer",
-              background: speed === g ? "#313244" : "transparent",
-              color: speed === g ? "#cdd6f4" : "#585b70",
-              border: speed === g ? "1px solid #45475a" : "1px solid transparent",
-              borderRadius: 3,
-            }}
-          >
-            {SPEED_GEAR_LABELS[g]}
-          </button>
-        ))}
+        <span style={{ color: "#585b70", fontSize: 11 }}>SPEED</span>
+        <span style={{ color: "#cdd6f4", fontSize: 12, minWidth: 64, textAlign: "right" }}>
+          {speedU.toFixed(1)} u/s
+        </span>
       </div>
     </div>
   );

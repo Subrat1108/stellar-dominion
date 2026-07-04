@@ -6,16 +6,14 @@
 // per frame beyond compositing. Shown only in the cockpit camera view; the
 // center is left clear so a body visibly grows as you approach it.
 //
-// Reads viewState (plain mutable ref) + the world ref + the shared speedState
-// singleton directly, since the renderer that drives them runs outside React.
-// The moving target/direction pipper is drawn by the renderer (scene.ts); this
-// component owns the static frame + the integrated text HUD (mode + throttle).
+// Reads viewState (plain mutable ref) + the world ref directly, since the
+// renderer that drives them runs outside React. The moving target/direction
+// pipper is drawn by the renderer (scene.ts); this component owns the static
+// frame + the integrated text HUD (mode + speed).
 
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import { viewState } from "../app/view-state.ts";
-import { speedState } from "../app/speed-state.ts";
-import { SPEED_GEAR_LABELS } from "../sim/presentation.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 
 interface CockpitProps {
@@ -38,7 +36,8 @@ export default function Cockpit({ world, bus }: CockpitProps) {
   if (viewState.view !== "cockpit") return null;
 
   const mode = flightMode(world);
-  const throttle = SPEED_GEAR_LABELS[speedState.value];
+  const vel = world.components.shipVelocity.get(world.shipId);
+  const speedU = vel ? Math.hypot(vel.vx, vel.vy, vel.vz) : 0;
 
   const strutBase = {
     position: "absolute" as const,
@@ -124,8 +123,8 @@ export default function Cockpit({ world, bus }: CockpitProps) {
           textShadow: "0 0 4px #000",
         }}
       >
-        <span style={{ color: "#585b70", letterSpacing: 1 }}>THR </span>
-        <span style={{ color: "#cdd6f4", fontWeight: "bold", letterSpacing: 1 }}>{throttle}</span>
+        <span style={{ color: "#585b70", letterSpacing: 1 }}>SPD </span>
+        <span style={{ color: "#cdd6f4", fontWeight: "bold", letterSpacing: 1 }}>{speedU.toFixed(1)}</span>
       </div>
     </div>
   );

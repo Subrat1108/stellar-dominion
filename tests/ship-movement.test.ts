@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { step, run, type Input } from "../src/sim/loop.ts";
 import { FIXED_DT } from "../src/sim/constants.ts";
-import { orbitInsertionRadius } from "../src/sim/presentation.ts";
+import { orbitInsertionRadius, MAX_SPEED } from "../src/sim/presentation.ts";
 
 /** First star-orbiting rocky planet in the world, with its entity id + radius. */
 function firstPlanet(world: ReturnType<typeof createStartingSystem>) {
@@ -26,7 +26,7 @@ function distToBody(world: ReturnType<typeof createStartingSystem>, bodyId: numb
 
 /** Build a full Input from a partial, defaulting the rest to neutral. */
 function mk(partial: Partial<Input>): Input {
-  return { thrust: 0, yaw: 0, pitch: 0, throttle: 1, ...partial };
+  return { thrust: 0, strafe: 0, yaw: 0, pitch: 0, ...partial };
 }
 
 function speed(world: ReturnType<typeof createStartingSystem>): number {
@@ -119,21 +119,33 @@ describe("ship movement system", () => {
     expect(p).toBeGreaterThan(Math.PI / 2 - 0.1);
   });
 
-  it("velocity is capped at the throttle's max speed (u/s)", () => {
-    // Exploration-polish A: input.throttle now carries the gear's ABSOLUTE max
-    // speed (u/s), not a multiplier on the component's base speed.
+  it("velocity is capped at MAX_SPEED (no gears)", () => {
     const world = createStartingSystem();
-    const cap = 2; // u/s
-    for (let i = 0; i < 600; i++) step(world, mk({ thrust: 1, throttle: cap }));
-    expect(speed(world)).toBeLessThanOrEqual(cap + 0.0001);
+    for (let i = 0; i < 1200; i++) step(world, mk({ thrust: 1 }));
+    expect(speed(world)).toBeLessThanOrEqual(MAX_SPEED + 0.0001);
   });
 
-  it("a higher throttle (gear max speed) raises the effective top speed", () => {
-    const slow = createStartingSystem("throttle-a");
-    const fast = createStartingSystem("throttle-a");
-    for (let i = 0; i < 600; i++) step(slow, mk({ thrust: 1, throttle: 1 }));
-    for (let i = 0; i < 600; i++) step(fast, mk({ thrust: 1, throttle: 10 }));
-    expect(speed(fast)).toBeGreaterThan(speed(slow));
+  it("W builds up speed over time (accelerates toward the cap, not instant)", () => {
+    const world = createStartingSystem();
+    for (let i = 0; i < 6; i++) step(world, mk({ thrust: 1 }));
+    const early = speed(world);
+    for (let i = 0; i < 120; i++) step(world, mk({ thrust: 1 }));
+    const later = speed(world);
+    expect(later).toBeGreaterThan(early); // still building up
+    expect(early).toBeLessThan(MAX_SPEED * 0.5); // not instantly at the cap
+  });
+
+  it("A/D strafe moves the ship sideways without changing heading", () => {
+    const world = createStartingSystem();
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.heading = 0; ctrl.pitch = 0; // nose +Z; right vector = -X
+    const h0 = ctrl.heading;
+    const p0 = { ...world.components.transform.get(world.shipId)!.position };
+    for (let i = 0; i < 30; i++) step(world, mk({ strafe: 1 })); // D = right
+    const p1 = world.components.transform.get(world.shipId)!.position;
+    expect(ctrl.heading).toBe(h0);              // no rotation from strafing
+    expect(Math.abs(p1.x - p0.x)).toBeGreaterThan(0.001); // moved along X (sideways)
+    expect(Math.abs(p1.z - p0.z)).toBeLessThan(Math.abs(p1.x - p0.x)); // mostly lateral
   });
 
   it("reverse thrust reduces speed before re-accelerating in reverse", () => {
@@ -173,7 +185,7 @@ describe("ship movement system", () => {
     ctrl.autopilotActive = true;
     ctrl.autopilotTargetId = id;
     const before = distToBody(world, id);
-    for (let i = 0; i < 120; i++) step(world, mk({ thrust: -1, yaw: 1, throttle: 0.5 }));
+    for (let i = 0; i < 120; i++) step(world, mk({ thrust: -1, strafe: 1, yaw: 1 }));
     // Manual "brake + turn away" is ignored; the autopilot closes the distance.
     expect(distToBody(world, id)).toBeLessThan(before);
   });
@@ -224,7 +236,7 @@ describe("ship movement system", () => {
     ctrl.autopilotTargetId = id;
 
     for (let i = 0; i < 1200 && ctrl.orbitingBodyId === undefined; i++) {
-      step(world, mk({ throttle: 0.2 }));
+      step(world, mk({}));
     }
     expect(ctrl.orbitingBodyId).toBe(id);
     expect(ctrl.autopilotActive).toBe(false);

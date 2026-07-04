@@ -20,16 +20,16 @@ import {
   ORBIT_DIRECTION,
   ORBIT_FRAME_YAW_BIAS,
   softStopRadius,
+  THRUST_ACCEL,
+  MAX_SPEED,
 } from "../presentation.ts";
 import { gravParameter, soiRadius, gravityAccel, type GravBody } from "../math/gravity.ts";
 import { approachSpeed, moveToward, type ApproachParams } from "../math/flight.ts";
 import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
-// Acceleration is a fixed multiple of the current max speed, so the ramp-up feel
-// stays gear-independent (the legacy ratio was BASE_ACCEL/maxSpeed = 0.03/0.01 = 3).
-const ACCEL_RATIO   = 3;
-const DRAG          = 0.98;              // velocity multiplied each tick (open space only)
+const DRAG          = 0.99;              // velocity multiplied each tick (open space only);
+                                         // light, so W builds up speed and the ship coasts
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
 // Per-tick ease factor for the orbit framing (heading/pitch) on insertion, so the
 // view glides from "facing the body" to the left-biased orbit framing instead of
@@ -86,15 +86,15 @@ export function shipMovementSystem(world: World, input: Input): void {
     return;
   }
 
-  let { thrust, yaw, pitch } = input;
-  // input.throttle carries the selected gear's MAX SPEED in scene-u/sim-sec
-  // (presentation.maxSpeedForGear). Acceleration tracks it so the ramp feel is
-  // gear-independent. Falls back to the component's base speed if unset.
-  const maxSpeed = input.throttle > 0 ? input.throttle : vel.maxSpeed;
-  const accel = maxSpeed * ACCEL_RATIO;
+  let { thrust, strafe, yaw, pitch } = input;
+  // Fixed thrust acceleration + speed cap (no gears): W/S/A/D accelerate, the
+  // ship builds up speed toward MAX_SPEED and coasts under light drag.
+  const maxSpeed = MAX_SPEED;
+  const accel = THRUST_ACCEL;
 
   const hasManualInput =
-    Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01;
+    Math.abs(thrust) > 0.01 || Math.abs(strafe) > 0.01 ||
+    Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01;
 
   // Mode gating (Polish B control model):
   //  - AUTOPILOT: thrust is LOCKED — player input is ignored, not a cancel. The
@@ -102,7 +102,7 @@ export function shipMovementSystem(world: World, input: Input): void {
   //  - HELD ORBIT: analytic hold, UNLESS the player gives manual input, which
   //    drops the hold and hands control back (continuing from the orbit state).
   if (ctrl.autopilotActive) {
-    thrust = 0; yaw = 0; pitch = 0;
+    thrust = 0; strafe = 0; yaw = 0; pitch = 0;
   } else if (ctrl.orbitingBodyId !== undefined) {
     if (hasManualInput) {
       delete ctrl.orbitingBodyId; // take manual control out of the held orbit
@@ -251,14 +251,20 @@ export function shipMovementSystem(world: World, input: Input): void {
     vel.vy = svy;
     vel.vz = svz;
   } else {
-    // Manual physics: thrust along the nose, then patched-conic gravity from any
-    // body whose SOI contains the ship (semi-implicit: update velocity, then
+    // Manual physics: thrust along the nose (W/S) + strafe along the ship's
+    // horizontal RIGHT vector (A/D, no rotation), then patched-conic gravity from
+    // any body whose SOI contains the ship (semi-implicit: update velocity, then
     // integrate below). Drag applies ONLY in open space (outside all SOIs) as the
-    // arcade auto-stop; inside an SOI it is omitted so an orbit persists and the
+    // arcade slow-down; inside an SOI it is omitted so an orbit persists and the
     // gravity well is felt when you cut thrust.
     vel.vx += thrust * accel * nose.x * FIXED_DT;
     vel.vy += thrust * accel * nose.y * FIXED_DT;
     vel.vz += thrust * accel * nose.z * FIXED_DT;
+    // Horizontal right vector = normalize(-nose.z, 0, nose.x); +D = right, −A = left.
+    const rl = Math.hypot(nose.z, nose.x) || 1;
+    const rx = -nose.z / rl, rz = nose.x / rl;
+    vel.vx += strafe * accel * rx * FIXED_DT;
+    vel.vz += strafe * accel * rz * FIXED_DT;
 
     const gravBodies: GravBody[] = [];
     for (const [entity, body] of world.components.celestialBody) {

@@ -1,17 +1,17 @@
 // Keyboard state tracker — purely a capture layer, no sim/render logic.
 //
 // keydown/keyup listeners maintain a live Set of pressed keys.
-// getSimInput() converts that to an Input for the sim each frame (throttle is
-// filled in by the caller from speedState). consume* helpers fire once per press.
+// getSimInput() converts that to an Input for the sim each frame. consume*
+// helpers fire once per press.
 //
-// Flight is a deliberately small six-key scheme:
-//   W / S ... thrust forward / back along the nose
-//   A / D ... steer left / right (yaw)
-//   ↑ / ↓ ... steer up / down (pitch)
+// Movement is four keys that only TRANSLATE the ship (heading is set by pointer
+// steering, never keys):
+//   W / S ... thrust forward / back along the nose (accelerate / decelerate+reverse)
+//   A / D ... strafe left / right (lateral thrust, no rotation)
 // Camera:
-//   C ....... cycle camera view (cockpit → chase → map)
+//   C ....... toggle camera view (cockpit ↔ chase)
 //   M ....... toggle map view
-//   right-drag (handled in the renderer) ... look around
+//   hold left mouse button / trackpad double-tap-hold (in the renderer) ... steer
 
 import type { Input } from "../sim/loop.ts";
 import { steerState } from "./steer-state.ts";
@@ -24,11 +24,9 @@ window.addEventListener("keydown", (e) => {
   held.add(e.code);
   if (e.code === "KeyM" && !e.repeat) mapTogglePending = true;
   if (e.code === "KeyC" && !e.repeat) viewCyclePending = true;
-  // Hold Space = free-look modifier: mouse/touchpad motion swings the camera
-  // instead of steering the ship (Polish B). preventDefault stops page scroll.
+  // Hold Space = free-look modifier: while steering, pointer motion swings the
+  // camera instead of turning the ship. preventDefault stops page scroll.
   if (e.code === "Space") { steerState.freeLook = true; e.preventDefault(); }
-  // Stop the pitch arrows from scrolling the page while flying.
-  if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
 });
 
 window.addEventListener("keyup", (e) => {
@@ -36,20 +34,19 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "Space") steerState.freeLook = false;
 });
 
-/** Build a sim Input from current keyboard state (throttle defaults to 1). */
+/** Build a sim Input from current keyboard state. Keys only TRANSLATE the ship;
+ *  yaw/pitch come from pointer steering (merged in by the caller). */
 export function getSimInput(): Input {
   const forward  = held.has("KeyW");
   const backward = held.has("KeyS");
-  const yawLeft  = held.has("KeyA");
-  const yawRight = held.has("KeyD");
-  const pitchUp  = held.has("ArrowUp");
-  const pitchDn  = held.has("ArrowDown");
+  const left     = held.has("KeyA");
+  const right    = held.has("KeyD");
 
   return {
     thrust: forward ? 1 : backward ? -1 : 0,
-    yaw:    yawRight ? 1 : yawLeft ? -1 : 0,
-    pitch:  pitchUp ? 1 : pitchDn ? -1 : 0,
-    throttle: 1,
+    strafe: right ? 1 : left ? -1 : 0,
+    yaw: 0,
+    pitch: 0,
   };
 }
 

@@ -4,7 +4,6 @@
 
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
-import type { SpeedGear } from "../app/speed-state.ts";
 import { viewState } from "../app/view-state.ts";
 import { steerState } from "../app/steer-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
@@ -20,20 +19,19 @@ import SurfaceView from "./SurfaceView.tsx";
 interface AppProps {
   world: World;
   bus: GameBus;
-  speedState: { value: SpeedGear };
 }
 
-export default function App({ world, bus, speedState }: AppProps) {
+export default function App({ world, bus }: AppProps) {
   return (
     <>
-      <HUD world={world} bus={bus} speedState={speedState} />
+      <HUD world={world} bus={bus} />
       <SystemPanel world={world} bus={bus} />
       <SectorPanel world={world} bus={bus} />
       <Minimap world={world} bus={bus} />
       <Scanner world={world} bus={bus} />
       <Cockpit world={world} bus={bus} />
       <SurfaceView world={world} bus={bus} />
-      <DebugPanel world={world} bus={bus} speedState={speedState} />
+      <DebugPanel world={world} bus={bus} />
       <SteerHint bus={bus} />
       <TransitionFade bus={bus} />
       <HazardBanner world={world} bus={bus} />
@@ -66,8 +64,8 @@ function SteerHint({ bus }: { bus: GameBus }) {
       }}
     >
       {locked
-        ? "STEERING · move to fly · hold Space to look · Esc to release"
-        : "▶ CLICK TO FLY — move mouse/trackpad to steer, hold Space to look"}
+        ? "STEERING · move to aim · W/S/A/D to fly · hold Space to look · release to stop"
+        : "W/S accelerate · A/D strafe · hold left-button / trackpad double-tap-hold to steer · two-finger scroll to zoom"}
     </div>
   );
 }

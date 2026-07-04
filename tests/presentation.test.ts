@@ -9,8 +9,8 @@ import {
   starRenderRadius,
   parkDistance,
   PARK_RADIUS_MULT,
-  maxSpeedForGear,
-  SPEED_GEAR_LABELS,
+  THRUST_ACCEL,
+  MAX_SPEED,
   SHIP_LENGTH,
   orbitInsertionRadius,
   ORBIT_INSERTION_MULT,
@@ -123,34 +123,10 @@ describe("softStopRadius (near-plane-safe surface stop)", () => {
   });
 });
 
-describe("maxSpeedForGear (exponential throttle)", () => {
-  it("spans DOCK → MAX across the five gears", () => {
-    expect(maxSpeedForGear(0)).toBeCloseTo(0.004, 6);
-    expect(maxSpeedForGear(4)).toBeCloseTo(120, 4);
-    expect(SPEED_GEAR_LABELS.length).toBe(5);
-  });
-
-  it("is strictly increasing across gears", () => {
-    for (let g = 1; g < SPEED_GEAR_LABELS.length; g++) {
-      expect(maxSpeedForGear(g)).toBeGreaterThan(maxSpeedForGear(g - 1));
-    }
-  });
-
-  it("is geometric (constant ratio between adjacent gears)", () => {
-    const r1 = maxSpeedForGear(1) / maxSpeedForGear(0);
-    const r2 = maxSpeedForGear(2) / maxSpeedForGear(1);
-    expect(r2).toBeCloseTo(r1, 6);
-  });
-
-  it("clamps out-of-range gear indices to the endpoints", () => {
-    expect(maxSpeedForGear(-3)).toBe(maxSpeedForGear(0));
-    expect(maxSpeedForGear(99)).toBe(maxSpeedForGear(4));
-  });
-
-  it("gives fine control near a body and a fast cruise at the top", () => {
-    // DOCK crosses a ~0.0085 u body in a controllable few seconds...
-    expect(0.0085 / maxSpeedForGear(0)).toBeGreaterThan(1);
-    // ...MAX crosses the ~700 u system in under ~10 s.
-    expect(700 / maxSpeedForGear(4)).toBeLessThan(10);
+describe("thrust / speed (no gears)", () => {
+  it("MAX_SPEED crosses the ~700 u system in a reasonable time", () => {
+    expect(700 / MAX_SPEED).toBeLessThan(15);
+    expect(MAX_SPEED).toBeGreaterThan(0);
+    expect(THRUST_ACCEL).toBeGreaterThan(0);
   });
 });

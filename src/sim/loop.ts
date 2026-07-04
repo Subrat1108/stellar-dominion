@@ -16,25 +16,25 @@ import type { GameEvent } from "./commands/types.ts";
 import { FIXED_DT } from "./constants.ts";
 export { FIXED_DT };
 
-/** Per-tick player intents. Flight is a six-key scheme: thrust (W/S),
- *  yaw (A/D), pitch (↑/↓). No world-vertical axis. */
+/** Per-tick player intents. Movement is thrust/strafe on four keys (W/S/A/D);
+ *  the ship's heading (yaw/pitch) is set only by pointer STEERING, never keys. */
 export interface Input {
-  /** Forward/back thrust along the nose: -1 (brake) to 1 (full ahead). */
+  /** Forward/back thrust along the nose: -1 (reverse/brake) to 1 (full ahead). W/S. */
   thrust: number;
-  /** Yaw rate: -1 (left) to 1 (right). */
+  /** Lateral thrust along the ship's right vector: -1 (left) to 1 (right). A/D. */
+  strafe: number;
+  /** Yaw rate: -1 (left) to 1 (right). From pointer steering only. */
   yaw: number;
-  /** Pitch rate: -1 (nose down) to 1 (nose up). */
+  /** Pitch rate: -1 (nose down) to 1 (nose up). From pointer steering only. */
   pitch: number;
-  /** Throttle multiplier scaling acceleration and max speed (>= 1). */
-  throttle: number;
 }
 
 /** A no-op input — ship coasts. */
 export const ZERO_INPUT: Input = {
   thrust: 0,
+  strafe: 0,
   yaw: 0,
   pitch: 0,
-  throttle: 1,
 };
 
 /**

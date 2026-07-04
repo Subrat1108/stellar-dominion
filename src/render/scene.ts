@@ -98,49 +98,69 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   controls.maxDistance = 6000;
   controls.enabled = false; // only in map view
 
-  // --- Mouse / touchpad flight control (Polish B) ---
-  // In a flight view, CLICK the canvas to capture the pointer (pointer lock);
-  // trackpad/mouse motion then STEERS the ship (deltas → steerState, consumed by
-  // the frame loop as yaw/pitch Input). Hold the free-look modifier (Space, set
-  // in app/input.ts → steerState.freeLook) to swing the CAMERA instead without
-  // changing heading. Esc releases the lock. Clicks on HUD controls never reach
-  // this listener (the #ui overlay is pointer-events:none except .interactive),
-  // so buttons don't trigger capture. Right-drag also free-looks when unlocked.
+  // --- Mouse / touchpad flight control (control redesign, Session 21) ---
+  // Steering is HOLD-to-engage (no persistent lock): in a flight view, hold the
+  // LEFT mouse button (or a trackpad double-tap-and-hold, which the OS reports as
+  // a sustained primary-button press) and move — the pointer deltas STEER the ship
+  // (→ steerState, consumed by the frame loop as yaw/pitch). Release to stop.
+  // Hold the free-look modifier (Space) to swing the CAMERA instead. Right-drag
+  // also free-looks. When NOT steering, two-finger scroll zooms the map scales.
+  // Clicks on HUD controls never reach this listener (#ui is pointer-events:none
+  // except .interactive), so buttons don't start steering.
   const mouseLook = { yaw: 0, pitch: 0 };
   const canvas = webgl.domElement;
   let rightDown = false;
-
-  canvas.addEventListener("click", () => {
-    if (viewState.view === "map") return;                 // map uses OrbitControls
-    if (document.pointerLockElement !== canvas) canvas.requestPointerLock();
-  });
-  document.addEventListener("pointerlockchange", () => {
-    steerState.pointerLocked = document.pointerLockElement === canvas;
-  });
+  let steering = false;
+  let lastZoomSwitch = 0;
 
   canvas.addEventListener("mousedown", (e) => {
-    if (e.button === 2) { rightDown = true; e.preventDefault(); }
+    if (e.button === 0 && viewState.view !== "map") {
+      steering = true;
+      steerState.pointerLocked = true; // "steering active" flag for the HUD hint
+      e.preventDefault();
+    } else if (e.button === 2) {
+      rightDown = true;
+      e.preventDefault();
+    }
   });
-  canvas.addEventListener("mouseup",    () => { rightDown = false; });
-  canvas.addEventListener("mouseleave", () => { rightDown = false; });
+  function stopSteer(): void { steering = false; steerState.pointerLocked = false; }
+  canvas.addEventListener("mouseup", (e) => { if (e.button === 0) stopSteer(); rightDown = false; });
+  canvas.addEventListener("mouseleave", () => { stopSteer(); rightDown = false; });
   canvas.addEventListener("mousemove", (e) => {
     if (viewState.view === "map") return;
-    const locked = document.pointerLockElement === canvas;
-    if (locked && !steerState.freeLook) {
+    if (steering && !steerState.freeLook) {
       // Steer the ship: accumulate the pointer delta for the frame loop.
       steerState.dx += e.movementX;
       steerState.dy += e.movementY;
       return;
     }
-    // Free-look (held modifier while locked, or right-drag while unlocked):
-    // swing the camera around the ship without changing heading.
-    if ((locked && steerState.freeLook) || rightDown) {
+    // Free-look (Space held while steering, or right-drag): swing the camera.
+    if ((steering && steerState.freeLook) || rightDown) {
       mouseLook.yaw   -= e.movementX * 0.003;
       mouseLook.pitch -= e.movementY * 0.003;
       mouseLook.pitch  = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, mouseLook.pitch));
     }
   });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // Two-finger scroll (wheel) zooms the map SCALES when not steering: from a
+  // flight view scroll-out opens the system map; in the map, OrbitControls dollies
+  // between the system and sector tiers, and a scroll-in while zoomed in at the
+  // system tier drops back into the cockpit. Ignored while steering.
+  canvas.addEventListener("wheel", (e) => {
+    if (steering) return;
+    e.preventDefault();
+    const now = performance.now();
+    if (now - lastZoomSwitch < 350) return; // debounce tier switches
+    if (viewState.view !== "map") {
+      if (e.deltaY > 0) { lastZoomSwitch = now; setView("map"); } // scroll out → map
+      return;
+    }
+    if (e.deltaY < 0 && viewState.mapTier === "system") {
+      const camDist = camera.position.distanceTo(controls.target);
+      if (camDist < SYSTEM_DEFAULT_CAM_DIST * 0.5) { lastZoomSwitch = now; setView("cockpit"); }
+    }
+  }, { passive: false });
 
   // --- Lighting (added to the scene, not the moving world group) ---
   scene.add(new THREE.AmbientLight(0x223044, 0.7));
