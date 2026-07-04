@@ -96,6 +96,17 @@ A start-here file + a "why" log per session makes that rebuild cheap and keeps t
 planning rationale from living only in ephemeral chat.
 **Logged:** `docs/09` · affects `CLAUDE.md`.
 
+### 7. Per-change logging + push (not batched to session end)
+**Call:** `CLAUDE.md` protocol amended — **every prompt that changes files** is a
+checkpoint that must update `progress.md`, add context to this session file, and
+**commit + push to GitHub before the response ends**. Docs/trivial changes still
+get pushed, but only need a progress/session touch if they change state or plan.
+**Why:** This session exposed the failure mode — I batched the docs to "when the
+feel settles", so ~6 commits of real change sat undocumented in `progress.md`/the
+planning log until asked. Continuous logging + push keeps the repo the single
+source of truth at all times and makes any hand-off cheap.
+**Logged:** `CLAUDE.md` (Session logging protocol).
+
 ## Open questions / deferred
 
 - **μ from real mass (density-varied wells).** μ = ω²·r³ gives every low orbit the
