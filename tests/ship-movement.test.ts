@@ -160,22 +160,21 @@ describe("ship movement system", () => {
   });
 
   it("manual thrust in autopilot does not drive the ship (input ignored)", () => {
-    // With autopilot targeting a body, forcing a large opposite thrust must not
-    // move the ship the way manual thrust would — the input is discarded.
+    // With autopilot flying to a body, forcing a manual BRAKE + wrong yaw must be
+    // discarded — the scripted autopilot still closes on the target.
     const world = createStartingSystem();
     const { id } = firstPlanet(world);
     step(world); // place bodies
     const bp = world.components.transform.get(id)!.position;
     const ship = world.components.transform.get(world.shipId)!;
-    // Sit the ship a little outside orbit, pointed away from the body.
-    ship.position = { x: bp.x, y: bp.y, z: bp.z - 5 };
+    ship.position = { x: bp.x, y: bp.y, z: bp.z - 5 }; // 5 u short, facing +z
     const ctrl = world.components.shipControl.get(world.shipId)!;
-    ctrl.heading = Math.PI; // nose pointing -z (away from body at +z relative)
+    ctrl.heading = 0; // nose +z, toward the body
     ctrl.autopilotActive = true;
     ctrl.autopilotTargetId = id;
     const before = distToBody(world, id);
-    for (let i = 0; i < 120; i++) step(world, mk({ thrust: 1, throttle: 0.5 }));
-    // Autopilot should close distance despite the manual "full ahead" the wrong way.
+    for (let i = 0; i < 120; i++) step(world, mk({ thrust: -1, yaw: 1, throttle: 0.5 }));
+    // Manual "brake + turn away" is ignored; the autopilot closes the distance.
     expect(distToBody(world, id)).toBeLessThan(before);
   });
 
@@ -233,6 +232,50 @@ describe("ship movement system", () => {
     // (a low orbit, not the far park point).
     step(world, mk({}));
     expect(distToBody(world, id)).toBeCloseTo(rIns, 6);
+  });
+
+  it("manual flight feels gravity inside a body's SOI (falls toward the star)", () => {
+    // The star sits at the sim origin and never drifts, so gravity pull is clean.
+    const world = createStartingSystem();
+    step(world);
+    const ship = world.components.transform.get(world.shipId)!;
+    ship.position = { x: 5, y: 0, z: 0 }; // inside the star's SOI (~8.9 u)
+    const vel = world.components.shipVelocity.get(world.shipId)!;
+    vel.vx = 0; vel.vy = 0; vel.vz = 0;
+    const before = Math.hypot(ship.position.x, ship.position.y, ship.position.z);
+    for (let i = 0; i < 300; i++) step(world, mk({})); // no thrust — only gravity
+    const after = Math.hypot(ship.position.x, ship.position.y, ship.position.z);
+    expect(after).toBeLessThan(before);                        // pulled inward
+    expect(Math.hypot(vel.vx, vel.vy, vel.vz)).toBeGreaterThan(0); // gained speed
+  });
+
+  it("open space applies drag (arcade auto-stop) outside every SOI", () => {
+    const world = createStartingSystem();
+    const ship = world.components.transform.get(world.shipId)!;
+    ship.position = { x: 0, y: 0, z: 2000 }; // far outside all SOIs → no gravity
+    const vel = world.components.shipVelocity.get(world.shipId)!;
+    vel.vx = 0.5; vel.vy = 0; vel.vz = 0;
+    const s0 = Math.hypot(vel.vx, vel.vy, vel.vz);
+    for (let i = 0; i < 60; i++) step(world, mk({})); // coast, no thrust
+    expect(Math.hypot(vel.vx, vel.vy, vel.vz)).toBeLessThan(s0); // drag decays it
+  });
+
+  it("gravity flight is deterministic (same state twice)", () => {
+    function runOnce() {
+      const w = createStartingSystem("grav-det");
+      step(w);
+      const ship = w.components.transform.get(w.shipId)!;
+      ship.position = { x: 5, y: 0.3, z: 0 }; // inside the star SOI
+      const v = w.components.shipVelocity.get(w.shipId)!;
+      v.vx = 0.01; v.vy = 0; v.vz = 0.02;
+      for (let i = 0; i < 200; i++) step(w, mk({ thrust: i % 2 ? 1 : 0 }));
+      return { ...w.components.transform.get(w.shipId)!.position };
+    }
+    const a = runOnce();
+    const b = runOnce();
+    expect(a.x).toBe(b.x);
+    expect(a.y).toBe(b.y);
+    expect(a.z).toBe(b.z);
   });
 
   it("ship movement is deterministic", () => {

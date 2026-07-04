@@ -92,17 +92,22 @@ export function orbitInsertionRadius(renderRadius: number): number {
   return renderRadius * ORBIT_INSERTION_MULT;
 }
 
-// Slow, deterministic orbit rate (rad / sim-sec) once inserted — a feel value:
-// slow enough to admire, not a spin. 0.042 ≈ one full orbit every ~150 s.
-// NOTE (Polish B): once gravity lands (Commit 3) the held-orbit angular rate is
-// DERIVED from the tuned gravitational parameter (ω = √(μ/r³)) so the analytic
-// orbit is a true circular orbit; ORBIT_RATE remains the fallback / feel anchor.
-export const ORBIT_RATE = 0.042;
+// Low-orbit angular rate (rad / sim-sec). This is THE feel anchor for gravity
+// (Polish B): the tuned gravitational parameter is derived so that a circular
+// orbit at the insertion radius has exactly this rate (μ = ω²·r³ in math/gravity),
+// which makes the analytic held orbit a TRUE circular orbit and the
+// autopilot→manual handoff seamless. Set from a target low-orbit period: shorter
+// period ⇒ deeper, more-felt well but a livelier orbit; longer ⇒ gentler but the
+// Session-20 "admire, don't spin" look. 40 s balances a felt well against a calm
+// orbit (≈3–4 s free-fall from low orbit to the surface if you cut thrust).
+export const LOW_ORBIT_PERIOD_S = 40;
+export const ORBIT_RATE = (2 * Math.PI) / LOW_ORBIT_PERIOD_S;
 
 // Manual ENTER ORBIT is offered only within this centre-distance of a body, so
 // the analytic insertion (which snaps to orbitInsertionRadius) is a small, gentle
 // pull-in rather than a jarring jump from far away. A multiple of the insertion
-// radius; Commit 3 aligns this with the sphere of influence.
+// radius: 3 × 1.2R = 3.6R, comfortably INSIDE the sphere of influence (12R,
+// math/gravity.ts) — so you are already feeling the well when you enter orbit.
 export const ENTER_ORBIT_REACH_MULT = 3;
 export function enterOrbitRange(renderRadius: number): number {
   return orbitInsertionRadius(renderRadius) * ENTER_ORBIT_REACH_MULT;

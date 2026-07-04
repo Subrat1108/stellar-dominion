@@ -1,22 +1,36 @@
 // Ship movement system — deterministic, headless, no rendering code.
 //
 // 3D flight: yaw + pitch orient the nose; thrust drives the ship along the
-// nose vector (climb/dive by pitching, then thrusting). Velocity is a full
-// Vec3, capped at maxSpeed (scaled by the throttle lever).
-// Manual input (any non-zero axis) immediately disables autopilot.
+// nose vector (climb/dive by pitching, then thrusting). Velocity is a full Vec3.
+//
+// Three deterministic regimes (Polish B control model + gravity):
+//  - AUTOPILOT: scripted point-to-point flight on a trapezoidal speed profile
+//    (accelerate → cruise → decelerate), no gravity; player input is IGNORED.
+//  - HELD ORBIT: the analytic low-orbit hold (a true circular orbit; velocity
+//    matched to the body), pure function of tick; manual input drops it.
+//  - MANUAL: thrust along the nose + patched-conic gravity inside a body's SOI
+//    (semi-implicit Euler on the fixed tick), drag only in open space.
 
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
 import { orbitInsertionRadius, ORBIT_RATE, softStopRadius } from "../presentation.ts";
+import { gravParameter, soiRadius, gravityAccel, type GravBody } from "../math/gravity.ts";
+import { trapezoidalSpeed, moveToward } from "../math/flight.ts";
 import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
 // Acceleration is a fixed multiple of the current max speed, so the ramp-up feel
 // stays gear-independent (the legacy ratio was BASE_ACCEL/maxSpeed = 0.03/0.01 = 3).
 const ACCEL_RATIO   = 3;
-const DRAG          = 0.98;              // velocity multiplied each tick
+const DRAG          = 0.98;              // velocity multiplied each tick (open space only)
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
+
+// Autopilot auto-throttle (independent of the player's gear): a cruise speed and
+// accel that cross the ~700 u system in a handful of seconds and decelerate to a
+// gentle arrival. Tuned feel constants (scene u/s, scene u/s²).
+const AUTOPILOT_CRUISE = 40;
+const AUTOPILOT_ACCEL  = 30;
 
 /** Unit nose vector for a given yaw (heading) and pitch. */
 export function noseVector(heading: number, pitch: number): { x: number; y: number; z: number } {
@@ -97,9 +111,12 @@ export function shipMovementSystem(world: World, input: Input): void {
     }
   }
 
-  // Autopilot: steer the nose toward the target in 3D, then INSERT into a low
-  // orbit on arrival (orbitInsertionRadius) instead of stopping dead at a
-  // distance — so the planet fills the view like a wall, not a far marble.
+  // Autopilot: steer the nose toward the target and fly a TRAPEZOIDAL speed
+  // profile (accelerate out → cruise → decelerate), inserting into a low orbit
+  // on arrival. Scripted (velocity set directly, no gravity/drag) so it is a
+  // deterministic point-to-point regime; `scripted` skips the manual physics tail.
+  let scripted = false;
+  let apSpeed = 0;
   if (ctrl.autopilotActive && ctrl.autopilotTargetId !== undefined) {
     const tgt = transform.get(ctrl.autopilotTargetId);
     if (tgt) {
@@ -126,11 +143,18 @@ export function shipMovementSystem(world: World, input: Input): void {
         yaw   = -Math.sign(yawDiff)  * Math.min(1, Math.abs(yawDiff)   / 0.2);
         pitch = Math.sign(pitchDiff) * Math.min(1, Math.abs(pitchDiff) / 0.2);
 
-        const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
-        const brakingDist = (speed * speed) / (2 * accel) * 1.5;
-        thrust = Math.abs(yawDiff) < Math.PI / 4
-          ? (dist < brakingDist ? -1 : 1)
+        // Trapezoidal target speed by remaining distance; go slow until roughly
+        // pointed at the target so it turns before accelerating. Ramp actual
+        // speed toward the target within the accel limit (smooth accelerate-out).
+        // Turn in place (speed 0) until roughly pointed at the target, so the
+        // ship doesn't drift the wrong way while it swings onto its heading.
+        const facing = Math.abs(yawDiff) < Math.PI / 4;
+        const vTarget = facing
+          ? trapezoidalSpeed(dist, arriveDist, AUTOPILOT_CRUISE, AUTOPILOT_ACCEL)
           : 0;
+        const curSpeed = Math.hypot(vel.vx, vel.vy, vel.vz);
+        apSpeed = moveToward(curSpeed, vTarget, AUTOPILOT_ACCEL * FIXED_DT);
+        scripted = true;
       } else {
         // Arrived → insert into orbit. Seed the phase from the current offset so
         // X/Z don't jump; orbit-hold (above) takes over next tick.
@@ -142,7 +166,7 @@ export function shipMovementSystem(world: World, input: Input): void {
         ctrl.autopilotActive = false;
         delete ctrl.autopilotTargetId;
         vel.vx = 0; vel.vy = 0; vel.vz = 0; // no drift-in before orbit-hold
-        thrust = 0; yaw = 0; pitch = 0;
+        return;
       }
     }
   }
@@ -154,18 +178,45 @@ export function shipMovementSystem(world: World, input: Input): void {
   ctrl.heading -= yaw * TURN_RATE * FIXED_DT;
   ctrl.pitch    = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, ctrl.pitch + pitch * TURN_RATE * FIXED_DT));
 
-  // Apply thrust along the nose, then drag.
-  const nose  = noseVector(ctrl.heading, ctrl.pitch);
+  const nose = noseVector(ctrl.heading, ctrl.pitch);
 
-  vel.vx = (vel.vx + thrust * accel * nose.x * FIXED_DT) * DRAG;
-  vel.vy = (vel.vy + thrust * accel * nose.y * FIXED_DT) * DRAG;
-  vel.vz = (vel.vz + thrust * accel * nose.z * FIXED_DT) * DRAG;
+  if (scripted) {
+    // Autopilot: fly along the nose at the profile speed (auto-throttled — not
+    // capped to the player's gear). No gravity/drag; deterministic point-to-point.
+    vel.vx = apSpeed * nose.x;
+    vel.vy = apSpeed * nose.y;
+    vel.vz = apSpeed * nose.z;
+  } else {
+    // Manual physics: thrust along the nose, then patched-conic gravity from any
+    // body whose SOI contains the ship (semi-implicit: update velocity, then
+    // integrate below). Drag applies ONLY in open space (outside all SOIs) as the
+    // arcade auto-stop; inside an SOI it is omitted so an orbit persists and the
+    // gravity well is felt when you cut thrust.
+    vel.vx += thrust * accel * nose.x * FIXED_DT;
+    vel.vy += thrust * accel * nose.y * FIXED_DT;
+    vel.vz += thrust * accel * nose.z * FIXED_DT;
 
-  // Clamp to the gear's max speed.
-  const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
-  if (speed > maxSpeed) {
-    const s = maxSpeed / speed;
-    vel.vx *= s; vel.vy *= s; vel.vz *= s;
+    const gravBodies: GravBody[] = [];
+    for (const [entity, body] of world.components.celestialBody) {
+      const bp = transform.get(entity)?.position ?? { x: 0, y: 0, z: 0 };
+      gravBodies.push({
+        x: bp.x, y: bp.y, z: bp.z,
+        mu: gravParameter(body.renderRadius),
+        soi: soiRadius(body.renderRadius),
+      });
+    }
+    const g = gravityAccel(pos.position.x, pos.position.y, pos.position.z, gravBodies);
+    vel.vx += g.ax * FIXED_DT;
+    vel.vy += g.ay * FIXED_DT;
+    vel.vz += g.az * FIXED_DT;
+    if (!g.inSOI) { vel.vx *= DRAG; vel.vy *= DRAG; vel.vz *= DRAG; }
+
+    // Clamp to the gear's max speed (manual only — autopilot auto-throttles).
+    const speed = Math.hypot(vel.vx, vel.vy, vel.vz);
+    if (speed > maxSpeed) {
+      const s = maxSpeed / speed;
+      vel.vx *= s; vel.vy *= s; vel.vz *= s;
+    }
   }
 
   // Integrate position.
