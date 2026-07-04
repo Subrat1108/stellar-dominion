@@ -51,42 +51,50 @@ export function shipMovementSystem(world: World, input: Input): void {
   const maxSpeed = input.throttle > 0 ? input.throttle : vel.maxSpeed;
   const accel = maxSpeed * ACCEL_RATIO;
 
-  // Manual input overrides both autopilot and an active orbit.
-  if (Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01) {
-    ctrl.autopilotActive = false;
-    delete ctrl.orbitingBodyId;
-  }
+  const hasManualInput =
+    Math.abs(thrust) > 0.01 || Math.abs(yaw) > 0.01 || Math.abs(pitch) > 0.01;
 
-  // Orbit hold: once inserted, hold a slow deterministic low orbit around the
-  // body and MATCH its velocity, so the body stops drifting relative to the ship
-  // and fills the view as a curved wall (no ram/bounce). Bodies drift faster than
-  // the DOCK throttle, so this velocity-match is what makes arrival feel right.
-  if (ctrl.orbitingBodyId !== undefined) {
-    const body = world.components.celestialBody.get(ctrl.orbitingBodyId);
-    const bodyPos = transform.get(ctrl.orbitingBodyId)?.position;
-    if (body && bodyPos) {
-      const rIns = orbitInsertionRadius(body.renderRadius);
-      const angle = (ctrl.orbitAngle ?? 0) + ORBIT_RATE * FIXED_DT;
-      ctrl.orbitAngle = angle;
-      // Hold the insertion altitude in the body's local XZ plane.
-      pos.position.x = bodyPos.x + Math.cos(angle) * rIns;
-      pos.position.y = bodyPos.y;
-      pos.position.z = bodyPos.z + Math.sin(angle) * rIns;
-      // Velocity = body's heliocentric velocity (finite-difference of its analytic
-      // position, moon-safe) + the tangential orbit velocity.
-      const T  = world.time * ORBITAL_TIME_RATE;
-      const dT = FIXED_DT * ORBITAL_TIME_RATE;
-      const p1 = bodyWorldPosition(world, ctrl.orbitingBodyId, T);
-      const p0 = bodyWorldPosition(world, ctrl.orbitingBodyId, T - dT);
-      vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
-      vel.vy = (p1.y - p0.y) / FIXED_DT;
-      vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
-      // Face along the orbit tangent (nose = (sin h, 0, cos h) → h = -angle).
-      ctrl.heading = -angle;
-      ctrl.pitch = 0;
-      return;
+  // Mode gating (Polish B control model):
+  //  - AUTOPILOT: thrust is LOCKED — player input is ignored, not a cancel. The
+  //    ship flies itself until a CancelCourse command (the ✕ AUTOPILOT button).
+  //  - HELD ORBIT: analytic hold, UNLESS the player gives manual input, which
+  //    drops the hold and hands control back (continuing from the orbit state).
+  if (ctrl.autopilotActive) {
+    thrust = 0; yaw = 0; pitch = 0;
+  } else if (ctrl.orbitingBodyId !== undefined) {
+    if (hasManualInput) {
+      delete ctrl.orbitingBodyId; // take manual control out of the held orbit
+    } else {
+      // Orbit hold: hold a slow deterministic low orbit around the body and MATCH
+      // its velocity, so the body stops drifting relative to the ship and fills
+      // the view as a curved wall (no ram/bounce). Bodies drift faster than the
+      // DOCK throttle, so this velocity-match is what makes the state feel right.
+      const body = world.components.celestialBody.get(ctrl.orbitingBodyId);
+      const bodyPos = transform.get(ctrl.orbitingBodyId)?.position;
+      if (body && bodyPos) {
+        const rIns = orbitInsertionRadius(body.renderRadius);
+        const angle = (ctrl.orbitAngle ?? 0) + ORBIT_RATE * FIXED_DT;
+        ctrl.orbitAngle = angle;
+        // Hold the insertion altitude in the body's local XZ plane.
+        pos.position.x = bodyPos.x + Math.cos(angle) * rIns;
+        pos.position.y = bodyPos.y;
+        pos.position.z = bodyPos.z + Math.sin(angle) * rIns;
+        // Velocity = body's heliocentric velocity (finite-difference of its
+        // analytic position, moon-safe) + the tangential orbit velocity.
+        const T  = world.time * ORBITAL_TIME_RATE;
+        const dT = FIXED_DT * ORBITAL_TIME_RATE;
+        const p1 = bodyWorldPosition(world, ctrl.orbitingBodyId, T);
+        const p0 = bodyWorldPosition(world, ctrl.orbitingBodyId, T - dT);
+        vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
+        vel.vy = (p1.y - p0.y) / FIXED_DT;
+        vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
+        // Face along the orbit tangent (nose = (sin h, 0, cos h) → h = -angle).
+        ctrl.heading = -angle;
+        ctrl.pitch = 0;
+        return;
+      }
+      delete ctrl.orbitingBodyId; // body gone (e.g. warp swap) — drop orbit
     }
-    delete ctrl.orbitingBodyId; // body gone (e.g. warp swap) — drop orbit
   }
 
   // Autopilot: steer the nose toward the target in 3D, then INSERT into a low

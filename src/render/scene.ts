@@ -23,6 +23,7 @@ import { positionAt } from "../sim/math/kepler.ts";
 import { noseVector } from "../sim/systems/ship-movement.ts";
 import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
+import { steerState } from "../app/steer-state.ts";
 import { nearestBodyId, markerScreenPosition } from "../app/nav.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
 import { buildSectorScene } from "./sector-scene.ts";
@@ -96,21 +97,49 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   controls.maxDistance = 6000;
   controls.enabled = false; // only in map view
 
-  // --- Mouse-look for chase view (right-click drag) ---
+  // --- Mouse / touchpad flight control (Polish B) ---
+  // In a flight view, CLICK the canvas to capture the pointer (pointer lock);
+  // trackpad/mouse motion then STEERS the ship (deltas → steerState, consumed by
+  // the frame loop as yaw/pitch Input). Hold the free-look modifier (Space, set
+  // in app/input.ts → steerState.freeLook) to swing the CAMERA instead without
+  // changing heading. Esc releases the lock. Clicks on HUD controls never reach
+  // this listener (the #ui overlay is pointer-events:none except .interactive),
+  // so buttons don't trigger capture. Right-drag also free-looks when unlocked.
   const mouseLook = { yaw: 0, pitch: 0 };
-  let mouseDown = false;
-  webgl.domElement.addEventListener("mousedown", (e) => {
-    if (e.button === 2) { mouseDown = true; e.preventDefault(); }
+  const canvas = webgl.domElement;
+  let rightDown = false;
+
+  canvas.addEventListener("click", () => {
+    if (viewState.view === "map") return;                 // map uses OrbitControls
+    if (document.pointerLockElement !== canvas) canvas.requestPointerLock();
   });
-  webgl.domElement.addEventListener("mouseup",    () => { mouseDown = false; });
-  webgl.domElement.addEventListener("mouseleave", () => { mouseDown = false; });
-  webgl.domElement.addEventListener("mousemove", (e) => {
-    if (!mouseDown || viewState.view === "map") return;
-    mouseLook.yaw   -= e.movementX * 0.003;
-    mouseLook.pitch -= e.movementY * 0.003;
-    mouseLook.pitch  = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, mouseLook.pitch));
+  document.addEventListener("pointerlockchange", () => {
+    steerState.pointerLocked = document.pointerLockElement === canvas;
   });
-  webgl.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 2) { rightDown = true; e.preventDefault(); }
+  });
+  canvas.addEventListener("mouseup",    () => { rightDown = false; });
+  canvas.addEventListener("mouseleave", () => { rightDown = false; });
+  canvas.addEventListener("mousemove", (e) => {
+    if (viewState.view === "map") return;
+    const locked = document.pointerLockElement === canvas;
+    if (locked && !steerState.freeLook) {
+      // Steer the ship: accumulate the pointer delta for the frame loop.
+      steerState.dx += e.movementX;
+      steerState.dy += e.movementY;
+      return;
+    }
+    // Free-look (held modifier while locked, or right-drag while unlocked):
+    // swing the camera around the ship without changing heading.
+    if ((locked && steerState.freeLook) || rightDown) {
+      mouseLook.yaw   -= e.movementX * 0.003;
+      mouseLook.pitch -= e.movementY * 0.003;
+      mouseLook.pitch  = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, mouseLook.pitch));
+    }
+  });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // --- Lighting (added to the scene, not the moving world group) ---
   scene.add(new THREE.AmbientLight(0x223044, 0.7));
@@ -202,6 +231,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     controls.enabled = v === "map";
     mouseLook.yaw = 0;
     mouseLook.pitch = 0;
+    // The map uses OrbitControls (normal mouse), so drop any flight pointer lock.
+    if (v === "map" && document.pointerLockElement === canvas) document.exitPointerLock();
     if (v === "map") {
       // Always (re)enter the map at the in-system tier.
       viewState.mapTier = "system";
@@ -299,6 +330,13 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       shipMesh.visible = view !== "cockpit"; // hide own hull in first-person
 
       if (!shipCtrl) return;
+
+      // When steering (locked, not free-looking) let the swung camera ease back
+      // to straight-ahead so the view follows the nose after a look-around.
+      if (steerState.pointerLocked && !steerState.freeLook) {
+        mouseLook.yaw *= 0.85;
+        mouseLook.pitch *= 0.85;
+      }
 
       // Mouse-look offset rotates the camera around the ship.
       _qLook.setFromEuler(new THREE.Euler(mouseLook.pitch, mouseLook.yaw, 0, "YXZ"));

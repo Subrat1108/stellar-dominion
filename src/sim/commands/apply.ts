@@ -9,7 +9,7 @@
 // on the GameBus after the tick.
 
 import type { World } from "../ecs/world.ts";
-import { parkDistance } from "../presentation.ts";
+import { parkDistance, enterOrbitRange } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
 import { foundColony, buildStructure, setTerraformAllocation } from "./colony.ts";
 import { beginWarpScan, commitWarp, cancelWarp } from "./warp.ts";
@@ -34,6 +34,8 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
 
   switch (cmd.kind) {
     case "SetCourse": {
+      // Marks the target only — draws the direction indicator, no motion. Flying
+      // there is a separate, explicit EngageAutopilot (Polish B control model).
       if (ctrl.landedBodyId !== undefined)
         return { ok: false, reason: "cannot set course while landed — take off first" };
       const body = world.components.celestialBody.get(cmd.bodyId);
@@ -41,12 +43,57 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
       if (body.kind === "star")
         return { ok: false, reason: "cannot set course into the star" };
       ctrl.autopilotTargetId = cmd.bodyId;
-      ctrl.autopilotActive = true;
+      ctrl.autopilotActive = false; // marks only; does NOT engage
       return { ok: true, events: [{ kind: "CourseSet", bodyId: cmd.bodyId, tick }] };
     }
 
-    case "CancelCourse": {
+    case "EngageAutopilot": {
+      // Commit to fly the marked target (or the one passed in). Flight is handed
+      // to the autopilot: it trapezoids in and inserts to orbit; manual thrust is
+      // locked while engaged (ship-movement) until CancelCourse.
+      if (ctrl.landedBodyId !== undefined)
+        return { ok: false, reason: "cannot engage autopilot while landed — take off first" };
+      const targetId = cmd.bodyId ?? ctrl.autopilotTargetId;
+      if (targetId === undefined)
+        return { ok: false, reason: "no course set — SET COURSE to a body first" };
+      const body = world.components.celestialBody.get(targetId);
+      if (!body) return { ok: false, reason: "no such body" };
+      if (body.kind === "star")
+        return { ok: false, reason: "cannot autopilot into the star" };
+      ctrl.autopilotTargetId = targetId;
+      ctrl.autopilotActive = true;
+      delete ctrl.orbitingBodyId; // leaving any held orbit to fly out
+      return { ok: true, events: [{ kind: "AutopilotEngaged", bodyId: targetId, tick }] };
+    }
+
+    case "EnterOrbit": {
+      // Manual insertion into a low orbit when already near a body (the same
+      // analytic orbit-hold the autopilot uses on arrival).
+      if (ctrl.landedBodyId !== undefined)
+        return { ok: false, reason: "cannot enter orbit while landed — take off first" };
+      const body = world.components.celestialBody.get(cmd.bodyId);
+      if (!body) return { ok: false, reason: "no such body" };
+      if (body.kind === "star")
+        return { ok: false, reason: "cannot orbit into the star" };
+      const dist = distanceToBody(world, cmd.bodyId);
+      if (dist > enterOrbitRange(body.renderRadius))
+        return { ok: false, reason: "too far to enter orbit — fly closer first" };
+      // Seed the orbit phase from the current offset so X/Z don't jump; the
+      // orbit-hold in ship-movement snaps to the insertion radius next tick.
+      const ship = world.components.transform.get(world.shipId)?.position;
+      const bp = world.components.transform.get(cmd.bodyId)?.position;
+      ctrl.orbitingBodyId = cmd.bodyId;
+      ctrl.orbitAngle = ship && bp ? Math.atan2(ship.z - bp.z, ship.x - bp.x) : 0;
       ctrl.autopilotActive = false;
+      delete ctrl.autopilotTargetId;
+      return { ok: true, events: [{ kind: "OrbitEntered", bodyId: cmd.bodyId, tick }] };
+    }
+
+    case "CancelCourse": {
+      // Disengage autopilot (and any held orbit) → hand back to manual. The
+      // target stays MARKED so the direction indicator persists.
+      ctrl.autopilotActive = false;
+      delete ctrl.orbitingBodyId;
       return { ok: true, events: [{ kind: "CourseCancelled", tick }] };
     }
 

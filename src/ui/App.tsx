@@ -6,6 +6,7 @@ import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import type { SpeedGear } from "../app/speed-state.ts";
 import { viewState } from "../app/view-state.ts";
+import { steerState } from "../app/steer-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import HUD from "./HUD.tsx";
 import SystemPanel from "./SystemPanel.tsx";
@@ -33,9 +34,41 @@ export default function App({ world, bus, speedState }: AppProps) {
       <Cockpit world={world} bus={bus} />
       <SurfaceView world={world} bus={bus} />
       <DebugPanel world={world} bus={bus} speedState={speedState} />
+      <SteerHint bus={bus} />
       <TransitionFade bus={bus} />
       <HazardBanner world={world} bus={bus} />
     </>
+  );
+}
+
+/** Discoverability prompt for pointer-lock steering (Polish B). Shows in flight
+ *  until the pointer is captured, then a compact "release" hint while steering. */
+function SteerHint({ bus }: { bus: GameBus }) {
+  useGameTick(bus, 6);
+  if (viewState.view === "map") return null;
+  const locked = steerState.pointerLocked;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 84, // sits just above the center-bottom Scanner readout
+        left: "50%",
+        transform: "translateX(-50%)",
+        padding: "3px 12px",
+        background: "rgba(5,6,10,0.7)",
+        border: "1px solid #1e2030",
+        borderRadius: 3,
+        font: "10px/1.4 ui-monospace, monospace",
+        color: locked ? "#585b70" : "#89dceb",
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+        zIndex: 6,
+      }}
+    >
+      {locked
+        ? "STEERING · move to fly · hold Space to look · Esc to release"
+        : "▶ CLICK TO FLY — move mouse/trackpad to steer, hold Space to look"}
+    </div>
   );
 }
 

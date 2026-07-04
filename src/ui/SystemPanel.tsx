@@ -10,7 +10,7 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
-import { parkDistance } from "../sim/presentation.ts";
+import { parkDistance, enterOrbitRange } from "../sim/presentation.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
 import { viewState } from "../app/view-state.ts";
 
@@ -61,6 +61,14 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
 
   function handleSetCourse(entityId: number) {
     dispatch(world, { kind: "SetCourse", bodyId: entityId });
+  }
+
+  function handleAutopilot(entityId: number) {
+    dispatch(world, { kind: "EngageAutopilot", bodyId: entityId });
+  }
+
+  function handleEnterOrbit(entityId: number) {
+    dispatch(world, { kind: "EnterOrbit", bodyId: entityId });
   }
 
   function handleLand(entityId: number) {
@@ -124,6 +132,8 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
             entityId={selectedId}
             distFromShip={distFromShip(selectedId)}
             onSetCourse={handleSetCourse}
+            onAutopilot={handleAutopilot}
+            onEnterOrbit={handleEnterOrbit}
             onLand={handleLand}
           />
         ) : (
@@ -210,18 +220,26 @@ function BodyInspector({
   entityId,
   distFromShip,
   onSetCourse,
+  onAutopilot,
+  onEnterOrbit,
   onLand,
 }: {
   body: CelestialBody;
   entityId: number;
   distFromShip: number;
   onSetCourse: (id: number) => void;
+  onAutopilot: (id: number) => void;
+  onEnterOrbit: (id: number) => void;
   onLand: (id: number) => void;
 }) {
   // A rocky planet within landing range can be landed on; gas giants/star can't.
   const canLand =
     body.kind === "planet" &&
     distFromShip <= parkDistance(body.renderRadius) * LANDING_RANGE_FACTOR;
+  // ENTER ORBIT is offered for any non-star body once you're close enough that
+  // the analytic insertion is a gentle pull-in (matches commands/apply.ts).
+  const canEnterOrbit =
+    body.kind !== "star" && distFromShip <= enterOrbitRange(body.renderRadius);
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Name + tag */}
@@ -243,44 +261,26 @@ function BodyInspector({
         </div>
       </div>
 
-      {/* Set Course + Land actions — not shown for the star */}
+      {/* Flight actions (Polish B control model) — not shown for the star.
+          SET COURSE marks the target (direction indicator); AUTOPILOT flies
+          there; ENTER ORBIT drops into a low orbit when close; LAND touches down. */}
       {body.kind !== "star" && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => onSetCourse(entityId)}
-            style={{
-              padding: "4px 10px",
-              fontSize: 11,
-              fontFamily: "inherit",
-              cursor: "pointer",
-              background: "#1e3a5f",
-              color: "#89b4fa",
-              border: "1px solid #2a4a7f",
-              borderRadius: 4,
-              letterSpacing: 0.5,
-            }}
-          >
-            ▶ SET COURSE
-          </button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <ActionButton label="▶ SET COURSE" color="#89b4fa" bg="#1e3a5f" border="#2a4a7f"
+            title="Mark this body — draws a heading indicator (does not move the ship)"
+            onClick={() => onSetCourse(entityId)} />
+          <ActionButton label="✈ AUTOPILOT" color="#f9e2af" bg="#3a341e" border="#5c4a1e"
+            title="Fly to this body automatically (manual thrust is locked while engaged)"
+            onClick={() => onAutopilot(entityId)} />
+          <ActionButton label="◎ ENTER ORBIT" color="#89dceb" bg="#173a44" border="#245c6a"
+            enabled={canEnterOrbit}
+            title={canEnterOrbit ? "Drop into a low orbit" : "Fly closer to enter orbit"}
+            onClick={() => onEnterOrbit(entityId)} />
           {body.kind === "planet" && (
-            <button
-              onClick={() => canLand && onLand(entityId)}
-              disabled={!canLand}
+            <ActionButton label="⬇ LAND" color="#a6e3a1" bg="#1e3a5f" border="#2f5f3a"
+              enabled={canLand}
               title={canLand ? "Land on the surface" : "Fly closer to land"}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontFamily: "inherit",
-                cursor: canLand ? "pointer" : "not-allowed",
-                background: canLand ? "#1e3a5f" : "transparent",
-                color: canLand ? "#a6e3a1" : "#45475a",
-                border: `1px solid ${canLand ? "#2f5f3a" : "#1e2030"}`,
-                borderRadius: 4,
-                letterSpacing: 0.5,
-              }}
-            >
-              ⬇ LAND
-            </button>
+              onClick={() => onLand(entityId)} />
           )}
         </div>
       )}
@@ -388,6 +388,39 @@ function BodyInspector({
 
 // ---------------------------------------------------------------------------
 // Small helper components
+
+function ActionButton({
+  label, color, bg, border, onClick, title, enabled = true,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  onClick: () => void;
+  title?: string;
+  enabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => enabled && onClick()}
+      disabled={!enabled}
+      title={title}
+      style={{
+        padding: "4px 10px",
+        fontSize: 11,
+        fontFamily: "inherit",
+        cursor: enabled ? "pointer" : "not-allowed",
+        background: enabled ? bg : "transparent",
+        color: enabled ? color : "#45475a",
+        border: `1px solid ${enabled ? border : "#1e2030"}`,
+        borderRadius: 4,
+        letterSpacing: 0.5,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 function Row({
   label,

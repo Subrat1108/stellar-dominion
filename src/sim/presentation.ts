@@ -94,7 +94,19 @@ export function orbitInsertionRadius(renderRadius: number): number {
 
 // Slow, deterministic orbit rate (rad / sim-sec) once inserted — a feel value:
 // slow enough to admire, not a spin. 0.042 ≈ one full orbit every ~150 s.
+// NOTE (Polish B): once gravity lands (Commit 3) the held-orbit angular rate is
+// DERIVED from the tuned gravitational parameter (ω = √(μ/r³)) so the analytic
+// orbit is a true circular orbit; ORBIT_RATE remains the fallback / feel anchor.
 export const ORBIT_RATE = 0.042;
+
+// Manual ENTER ORBIT is offered only within this centre-distance of a body, so
+// the analytic insertion (which snaps to orbitInsertionRadius) is a small, gentle
+// pull-in rather than a jarring jump from far away. A multiple of the insertion
+// radius; Commit 3 aligns this with the sphere of influence.
+export const ENTER_ORBIT_REACH_MULT = 3;
+export function enterOrbitRange(renderRadius: number): number {
+  return orbitInsertionRadius(renderRadius) * ENTER_ORBIT_REACH_MULT;
+}
 
 // --- Soft-surface stop (Session 20 fix) --------------------------------------
 // Manual flight is stopped this far from a body's centre. Proportional to the

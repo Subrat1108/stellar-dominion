@@ -144,15 +144,39 @@ describe("ship movement system", () => {
     expect(speed(world)).toBeLessThan(peak);
   });
 
-  it("manual input disables autopilot", () => {
+  it("thrust is LOCKED during autopilot — manual input does not cancel it", () => {
+    // Polish B control model: while autopilot is engaged, player thrust/steer is
+    // IGNORED (not a cancel — you leave via a CancelCourse command). Autopilot
+    // stays active and the ship keeps steering toward its target.
     const world = createStartingSystem();
+    const { id } = firstPlanet(world);
     const ctrl = world.components.shipControl.get(world.shipId)!;
     ctrl.autopilotActive = true;
-    ctrl.autopilotTargetId = 2;
+    ctrl.autopilotTargetId = id;
 
-    step(world, mk({ thrust: 1 }));
+    step(world, mk({ thrust: 1, yaw: 1, pitch: 1 }));
 
-    expect(ctrl.autopilotActive).toBe(false);
+    expect(ctrl.autopilotActive).toBe(true); // NOT cancelled by manual input
+  });
+
+  it("manual thrust in autopilot does not drive the ship (input ignored)", () => {
+    // With autopilot targeting a body, forcing a large opposite thrust must not
+    // move the ship the way manual thrust would — the input is discarded.
+    const world = createStartingSystem();
+    const { id } = firstPlanet(world);
+    step(world); // place bodies
+    const bp = world.components.transform.get(id)!.position;
+    const ship = world.components.transform.get(world.shipId)!;
+    // Sit the ship a little outside orbit, pointed away from the body.
+    ship.position = { x: bp.x, y: bp.y, z: bp.z - 5 };
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.heading = Math.PI; // nose pointing -z (away from body at +z relative)
+    ctrl.autopilotActive = true;
+    ctrl.autopilotTargetId = id;
+    const before = distToBody(world, id);
+    for (let i = 0; i < 120; i++) step(world, mk({ thrust: 1, throttle: 0.5 }));
+    // Autopilot should close distance despite the manual "full ahead" the wrong way.
+    expect(distToBody(world, id)).toBeLessThan(before);
   });
 
   it("orbit-hold keeps the ship at the insertion radius while the body drifts", () => {

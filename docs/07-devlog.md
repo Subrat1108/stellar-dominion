@@ -2,7 +2,7 @@
 
 A running, append-only log. **One short entry per work session.** New entries go at the top. This is how any future session (or AI) reconstructs "where are we and why" cheaply.
 
-> **Resume point (Session 21, in progress — Exploration Polish B):** Commit 0 (docs + `progress.md` + `docs/planning/`) **done**. Next: **Commit 1 — cockpit POV + 2-camera cleanup + SET COURSE direction indicator**. Then Commit 2 (control model + mouse/touchpad steering), Commit 3 (gravity + autopilot auto-throttle + enter-orbit). Plan + rationale in `docs/planning/session-21.md`. All 187 tests green at Commit 0.
+> **Resume point (Session 21, in progress — Exploration Polish B):** Commits 0–2 **done** (scaffolding; cockpit POV + 2-camera cleanup + course indicator; control model + mouse/touchpad steering). Next: **Commit 3 — gravity (SOI/μ, force integration in manual, analytic held orbit derived from μ) + autopilot trapezoidal auto-throttle + reconcile enter-orbit range with SOI**. Plan + rationale in `docs/planning/session-21.md`. **202 tests green** at Commit 2; typecheck + build clean. In-browser feel verification still pending (no browser driver in this env — user confirms; checklist at session end).
 
 Entry template:
 ```

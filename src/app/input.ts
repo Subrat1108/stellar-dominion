@@ -14,6 +14,7 @@
 //   right-drag (handled in the renderer) ... look around
 
 import type { Input } from "../sim/loop.ts";
+import { steerState } from "./steer-state.ts";
 
 const held = new Set<string>();
 let mapTogglePending = false;
@@ -23,12 +24,16 @@ window.addEventListener("keydown", (e) => {
   held.add(e.code);
   if (e.code === "KeyM" && !e.repeat) mapTogglePending = true;
   if (e.code === "KeyC" && !e.repeat) viewCyclePending = true;
+  // Hold Space = free-look modifier: mouse/touchpad motion swings the camera
+  // instead of steering the ship (Polish B). preventDefault stops page scroll.
+  if (e.code === "Space") { steerState.freeLook = true; e.preventDefault(); }
   // Stop the pitch arrows from scrolling the page while flying.
   if (e.code === "ArrowUp" || e.code === "ArrowDown") e.preventDefault();
 });
 
 window.addEventListener("keyup", (e) => {
   held.delete(e.code);
+  if (e.code === "Space") steerState.freeLook = false;
 });
 
 /** Build a sim Input from current keyboard state (throttle defaults to 1). */

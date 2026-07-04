@@ -116,6 +116,73 @@ describe("command validation", () => {
   });
 });
 
+describe("flight control model (Polish B)", () => {
+  it("SET COURSE marks the target but does NOT engage autopilot", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    const result = applyCommand(world, { kind: "SetCourse", bodyId: planetId });
+    expect(result.ok).toBe(true);
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    expect(ctrl.autopilotTargetId).toBe(planetId); // marked
+    expect(ctrl.autopilotActive).toBe(false);      // but NOT flying
+  });
+
+  it("ENGAGE AUTOPILOT flies the marked target", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    applyCommand(world, { kind: "SetCourse", bodyId: planetId });
+    const result = applyCommand(world, { kind: "EngageAutopilot" });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.events[0]).toMatchObject({ kind: "AutopilotEngaged", bodyId: planetId });
+    expect(world.components.shipControl.get(world.shipId)!.autopilotActive).toBe(true);
+  });
+
+  it("ENGAGE AUTOPILOT with a bodyId sets the target and flies it in one call", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    const result = applyCommand(world, { kind: "EngageAutopilot", bodyId: planetId });
+    expect(result.ok).toBe(true);
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    expect(ctrl.autopilotTargetId).toBe(planetId);
+    expect(ctrl.autopilotActive).toBe(true);
+  });
+
+  it("ENGAGE AUTOPILOT is rejected with no course set", () => {
+    const world = startedWorld();
+    const result = applyCommand(world, { kind: "EngageAutopilot" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("CANCEL COURSE disengages autopilot but keeps the target marked", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    applyCommand(world, { kind: "EngageAutopilot", bodyId: planetId });
+    applyCommand(world, { kind: "CancelCourse" });
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    expect(ctrl.autopilotActive).toBe(false);
+    expect(ctrl.autopilotTargetId).toBe(planetId); // still marked
+  });
+
+  it("ENTER ORBIT drops into a held orbit when near a body", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    parkShipAt(world, planetId); // parked at parkDistance ≈ 2.75R, inside enter-orbit range
+    const result = applyCommand(world, { kind: "EnterOrbit", bodyId: planetId });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.events[0]).toMatchObject({ kind: "OrbitEntered", bodyId: planetId });
+    expect(world.components.shipControl.get(world.shipId)!.orbitingBodyId).toBe(planetId);
+  });
+
+  it("ENTER ORBIT is rejected when too far from the body", () => {
+    const world = startedWorld();
+    const planetId = findBody(world, (b) => b.kind === "planet");
+    const ship = world.components.transform.get(world.shipId)!;
+    ship.position = { x: 0, y: 0, z: 100000 };
+    const result = applyCommand(world, { kind: "EnterOrbit", bodyId: planetId });
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe("BuildStructure", () => {
   /** Land + found a colony on a rocky planet, returning its body id. */
   function landAndFound(world: ReturnType<typeof startedWorld>): number {

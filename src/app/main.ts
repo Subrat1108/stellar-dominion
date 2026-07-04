@@ -13,6 +13,8 @@ import { maxSpeedForGear } from "../sim/presentation.ts";
 import { createRenderer } from "../render/scene.ts";
 import { GameBus } from "./game-bus.ts";
 import { speedState } from "./speed-state.ts";
+import { steerState } from "./steer-state.ts";
+import { pointerToSteering } from "./steering.ts";
 import { landingState } from "./landing-state.ts";
 import App from "../ui/App.tsx";
 import { getSimInput, consumeMapToggle, consumeViewCycle } from "./input.ts";
@@ -43,6 +45,7 @@ let last = performance.now();
 let accumulator = 0;
 const STEP_MS = FIXED_DT * 1000;
 const MAX_STEPS_PER_FRAME = 240; // spiral-of-death guard
+const STEER_SENSITIVITY = 0.06; // pointer-pixel → yaw/pitch Input gain
 
 function frame(now: number): void {
   accumulator += now - last;
@@ -56,9 +59,26 @@ function frame(now: number): void {
   const input = getSimInput();
   input.throttle = maxSpeedForGear(speedState.value);
 
+  // Mouse/touchpad steering: convert this frame's accumulated pointer delta into
+  // yaw/pitch and clear the accumulator. Applied to the FIRST tick only so a given
+  // pointer movement produces the same turn regardless of how many ticks the
+  // frame runs (frame-rate-independent feel; the sim stays deterministic per
+  // input stream). Keyboard yaw/pitch apply on every tick as before.
+  const steer = pointerToSteering(steerState.dx, steerState.dy, STEER_SENSITIVITY);
+  steerState.dx = 0;
+  steerState.dy = 0;
+
   let steps = 0;
   while (accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
-    const events = step(world, input);
+    const tickInput =
+      steps === 0 && (steer.yaw !== 0 || steer.pitch !== 0)
+        ? {
+            ...input,
+            yaw: Math.max(-1, Math.min(1, input.yaw + steer.yaw)),
+            pitch: Math.max(-1, Math.min(1, input.pitch + steer.pitch)),
+          }
+        : input;
+    const events = step(world, tickInput);
     for (const event of events) bus.emitEvent(event);
     bus.emitTick(world.tick);
     accumulator -= STEP_MS;

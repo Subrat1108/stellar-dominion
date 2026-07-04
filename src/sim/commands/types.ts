@@ -10,7 +10,13 @@ import type { BuildingType, TerraformLever } from "../data/colony.ts";
 
 /** A discrete player action queued for deterministic application in the tick. */
 export type Command =
+  // Flight control (Polish B): SetCourse only MARKS a target (draws the
+  // direction indicator, no motion); EngageAutopilot commits to fly it (and may
+  // set the target in the same call); EnterOrbit drops into a low orbit when
+  // near a body; CancelCourse disengages autopilot but keeps the target marked.
   | { kind: "SetCourse"; bodyId: number }
+  | { kind: "EngageAutopilot"; bodyId?: number }
+  | { kind: "EnterOrbit"; bodyId: number }
   | { kind: "CancelCourse" }
   | { kind: "LandAtBody"; bodyId: number }
   | { kind: "TakeOff" }
@@ -25,6 +31,8 @@ export type Command =
 /** Result of applying a command (events emitted on success; reason on reject). */
 export type GameEvent =
   | { kind: "CourseSet"; bodyId: number; tick: number }
+  | { kind: "AutopilotEngaged"; bodyId: number; tick: number }
+  | { kind: "OrbitEntered"; bodyId: number; tick: number }
   | { kind: "CourseCancelled"; tick: number }
   | { kind: "Landed"; bodyId: number; tick: number }
   | { kind: "TookOff"; bodyId: number; tick: number }
