@@ -195,7 +195,7 @@ describe("ship movement system", () => {
     // (it would diverge if it weren't matching the body's velocity).
     for (let i = 0; i < 1200; i++) step(world, mk({}));
     expect(distToBody(world, id)).toBeCloseTo(rIns, 5);
-    expect(ctrl.orbitAngle).toBeGreaterThan(0); // orbit advanced
+    expect(ctrl.orbitAngle).not.toBe(0); // orbit advanced (direction-agnostic)
     expect(ctrl.orbitingBodyId).toBe(id);
   });
 

@@ -17,6 +17,7 @@ import { FIXED_DT } from "../constants.ts";
 import {
   orbitInsertionRadius,
   ORBIT_RATE,
+  ORBIT_DIRECTION,
   ORBIT_FRAME_YAW_BIAS,
   softStopRadius,
 } from "../presentation.ts";
@@ -36,14 +37,16 @@ const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
 const ORBIT_FRAME_EASE = 0.06;
 
 // Autopilot auto-throttle (independent of the player's gear): fast open-space
-// cruise, then a body-scaled slow final approach so the target visibly grows
-// instead of being skipped in a single tick (see math/flight.approachSpeed).
+// cruise, then a LONG, slow, body-scaled final approach so the planet grows
+// gradually from a far dot and slides slowly into orbit (see approachSpeed).
+// The slow zone starts ~100 R out (where the body is ~0.6°) and the approach
+// takes ~20 s to close in, so the growth is cinematic, not a sudden pop.
 const AUTOPILOT: ApproachParams = {
-  cruise: 40,        // scene u/s open-space cruise
-  accel: 30,         // scene u/s² far-phase deceleration
-  slowZoneMult: 50,  // slow phase begins 50 R out (≈54 R with the 4 R arrival)
-  slowRate: 8,       // slow-zone-edge speed = 8·R per second (~10 s to close in)
-  minRate: 5,        // floor = 5·R per second, so it actually arrives
+  cruise: 40,         // scene u/s open-space cruise
+  accel: 30,          // scene u/s² far-phase deceleration
+  slowZoneMult: 100,  // slow phase begins 100 R out (~1 u for a small planet)
+  slowRate: 10,       // slow-zone-edge speed = 10·R per second
+  minRate: 3,         // floor = 3·R per second, so it still arrives (~20 s total)
 };
 
 /** Unit nose vector for a given yaw (heading) and pitch. */
@@ -101,7 +104,8 @@ export function shipMovementSystem(world: World, input: Input): void {
       const bodyPos = transform.get(ctrl.orbitingBodyId)?.position;
       if (body && bodyPos) {
         const rIns = orbitInsertionRadius(body.renderRadius);
-        const angle = (ctrl.orbitAngle ?? 0) + ORBIT_RATE * FIXED_DT;
+        const w = ORBIT_DIRECTION * ORBIT_RATE; // signed angular rate
+        const angle = (ctrl.orbitAngle ?? 0) + w * FIXED_DT;
         ctrl.orbitAngle = angle;
         // Hold the insertion altitude in the body's local XZ plane.
         pos.position.x = bodyPos.x + Math.cos(angle) * rIns;
@@ -113,9 +117,10 @@ export function shipMovementSystem(world: World, input: Input): void {
         const dT = FIXED_DT * ORBITAL_TIME_RATE;
         const p1 = bodyWorldPosition(world, ctrl.orbitingBodyId, T);
         const p0 = bodyWorldPosition(world, ctrl.orbitingBodyId, T - dT);
-        vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
+        // Tangential velocity = d/dt[cos(angle),sin(angle)]·rIns = [−sin,cos]·rIns·w.
+        vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * w;
         vel.vy = (p1.y - p0.y) / FIXED_DT;
-        vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
+        vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * w;
         // Face TOWARD the body (so it fills the forward view) but bias the heading
         // left, so the body sits ahead-and-left, clear of the right-side panel.
         // The body is at (cos,0,sin)·rIns from the ship, i.e. direction

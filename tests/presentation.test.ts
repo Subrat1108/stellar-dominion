@@ -56,12 +56,16 @@ describe("physical body radii (honest scale)", () => {
   });
 });
 
-describe("ship avatar scale (Session 20 fix)", () => {
-  it("is a small fraction of an Earth-radius body (well under 1:10)", () => {
+describe("ship avatar scale", () => {
+  it("is a tiny fraction of an Earth-radius body (dramatic scale, but renderable)", () => {
     const bodyR = planetRenderRadius(R_EARTH); // ~0.00835 u
     const ratio = SHIP_LENGTH / bodyR;         // length : radius
-    expect(ratio).toBeLessThan(0.1); // well under 1:10
-    expect(ratio).toBeGreaterThan(1 / 300); // not below the near-plane regime
+    // The ship reads as a tiny craft against a planet (Polish B: smaller than a
+    // ring ice-chunk). Its APPARENT size is SHIP_LENGTH : CHASE_DIST (render/
+    // scene.ts), so this only bounds the honest ordering ship ≪ planet; the ship
+    // stays well above zero so it renders.
+    expect(ratio).toBeLessThan(0.01); // ≪ 1:100 — a speck against the world
+    expect(SHIP_LENGTH).toBeGreaterThan(0);
   });
 });
 

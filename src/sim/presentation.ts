@@ -114,10 +114,15 @@ export function landingRange(renderRadius: number): number {
 // which makes the analytic held orbit a TRUE circular orbit and the
 // autopilot→manual handoff seamless. Set from a target low-orbit period: shorter
 // period ⇒ deeper, more-felt well but a fast, unrealistic sweep around the body;
-// longer ⇒ a calm, majestic orbit and a gentler well. 150 s reads as a slow,
-// realistic orbit (~2.4°/s sweep) rather than a spin (40 s felt far too fast).
-export const LOW_ORBIT_PERIOD_S = 150;
+// longer ⇒ a calm, majestic orbit and a gentler well. 300 s is a very slow,
+// stately orbit (~1.2°/s sweep); shorter periods felt like a spin.
+export const LOW_ORBIT_PERIOD_S = 300;
 export const ORBIT_RATE = (2 * Math.PI) / LOW_ORBIT_PERIOD_S;
+
+// Orbit direction: −1 reverses the sweep (the default +1 read as "clockwise and
+// backwards" in playtest). Applied to the angle advance AND the tangential
+// velocity in the orbit hold, so position and velocity stay consistent.
+export const ORBIT_DIRECTION = -1;
 
 // Manual ENTER ORBIT is offered only within this centre-distance of a body, so
 // the analytic insertion (which snaps to orbitInsertionRadius) is a small, gentle
@@ -151,8 +156,12 @@ export function softStopRadius(renderRadius: number): number {
 // the camera sits ~20 ship-lengths back while staying ≪ a body radius (the body
 // still fills the view as a wall on arrival). Going smaller than ~1:300 would put
 // the ship below the near plane → a dedicated ship near-camera layer (deferred).
-export const SHIP_RADIUS = 0.000011;
-export const SHIP_LENGTH = 0.00005;
+// Shrunk further (Polish B feedback): the ship reads as a tiny craft — smaller
+// than a ring ice-chunk or small asteroid — against a planet ~470× its length.
+// The camera rig (render/scene.ts) is unchanged, so at CHASE_DIST the ship now
+// subtends ~0.9° (was ~2.9°): a small speck ahead, for a dramatic sense of scale.
+export const SHIP_RADIUS = 0.0000034;
+export const SHIP_LENGTH = 0.000015;
 
 // --- Throttle / speed (exploration-polish A) ---------------------------------
 // Honest distances are large (the inner system spans ~700 u), so the throttle
