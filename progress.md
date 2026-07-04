@@ -9,25 +9,24 @@
 
 The deterministic space-4X sim runs end-to-end: a seeded content engine generates
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
-found colonies, run the resource economy, and terraform (Phases 2–3A). The current
-work is **Exploration Polish B** — making the exploration/flight leg playable by
-hand: an immersive cockpit view, a real control model (SET COURSE / AUTOPILOT /
-LAND with manual-vs-autopilot modes + working mouse/touchpad steering), and
-**deterministic patched-conic orbital gravity** (SOI-bounded gravity well, real
-orbits, escape velocity). Sessions 19–20 (Polish A + fix) made bodies honestly
-scaled and fixed orbital insertion; the leg still needs a proper cockpit + controls
-+ gravity, which is Polish B.
+found colonies, run the resource economy, and terraform (Phases 2–3A). **Exploration
+Polish B (Session 21) is code-complete:** an immersive cockpit canopy (cheap CSS
+overlay, first-person POV), a real control model (SET COURSE marks / AUTOPILOT flies
+a trapezoidal profile / ENTER ORBIT / LAND, with manual-vs-autopilot modes and
+thrust locked in autopilot), working **mouse/touchpad pointer-lock steering** (hold
+Space to free-look), two cameras only (map left the cycle), and **deterministic
+patched-conic orbital gravity** — a tuned-μ feel model with real SOI/`v_circ`/`v_esc`
+structure, force integration in manual inside a body's SOI, a seamless
+autopilot→manual handoff, and escape velocity. 218 tests green; typecheck + build +
+dev-server boot all clean.
 
 ## Active next step
 
-**Exploration Polish B (Session 21).** Commit split:
-0. docs + `progress.md` scaffolding *(this commit)*
-1. cockpit POV + 2-camera cleanup + SET COURSE direction indicator
-2. control model (SET COURSE / AUTOPILOT / ENTER ORBIT split, thrust gating) + mouse/touchpad steering
-3. gravity (SOI/μ, force integration in manual, analytic held orbit) + autopilot auto-throttle + enter-orbit
-
-Determinism is sacred; all tests stay green (target ~200+). Design rationale for
-this session is in `docs/planning/session-21.md`.
+**Awaiting user in-browser feel confirmation for Polish B** (steering + the
+autopilot→manual gravity handoff especially — checklist in the Session 21 devlog
+entry; no browser driver in this env so feel is user-verified). After that:
+**Exploration Polish C** — the unified clickable multi-scale map (+ promoting the
+minimap). Design rationale for Session 21 is in `docs/planning/session-21.md`.
 
 ## Links
 
