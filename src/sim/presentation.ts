@@ -84,18 +84,21 @@ export function parkDistance(renderRadius: number): number {
 }
 
 // --- Orbital insertion --------------------------------------------------------
-// On arrival the autopilot settles into a low orbit at this multiple of the real
-// radius (centre-distance). At 4R the body subtends ~29° — a clear DISC filling a
-// good part of the view (Polish B: "at least 30% of the screen"), not a curved
-// wall (the old 1.2R filled the whole FOV and read as a wall you couldn't see).
-export const ORBIT_INSERTION_MULT = 4.0;
+// On arrival the autopilot settles into a LOW orbit at this multiple of the real
+// radius (centre-distance). At 2 R the body subtends ~60° — a large, strongly
+// CURVED body you cannot take in all at once (you're genuinely close, as in a
+// real low orbit), not a small full disc floating far away (4 R read as "looking
+// at a planet from afar"). Combined with the left framing bias it becomes a big
+// curved world on the left with open space on the right, not a full-screen wall.
+export const ORBIT_INSERTION_MULT = 2.0;
 export function orbitInsertionRadius(renderRadius: number): number {
   return renderRadius * ORBIT_INSERTION_MULT;
 }
 
-// Orbit framing: face the body but bias the heading so it sits ahead-and-LEFT,
-// clear of the right-side system panel (radians; ~17° left of the nose).
-export const ORBIT_FRAME_YAW_BIAS = 0.3;
+// Orbit framing: face the body but bias the heading so the (large) body sits to
+// the LEFT — its right limb near screen-centre, curving off the left/top/bottom —
+// leaving open space on the right, clear of the system panel (radians; ~29°).
+export const ORBIT_FRAME_YAW_BIAS = 0.5;
 
 // --- Landing reach ------------------------------------------------------------
 // A body is landable from within this centre-distance — larger than the orbit
@@ -110,10 +113,10 @@ export function landingRange(renderRadius: number): number {
 // orbit at the insertion radius has exactly this rate (μ = ω²·r³ in math/gravity),
 // which makes the analytic held orbit a TRUE circular orbit and the
 // autopilot→manual handoff seamless. Set from a target low-orbit period: shorter
-// period ⇒ deeper, more-felt well but a livelier orbit; longer ⇒ gentler but the
-// Session-20 "admire, don't spin" look. 40 s balances a felt well against a calm
-// orbit (≈3–4 s free-fall from low orbit to the surface if you cut thrust).
-export const LOW_ORBIT_PERIOD_S = 40;
+// period ⇒ deeper, more-felt well but a fast, unrealistic sweep around the body;
+// longer ⇒ a calm, majestic orbit and a gentler well. 150 s reads as a slow,
+// realistic orbit (~2.4°/s sweep) rather than a spin (40 s felt far too fast).
+export const LOW_ORBIT_PERIOD_S = 150;
 export const ORBIT_RATE = (2 * Math.PI) / LOW_ORBIT_PERIOD_S;
 
 // Manual ENTER ORBIT is offered only within this centre-distance of a body, so

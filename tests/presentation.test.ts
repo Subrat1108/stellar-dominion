@@ -81,13 +81,13 @@ describe("parkDistance (real-radius framing)", () => {
   });
 });
 
-describe("orbitInsertionRadius (disc-framing low orbit)", () => {
-  it("is a few radii out — the body reads as a DISC filling a good part of the view", () => {
+describe("orbitInsertionRadius (close, large-body low orbit)", () => {
+  it("is a low multiple of the radius — close enough to read as a large curved world", () => {
     expect(orbitInsertionRadius(0.0085)).toBeCloseTo(0.0085 * ORBIT_INSERTION_MULT, 10);
-    // ~3–6 R: far enough that the body is a sphere (not a wall), close enough to
-    // dominate the view (~30 %+). At 4 R the angular diameter is ~29°.
-    expect(ORBIT_INSERTION_MULT).toBeGreaterThanOrEqual(3);
-    expect(ORBIT_INSERTION_MULT).toBeLessThanOrEqual(6);
+    // ~1.8–3 R: close enough that the body is a big curved mass you can't take in
+    // all at once (at 2 R the angular diameter is ~60°), not a small distant disc.
+    expect(ORBIT_INSERTION_MULT).toBeGreaterThanOrEqual(1.8);
+    expect(ORBIT_INSERTION_MULT).toBeLessThanOrEqual(3);
   });
 
   it("is landable — inside the landing range so you can LAND from orbit", () => {

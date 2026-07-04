@@ -222,11 +222,20 @@ const FRAG = /* glsl */ `
     float lambert=max(ndl,0.0);
     color*=uAmbient+(1.0-uAmbient)*lambert;
 
-    // Atmospheric limb glow (Fresnel) — reads on the LIT limb, fades to night.
-    // dayness softens across the terminator so the glow doesn't pop at the line.
+    // Absolute night-side floor: the multiplicative ambient alone can leave a
+    // DARK-coloured body's night hemisphere dimmer than the space background, so
+    // it reads as a see-through "hole". A small additive floor guarantees the dark
+    // side always sits above the background — a visible dark disc, not transparent.
+    color=max(color, vec3(0.035,0.04,0.05));
+
+    // Limb definition (Fresnel). The LIT limb gets the full atmospheric glow; a
+    // faint cool rim is added ALL the way round (even the night limb) so the
+    // body's silhouette against space is always defined — no vanishing edge.
     float dayness=smoothstep(-0.1,0.2,ndl);
-    float rim=pow(1.0-max(normalize(vViewNormal).z,0.0),3.0);
+    float viewFacing=max(normalize(vViewNormal).z,0.0);
+    float rim=pow(1.0-viewFacing,3.0);
     color+=uAtmColor*rim*uAtmDensity*0.6*dayness;
+    color+=vec3(0.05,0.06,0.08)*pow(1.0-viewFacing,4.0);
 
     gl_FragColor=vec4(color,1.0);
   }
@@ -252,8 +261,10 @@ function uniformsFor(p: PlanetVisualParams) {
 }
 
 // Night-side floor: small enough that the terminator reads clearly, large enough
-// that the dark hemisphere stays legible (not a pure-black silhouette). Tunable.
-const AMBIENT_STARLIGHT = 0.05;
+// that the dark hemisphere stays legible (not a pure-black silhouette). Paired
+// with an absolute floor + all-round limb in the shader so a dark body's night
+// side never drops below the space background and read as transparent. Tunable.
+const AMBIENT_STARLIGHT = 0.1;
 
 /** Build a procedural ShaderMaterial for a planet or gas giant. */
 export function makePlanetMaterial(body: CelestialBody): THREE.ShaderMaterial {
