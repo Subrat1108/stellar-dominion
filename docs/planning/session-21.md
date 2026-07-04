@@ -112,10 +112,39 @@ planning rationale from living only in ephemeral chat.
 split (SET COURSE / AUTOPILOT / ENTER ORBIT) + thrust gating; pointer-lock mouse/
 touchpad steering + free-look; deterministic patched-conic gravity (SOI/μ, force
 integration in manual, analytic held orbit, escape velocity); autopilot trapezoidal
-auto-throttle.
+auto-throttle. *(Extended during the session by the tuning arc below.)*
 
 **Out:** Polish C (the unified clickable multi-scale map — minimap stays dumb, just
 leaves the camera cycle); Polish D (body detail panel); any economy/tech/warp-gating
 change; n-body gravity; a modeled 3D cockpit interior; anything touching the sim
 (colony/terraforming/population), the warp FSM, or the honest-scale body math.
+
+## Fix-pass addendum — the in-browser tuning arc (post-base, same session)
+
+The base slice was mechanically correct but the *feel* took ~6 playtest rounds to
+land. Rationale worth keeping for future feel work:
+
+- **Honest scale is the recurring antagonist.** A planet is a sub-pixel dot until
+  you're close, and the system is huge — so "watch the planet grow on approach"
+  and "cross the system quickly" fight each other. Resolution: a **two-phase,
+  body-scaled** approach (fast cruise, then a long slow zone measured in body
+  radii). Any new "approach/zoom" feel should be body-scaled, not absolute.
+- **Velocity-matching is mandatory near a body.** Inner planets drift ~0.03 u/s —
+  as fast as a slow approach. Both the approach and the orbit hold must match the
+  body's heliocentric velocity or the target slides away. But velocity-matching a
+  *radial* approach also makes the ship **station-keep and never insert** — which
+  forced the **spiral** insertion (blend radial→tangential) so it always closes
+  and hands to the orbit moving tangentially. Logged as a `docs/09` decision.
+- **"Realistic orbit" = close + slow + can't-see-the-whole-planet**, not a small
+  distant disc. Framing knobs (insertion radius, left bias, period, direction) are
+  irreducibly subjective — keep them as named constants and tune in-browser.
+- **Log-depth is a standing shader rule** (`docs/09`): the translucent-planet bug
+  was a custom shader not writing logarithmic depth. Every future custom shader
+  must include the `logdepthbuf` chunks.
+- **Debris fields sell scale cheaply** and are render-only + deterministic via a
+  render-only PRNG (never the sim RNG). Rings/belt are decoration now; making them
+  a *place* (mining, hazards) is a later slice.
+- **No browser driver in this environment** → all "feel" is user-verified. The
+  loop that worked: change one or two named constants, keep 220+ tests green +
+  build + dev-boot, ship, get the playtest verdict, repeat.
 </content>

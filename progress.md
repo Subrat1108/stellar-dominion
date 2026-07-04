@@ -10,23 +10,26 @@
 The deterministic space-4X sim runs end-to-end: a seeded content engine generates
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
 found colonies, run the resource economy, and terraform (Phases 2–3A). **Exploration
-Polish B (Session 21) is code-complete:** an immersive cockpit canopy (cheap CSS
-overlay, first-person POV), a real control model (SET COURSE marks / AUTOPILOT flies
-a trapezoidal profile / ENTER ORBIT / LAND, with manual-vs-autopilot modes and
-thrust locked in autopilot), working **mouse/touchpad pointer-lock steering** (hold
-Space to free-look), two cameras only (map left the cycle), and **deterministic
-patched-conic orbital gravity** — a tuned-μ feel model with real SOI/`v_circ`/`v_esc`
-structure, force integration in manual inside a body's SOI, a seamless
-autopilot→manual handoff, and escape velocity. 218 tests green; typecheck + build +
-dev-server boot all clean.
+Polish B (Session 21) is complete + tuned:** an immersive cockpit canopy (cheap CSS
+overlay, first-person POV); a real control model (SET COURSE marks / AUTOPILOT flies
+/ ENTER ORBIT / LAND, manual-vs-autopilot modes, thrust locked in autopilot, the
+AUTOPILOT button toggles); **mouse/touchpad pointer-lock steering** (hold Space to
+free-look); two cameras only (map left the cycle); **deterministic patched-conic
+orbital gravity** (tuned-μ, real SOI/`v_circ`/`v_esc`, seamless autopilot→manual
+handoff, escape velocity); a **spiral orbital insertion** that slides in and orbits
+seamlessly; **solid procedural planets** (fixed the log-depth see-through); and
+**flyable icy planetary rings + a Kuiper belt** for a dramatic sense of scale (tiny
+ship, huge worlds). 221 tests green; typecheck + build + dev-boot clean.
 
 ## Active next step
 
-**Awaiting user in-browser feel confirmation for Polish B** (steering + the
-autopilot→manual gravity handoff especially — checklist in the Session 21 devlog
-entry; no browser driver in this env so feel is user-verified). After that:
-**Exploration Polish C** — the unified clickable multi-scale map (+ promoting the
-minimap). Design rationale for Session 21 is in `docs/planning/session-21.md`.
+**Final in-browser feel confirmation for Polish B** (the spiral-insertion slide +
+orbit direction are the last things to eyeball; debris + solid bodies already
+confirmed by the user). All feel is user-verified — there's no browser driver in
+this environment. The tuning knobs are listed at the end of the Session 21 devlog
+entry. After confirmation: **Exploration Polish C** — the unified clickable
+multi-scale map (+ promoting the minimap). Design rationale for Session 21 is in
+`docs/planning/session-21.md`.
 
 ## Links
 
