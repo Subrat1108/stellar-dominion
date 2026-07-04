@@ -321,9 +321,15 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         camera.lookAt(_lookAt);
       }
 
-      // --- Target marker: point to the selected (autopilot) or nearest body ---
-      let targetId = shipCtrl.autopilotTargetId;
-      if (targetId === undefined || !bodyMeshes.has(targetId)) {
+      // --- Target marker ---------------------------------------------------
+      // A SET COURSE target (autopilotTargetId) is the primary "direction
+      // indicator": drawn in the course colour with a distinct on-screen pipper,
+      // and an edge chevron when off-screen/behind so you can always turn toward
+      // it. With no course set it falls back to a dim nearest-body hint.
+      const courseId = shipCtrl.autopilotTargetId;
+      const isCourse = courseId !== undefined && bodyMeshes.has(courseId);
+      let targetId = isCourse ? courseId : undefined;
+      if (targetId === undefined) {
         const positions: [number, { x: number; y: number; z: number }][] = [];
         for (const [id] of bodyMeshes) {
           const t = w.components.transform.get(id);
@@ -346,11 +352,14 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         targetMarker.style.display = "block";
         targetMarker.style.left = `${place.x}px`;
         targetMarker.style.top = `${place.y}px`;
+        // Course marker reads amber + brighter; a bare proximity hint is dim cyan.
+        targetMarker.style.color = isCourse ? "#f9e2af" : "#89dceb";
+        targetMarker.style.opacity = isCourse ? "1" : "0.6";
         if (place.offscreen) {
           targetMarker.textContent = "➤";
           targetMarker.style.transform = `translate(-50%,-50%) rotate(${place.angle}rad)`;
         } else {
-          targetMarker.textContent = "⊕";
+          targetMarker.textContent = isCourse ? "◎" : "⊕";
           targetMarker.style.transform = "translate(-50%,-50%)";
         }
       }
@@ -369,8 +378,10 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     },
 
     cycleView() {
-      const order: CameraView[] = ["cockpit", "chase", "map"];
-      const next = order[(order.indexOf(viewState.view) + 1) % order.length]!;
+      // Two flight cameras only (Polish B): C toggles cockpit ↔ chase. The map is
+      // no longer in the camera cycle — it's reached with M and becomes the real
+      // clickable multi-scale map in Polish C. From map, C returns to cockpit.
+      const next: CameraView = viewState.view === "cockpit" ? "chase" : "cockpit";
       setView(next);
     },
 

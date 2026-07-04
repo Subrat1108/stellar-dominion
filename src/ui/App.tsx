@@ -13,6 +13,7 @@ import SectorPanel from "./SectorPanel.tsx";
 import DebugPanel from "./DebugPanel.tsx";
 import Minimap from "./Minimap.tsx";
 import Scanner from "./Scanner.tsx";
+import Cockpit from "./Cockpit.tsx";
 import SurfaceView from "./SurfaceView.tsx";
 
 interface AppProps {
@@ -29,6 +30,7 @@ export default function App({ world, bus, speedState }: AppProps) {
       <SectorPanel world={world} bus={bus} />
       <Minimap world={world} bus={bus} />
       <Scanner world={world} bus={bus} />
+      <Cockpit world={world} bus={bus} />
       <SurfaceView world={world} bus={bus} />
       <DebugPanel world={world} bus={bus} speedState={speedState} />
       <TransitionFade bus={bus} />

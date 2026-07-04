@@ -98,7 +98,7 @@ export default function DebugPanel({ world, bus, speedState }: DebugPanelProps) 
         </div>
       ))}
       <div style={{ color: "#585b70", marginTop: 6, fontSize: 10 }}>
-        W/S thrust · A/D steer · ↑↓ pitch · C view · M map
+        W/S thrust · A/D steer · ↑↓ pitch · C cockpit/chase · M map
       </div>
     </div>
   );
