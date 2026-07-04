@@ -14,6 +14,7 @@ import {
   SHIP_LENGTH,
   orbitInsertionRadius,
   ORBIT_INSERTION_MULT,
+  landingRange,
   softStopRadius,
   MIN_SURFACE_ALTITUDE,
 } from "../src/sim/presentation.ts";
@@ -80,15 +81,17 @@ describe("parkDistance (real-radius framing)", () => {
   });
 });
 
-describe("orbitInsertionRadius (low-orbit framing)", () => {
-  it("is a low multiple of the radius (a wall, not a marble)", () => {
+describe("orbitInsertionRadius (disc-framing low orbit)", () => {
+  it("is a few radii out — the body reads as a DISC filling a good part of the view", () => {
     expect(orbitInsertionRadius(0.0085)).toBeCloseTo(0.0085 * ORBIT_INSERTION_MULT, 10);
-    expect(ORBIT_INSERTION_MULT).toBeGreaterThanOrEqual(1.1);
-    expect(ORBIT_INSERTION_MULT).toBeLessThanOrEqual(1.3);
+    // ~3–6 R: far enough that the body is a sphere (not a wall), close enough to
+    // dominate the view (~30 %+). At 4 R the angular diameter is ~29°.
+    expect(ORBIT_INSERTION_MULT).toBeGreaterThanOrEqual(3);
+    expect(ORBIT_INSERTION_MULT).toBeLessThanOrEqual(6);
   });
 
-  it("sits well inside the old park distance (much closer)", () => {
-    expect(orbitInsertionRadius(0.0085)).toBeLessThan(parkDistance(0.0085));
+  it("is landable — inside the landing range so you can LAND from orbit", () => {
+    expect(orbitInsertionRadius(0.0085)).toBeLessThan(landingRange(0.0085));
   });
 
   it("clears the surface", () => {

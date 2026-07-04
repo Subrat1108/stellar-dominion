@@ -14,9 +14,14 @@
 import type { World } from "../ecs/world.ts";
 import type { Input } from "../loop.ts";
 import { FIXED_DT } from "../constants.ts";
-import { orbitInsertionRadius, ORBIT_RATE, softStopRadius } from "../presentation.ts";
+import {
+  orbitInsertionRadius,
+  ORBIT_RATE,
+  ORBIT_FRAME_YAW_BIAS,
+  softStopRadius,
+} from "../presentation.ts";
 import { gravParameter, soiRadius, gravityAccel, type GravBody } from "../math/gravity.ts";
-import { trapezoidalSpeed, moveToward } from "../math/flight.ts";
+import { approachSpeed, moveToward, type ApproachParams } from "../math/flight.ts";
 import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
@@ -26,11 +31,16 @@ const ACCEL_RATIO   = 3;
 const DRAG          = 0.98;              // velocity multiplied each tick (open space only)
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
 
-// Autopilot auto-throttle (independent of the player's gear): a cruise speed and
-// accel that cross the ~700 u system in a handful of seconds and decelerate to a
-// gentle arrival. Tuned feel constants (scene u/s, scene u/s²).
-const AUTOPILOT_CRUISE = 40;
-const AUTOPILOT_ACCEL  = 30;
+// Autopilot auto-throttle (independent of the player's gear): fast open-space
+// cruise, then a body-scaled slow final approach so the target visibly grows
+// instead of being skipped in a single tick (see math/flight.approachSpeed).
+const AUTOPILOT: ApproachParams = {
+  cruise: 40,        // scene u/s open-space cruise
+  accel: 30,         // scene u/s² far-phase deceleration
+  slowZoneMult: 50,  // slow phase begins 50 R out (≈54 R with the 4 R arrival)
+  slowRate: 8,       // slow-zone-edge speed = 8·R per second (~10 s to close in)
+  minRate: 5,        // floor = 5·R per second, so it actually arrives
+};
 
 /** Unit nose vector for a given yaw (heading) and pitch. */
 export function noseVector(heading: number, pitch: number): { x: number; y: number; z: number } {
@@ -102,8 +112,14 @@ export function shipMovementSystem(world: World, input: Input): void {
         vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
         vel.vy = (p1.y - p0.y) / FIXED_DT;
         vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
-        // Face along the orbit tangent (nose = (sin h, 0, cos h) → h = -angle).
-        ctrl.heading = -angle;
+        // Face TOWARD the body (so it fills the forward view as a disc) but bias
+        // the heading left, so the body sits ahead-and-left, clear of the
+        // right-side system panel. The body is at (cos,0,sin)·rIns from the ship,
+        // i.e. direction (−cosθ, 0, −sinθ). Screen-left = a larger relative
+        // heading, so we SUBTRACT the bias (see the yaw convention below).
+        const tbx = -Math.cos(angle);
+        const tbz = -Math.sin(angle);
+        ctrl.heading = Math.atan2(tbx, tbz) - ORBIT_FRAME_YAW_BIAS;
         ctrl.pitch = 0;
         return;
       }
@@ -147,13 +163,16 @@ export function shipMovementSystem(world: World, input: Input): void {
         // pointed at the target so it turns before accelerating. Ramp actual
         // speed toward the target within the accel limit (smooth accelerate-out).
         // Turn in place (speed 0) until roughly pointed at the target, so the
-        // ship doesn't drift the wrong way while it swings onto its heading.
+        // ship doesn't drift the wrong way while it swings onto its heading; then
+        // fly the two-phase body-scaled approach, ramping actual speed within the
+        // accel limit and never stepping past the arrival bubble in one tick.
         const facing = Math.abs(yawDiff) < Math.PI / 4;
-        const vTarget = facing
-          ? trapezoidalSpeed(dist, arriveDist, AUTOPILOT_CRUISE, AUTOPILOT_ACCEL)
-          : 0;
-        const curSpeed = Math.hypot(vel.vx, vel.vy, vel.vz);
-        apSpeed = moveToward(curSpeed, vTarget, AUTOPILOT_ACCEL * FIXED_DT);
+        let vTarget = facing ? approachSpeed(dist, arriveDist, bodyR, AUTOPILOT) : 0;
+        vTarget = Math.min(vTarget, (dist - arriveDist) / FIXED_DT); // no overshoot
+        // Ramp the RELATIVE closing speed (tracked in ctrl, not |vel|, which also
+        // carries the matched body velocity below).
+        apSpeed = moveToward(ctrl.autopilotSpeed ?? 0, vTarget, AUTOPILOT.accel * FIXED_DT);
+        ctrl.autopilotSpeed = apSpeed;
         scripted = true;
       } else {
         // Arrived → insert into orbit. Seed the phase from the current offset so
@@ -165,6 +184,7 @@ export function shipMovementSystem(world: World, input: Input): void {
         );
         ctrl.autopilotActive = false;
         delete ctrl.autopilotTargetId;
+        delete ctrl.autopilotSpeed;
         vel.vx = 0; vel.vy = 0; vel.vz = 0; // no drift-in before orbit-hold
         return;
       }
@@ -181,11 +201,24 @@ export function shipMovementSystem(world: World, input: Input): void {
   const nose = noseVector(ctrl.heading, ctrl.pitch);
 
   if (scripted) {
-    // Autopilot: fly along the nose at the profile speed (auto-throttled — not
-    // capped to the player's gear). No gravity/drag; deterministic point-to-point.
-    vel.vx = apSpeed * nose.x;
-    vel.vy = apSpeed * nose.y;
-    vel.vz = apSpeed * nose.z;
+    // Autopilot: MATCH the target body's velocity + close at the profile speed
+    // along the nose. The body is effectively stationary during approach, so the
+    // slow final approach isn't outrun by the body's own orbital drift (inner
+    // planets drift ~0.03 u/s — as fast as a slow approach). Auto-throttled (not
+    // capped to the player's gear); no gravity/drag; deterministic.
+    let bvx = 0, bvy = 0, bvz = 0;
+    if (ctrl.autopilotTargetId !== undefined) {
+      const T  = world.time * ORBITAL_TIME_RATE;
+      const dT = FIXED_DT * ORBITAL_TIME_RATE;
+      const p1 = bodyWorldPosition(world, ctrl.autopilotTargetId, T);
+      const p0 = bodyWorldPosition(world, ctrl.autopilotTargetId, T - dT);
+      bvx = (p1.x - p0.x) / FIXED_DT;
+      bvy = (p1.y - p0.y) / FIXED_DT;
+      bvz = (p1.z - p0.z) / FIXED_DT;
+    }
+    vel.vx = bvx + apSpeed * nose.x;
+    vel.vy = bvy + apSpeed * nose.y;
+    vel.vz = bvz + apSpeed * nose.z;
   } else {
     // Manual physics: thrust along the nose, then patched-conic gravity from any
     // body whose SOI contains the ship (semi-implicit: update velocity, then

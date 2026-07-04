@@ -10,13 +10,9 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
-import { parkDistance, enterOrbitRange } from "../sim/presentation.ts";
+import { landingRange, enterOrbitRange } from "../sim/presentation.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
 import { viewState } from "../app/view-state.ts";
-
-// Landing is offered a little past the autopilot park point (matches the
-// LANDING_RANGE_FACTOR in commands/apply.ts).
-const LANDING_RANGE_FACTOR = 1.25;
 
 interface SystemPanelProps {
   world: World;
@@ -59,12 +55,20 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
     ? world.components.celestialBody.get(selectedId) ?? null
     : null;
 
+  // Live ship-control state drives the flight-action buttons (mode + gating).
+  const ctrl = world.components.shipControl.get(world.shipId);
+  const autopilotActive = ctrl?.autopilotActive ?? false;
+  const landed = ctrl?.landedBodyId !== undefined;
+  const orbitingId = ctrl?.orbitingBodyId;
+
   function handleSetCourse(entityId: number) {
     dispatch(world, { kind: "SetCourse", bodyId: entityId });
   }
 
+  // AUTOPILOT toggles: engage flight to this body, or cancel back to manual.
   function handleAutopilot(entityId: number) {
-    dispatch(world, { kind: "EngageAutopilot", bodyId: entityId });
+    if (autopilotActive) dispatch(world, { kind: "CancelCourse" });
+    else dispatch(world, { kind: "EngageAutopilot", bodyId: entityId });
   }
 
   function handleEnterOrbit(entityId: number) {
@@ -131,6 +135,9 @@ export default function SystemPanel({ world, bus }: SystemPanelProps) {
             body={selected}
             entityId={selectedId}
             distFromShip={distFromShip(selectedId)}
+            autopilotActive={autopilotActive}
+            landed={landed}
+            orbitingHere={orbitingId === selectedId}
             onSetCourse={handleSetCourse}
             onAutopilot={handleAutopilot}
             onEnterOrbit={handleEnterOrbit}
@@ -219,6 +226,9 @@ function BodyInspector({
   body,
   entityId,
   distFromShip,
+  autopilotActive,
+  landed,
+  orbitingHere,
   onSetCourse,
   onAutopilot,
   onEnterOrbit,
@@ -227,6 +237,9 @@ function BodyInspector({
   body: CelestialBody;
   entityId: number;
   distFromShip: number;
+  autopilotActive: boolean;
+  landed: boolean;
+  orbitingHere: boolean;
   onSetCourse: (id: number) => void;
   onAutopilot: (id: number) => void;
   onEnterOrbit: (id: number) => void;
@@ -234,12 +247,15 @@ function BodyInspector({
 }) {
   // A rocky planet within landing range can be landed on; gas giants/star can't.
   const canLand =
-    body.kind === "planet" &&
-    distFromShip <= parkDistance(body.renderRadius) * LANDING_RANGE_FACTOR;
-  // ENTER ORBIT is offered for any non-star body once you're close enough that
-  // the analytic insertion is a gentle pull-in (matches commands/apply.ts).
+    body.kind === "planet" && !landed && distFromShip <= landingRange(body.renderRadius);
+  // ENTER ORBIT is offered only in MANUAL mode (not autopilot, not already
+  // orbiting here, not landed) and once within the gentle-insertion range.
   const canEnterOrbit =
-    body.kind !== "star" && distFromShip <= enterOrbitRange(body.renderRadius);
+    body.kind !== "star" &&
+    !autopilotActive &&
+    !orbitingHere &&
+    !landed &&
+    distFromShip <= enterOrbitRange(body.renderRadius);
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Name + tag */}
@@ -267,10 +283,16 @@ function BodyInspector({
       {body.kind !== "star" && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <ActionButton label="▶ SET COURSE" color="#89b4fa" bg="#1e3a5f" border="#2a4a7f"
+            enabled={!landed}
             title="Mark this body — draws a heading indicator (does not move the ship)"
             onClick={() => onSetCourse(entityId)} />
-          <ActionButton label="✈ AUTOPILOT" color="#f9e2af" bg="#3a341e" border="#5c4a1e"
-            title="Fly to this body automatically (manual thrust is locked while engaged)"
+          <ActionButton
+            label={autopilotActive ? "✈ AUTOPILOT ON" : "✈ AUTOPILOT"}
+            color="#f9e2af" bg={autopilotActive ? "#5c4a1e" : "#3a341e"} border="#5c4a1e"
+            enabled={!landed}
+            title={autopilotActive
+              ? "Autopilot engaged — click to cancel and return to manual"
+              : "Fly to this body automatically (manual thrust is locked while engaged)"}
             onClick={() => onAutopilot(entityId)} />
           <ActionButton label="◎ ENTER ORBIT" color="#89dceb" bg="#173a44" border="#245c6a"
             enabled={canEnterOrbit}

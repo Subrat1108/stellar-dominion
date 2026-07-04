@@ -9,7 +9,7 @@
 // on the GameBus after the tick.
 
 import type { World } from "../ecs/world.ts";
-import { parkDistance, enterOrbitRange } from "../presentation.ts";
+import { landingRange, enterOrbitRange } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
 import { foundColony, buildStructure, setTerraformAllocation } from "./colony.ts";
 import { beginWarpScan, commitWarp, cancelWarp } from "./warp.ts";
@@ -21,10 +21,6 @@ function distanceToBody(world: World, bodyId: number): number {
   if (!ship || !body) return Infinity;
   return Math.hypot(ship.x - body.x, ship.y - body.y, ship.z - body.z);
 }
-
-// A body counts as "reachable for landing" a little past the autopilot park
-// point, since drag/orbital drift can leave the ship slightly outside it.
-const LANDING_RANGE_FACTOR = 1.25;
 
 /** Validate and apply a command. Mutates `world` only on success. */
 export function applyCommand(world: World, cmd: Command): CommandResult {
@@ -62,6 +58,7 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
         return { ok: false, reason: "cannot autopilot into the star" };
       ctrl.autopilotTargetId = targetId;
       ctrl.autopilotActive = true;
+      ctrl.autopilotSpeed = 0; // ramp closing speed up from rest
       delete ctrl.orbitingBodyId; // leaving any held orbit to fly out
       return { ok: true, events: [{ kind: "AutopilotEngaged", bodyId: targetId, tick }] };
     }
@@ -93,6 +90,7 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
       // Disengage autopilot (and any held orbit) → hand back to manual. The
       // target stays MARKED so the direction indicator persists.
       ctrl.autopilotActive = false;
+      delete ctrl.autopilotSpeed;
       delete ctrl.orbitingBodyId;
       return { ok: true, events: [{ kind: "CourseCancelled", tick }] };
     }
@@ -105,8 +103,7 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
       if (body.kind !== "planet")
         return { ok: false, reason: "only rocky planets have a landable surface" };
       const dist = distanceToBody(world, cmd.bodyId);
-      const reach = parkDistance(body.renderRadius) * LANDING_RANGE_FACTOR;
-      if (dist > reach)
+      if (dist > landingRange(body.renderRadius))
         return { ok: false, reason: "too far from the body — fly closer first" };
       // Touch down: freeze flight, drop autopilot.
       ctrl.landedBodyId = cmd.bodyId;

@@ -12,9 +12,10 @@ import { orbitInsertionRadius, ORBIT_RATE } from "../presentation.ts";
 
 // Sphere of influence as a multiple of the body's (real) render radius. Inside
 // it the ship feels the body; outside every SOI, gravity is zero (free cruise).
-// 12× → an Earth-size world's SOI ≈ 0.10 u; the 1.2R insertion orbit and the
-// enter-orbit range both sit well inside it.
-export const SOI_MULT = 12;
+// 60× → an Earth-size world's SOI ≈ 0.5 u; the 4R insertion orbit, the 10R
+// enter-orbit range, and the autopilot's ~54R slow-approach zone all sit inside
+// it, so gravity is present through the whole close approach.
+export const SOI_MULT = 60;
 
 export function soiRadius(renderRadius: number): number {
   return renderRadius * SOI_MULT;

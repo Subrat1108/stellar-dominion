@@ -170,6 +170,12 @@ export interface ShipControl {
   autopilotTargetId?: number;
   autopilotActive: boolean;
   /**
+   * Autopilot closing speed toward the target (scene u/s, RELATIVE to the body),
+   * ramped within the accel limit for a smooth accelerate-out. Transient; set
+   * while flying, cleared on arrival/cancel.
+   */
+  autopilotSpeed?: number;
+  /**
    * If set, the ship is landed on this body's surface; flight is disabled until
    * a TakeOff command clears it. Set/cleared only by the command layer.
    */

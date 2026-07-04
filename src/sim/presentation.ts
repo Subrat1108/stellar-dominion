@@ -83,13 +83,26 @@ export function parkDistance(renderRadius: number): number {
   return renderRadius * PARK_RADIUS_MULT;
 }
 
-// --- Orbital insertion (Session 20 fix) --------------------------------------
-// On arrival the autopilot settles into a LOW orbit at this multiple of the real
-// radius (centre-distance), so the body fills the view as a curved wall rather
-// than a distant marble. 1.2 → altitude 0.2 R above the surface; tunable 1.1–1.3.
-export const ORBIT_INSERTION_MULT = 1.2;
+// --- Orbital insertion --------------------------------------------------------
+// On arrival the autopilot settles into a low orbit at this multiple of the real
+// radius (centre-distance). At 4R the body subtends ~29° — a clear DISC filling a
+// good part of the view (Polish B: "at least 30% of the screen"), not a curved
+// wall (the old 1.2R filled the whole FOV and read as a wall you couldn't see).
+export const ORBIT_INSERTION_MULT = 4.0;
 export function orbitInsertionRadius(renderRadius: number): number {
   return renderRadius * ORBIT_INSERTION_MULT;
+}
+
+// Orbit framing: face the body but bias the heading so it sits ahead-and-LEFT,
+// clear of the right-side system panel (radians; ~17° left of the nose).
+export const ORBIT_FRAME_YAW_BIAS = 0.3;
+
+// --- Landing reach ------------------------------------------------------------
+// A body is landable from within this centre-distance — larger than the orbit
+// insertion radius so you can LAND straight out of a held low orbit (4R).
+export const LANDING_REACH_MULT = 1.5;
+export function landingRange(renderRadius: number): number {
+  return orbitInsertionRadius(renderRadius) * LANDING_REACH_MULT;
 }
 
 // Low-orbit angular rate (rad / sim-sec). This is THE feel anchor for gravity
@@ -105,10 +118,10 @@ export const ORBIT_RATE = (2 * Math.PI) / LOW_ORBIT_PERIOD_S;
 
 // Manual ENTER ORBIT is offered only within this centre-distance of a body, so
 // the analytic insertion (which snaps to orbitInsertionRadius) is a small, gentle
-// pull-in rather than a jarring jump from far away. A multiple of the insertion
-// radius: 3 × 1.2R = 3.6R, comfortably INSIDE the sphere of influence (12R,
-// math/gravity.ts) — so you are already feeling the well when you enter orbit.
-export const ENTER_ORBIT_REACH_MULT = 3;
+// pull-in rather than a jarring jump from far away. 2.5 × 4R = 10R, comfortably
+// INSIDE the sphere of influence (60R, math/gravity.ts) — so you are already
+// feeling the well when you enter orbit.
+export const ENTER_ORBIT_REACH_MULT = 2.5;
 export function enterOrbitRange(renderRadius: number): number {
   return orbitInsertionRadius(renderRadius) * ENTER_ORBIT_REACH_MULT;
 }
