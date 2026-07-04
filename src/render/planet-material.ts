@@ -104,6 +104,8 @@ export function bodyToVisualParams(body: CelestialBody): PlanetVisualParams {
 // --- GLSL ---------------------------------------------------------------------
 
 const VERT = /* glsl */ `
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   varying vec3 vPos;
   varying vec3 vNormal;     // OBJECT space (bodies are unrotated, so == world space)
   varying vec3 vViewNormal; // VIEW space — only for the camera-facing limb glow
@@ -112,6 +114,11 @@ const VERT = /* glsl */ `
     vNormal = normal;
     vViewNormal = normalize(normalMatrix * normal);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    // Write logarithmic depth (the renderer uses logarithmicDepthBuffer:true).
+    // Without this the custom shader writes LINEAR depth while every built-in
+    // material writes log depth, so the planet fails to occlude the distant
+    // starfield and you see stars THROUGH it. Built-ins do this automatically.
+    #include <logdepthbuf_vertex>
   }
 `;
 
@@ -119,6 +126,8 @@ const VERT = /* glsl */ `
 // branch-free, cheap enough for per-fragment use on integrated GPUs.
 const FRAG = /* glsl */ `
   precision highp float;
+  #include <common>
+  #include <logdepthbuf_pars_fragment>
   varying vec3 vPos;
   varying vec3 vNormal;
   varying vec3 vViewNormal;
@@ -191,6 +200,7 @@ const FRAG = /* glsl */ `
   }
 
   void main(){
+    #include <logdepthbuf_fragment>
     vec3 n=normalize(vNormal);
     float ndl=dot(n,normalize(uLightDir)); // <0 = night-facing
     vec3 sp=normalize(vPos)*2.0+vec3(uSeed*100.0);

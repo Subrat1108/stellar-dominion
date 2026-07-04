@@ -30,6 +30,10 @@ const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per seco
 const ACCEL_RATIO   = 3;
 const DRAG          = 0.98;              // velocity multiplied each tick (open space only)
 const PITCH_LIMIT   = Math.PI / 2 - 0.05; // clamp just shy of straight up/down
+// Per-tick ease factor for the orbit framing (heading/pitch) on insertion, so the
+// view glides from "facing the body" to the left-biased orbit framing instead of
+// snapping ~29°. Cosmetic only (orbit position is analytic). ~0.06 ≈ ¾ s glide.
+const ORBIT_FRAME_EASE = 0.06;
 
 // Autopilot auto-throttle (independent of the player's gear): fast open-space
 // cruise, then a body-scaled slow final approach so the target visibly grows
@@ -112,15 +116,21 @@ export function shipMovementSystem(world: World, input: Input): void {
         vel.vx = (p1.x - p0.x) / FIXED_DT - Math.sin(angle) * rIns * ORBIT_RATE;
         vel.vy = (p1.y - p0.y) / FIXED_DT;
         vel.vz = (p1.z - p0.z) / FIXED_DT + Math.cos(angle) * rIns * ORBIT_RATE;
-        // Face TOWARD the body (so it fills the forward view as a disc) but bias
-        // the heading left, so the body sits ahead-and-left, clear of the
-        // right-side system panel. The body is at (cos,0,sin)·rIns from the ship,
-        // i.e. direction (−cosθ, 0, −sinθ). Screen-left = a larger relative
-        // heading, so we SUBTRACT the bias (see the yaw convention below).
-        const tbx = -Math.cos(angle);
-        const tbz = -Math.sin(angle);
-        ctrl.heading = Math.atan2(tbx, tbz) - ORBIT_FRAME_YAW_BIAS;
-        ctrl.pitch = 0;
+        // Face TOWARD the body (so it fills the forward view) but bias the heading
+        // left, so the body sits ahead-and-left, clear of the right-side panel.
+        // The body is at (cos,0,sin)·rIns from the ship, i.e. direction
+        // (−cosθ, 0, −sinθ). Screen-left = a larger relative heading, so we
+        // SUBTRACT the bias (see the yaw convention below). EASE the heading (and
+        // pitch) toward that target rather than snapping — on arrival the ship is
+        // facing the body directly, and an instant ~29° swing to the framing bias
+        // is a jarring transition. Easing is purely cosmetic here (position is set
+        // analytically above), so it stays deterministic and holds the orbit.
+        const targetHeading = Math.atan2(-Math.cos(angle), -Math.sin(angle)) - ORBIT_FRAME_YAW_BIAS;
+        let dh = targetHeading - ctrl.heading;
+        while (dh >  Math.PI) dh -= 2 * Math.PI;
+        while (dh < -Math.PI) dh += 2 * Math.PI;
+        ctrl.heading += dh * ORBIT_FRAME_EASE;
+        ctrl.pitch += (0 - ctrl.pitch) * ORBIT_FRAME_EASE;
         return;
       }
       delete ctrl.orbitingBodyId; // body gone (e.g. warp swap) — drop orbit
