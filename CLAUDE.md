@@ -42,7 +42,7 @@ Design constraint: **grounded, not pure fantasy.** Star data, orbital mechanics,
 
 ## Session logging protocol (mandatory)
 
-The planning room and future sessions only see what's pushed to the repo. End every session by: (1) appending a `## Session N` entry to `docs/07-devlog.md` (goal, did, decisions, next, open questions); (2) updating the **Current status** block in this file — it is the canonical state snapshot; (3) appending any decisions to `docs/09-decisions.md` with a one-sentence rationale; (4) committing and pushing to GitHub — pushing is what makes work visible to the planning room.
+The planning room and future sessions only see what's pushed to the repo. End every session by: (1) appending a `## Session N` entry to `docs/07-devlog.md` (goal, did, decisions, next, open questions); (2) updating the **Current status** block in this file — it is the canonical state snapshot; (3) appending any decisions to `docs/09-decisions.md` with a one-sentence rationale; (4) updating root `progress.md` (the single start-here file: current-state paragraph + active next step) and, when a session sets design direction, adding/finishing `docs/planning/session-N.md` (the PLANNING-room "why" — design rationale that otherwise lives only in chat; see `docs/planning/README.md`); (5) committing and pushing to GitHub — pushing is what makes work visible to the planning room.
 
 ## Long tasks & checkpointing (don't lose work to context limits)
 

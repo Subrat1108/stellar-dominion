@@ -2,6 +2,8 @@
 
 A running, append-only log. **One short entry per work session.** New entries go at the top. This is how any future session (or AI) reconstructs "where are we and why" cheaply.
 
+> **Resume point (Session 21, in progress — Exploration Polish B):** Commit 0 (docs + `progress.md` + `docs/planning/`) **done**. Next: **Commit 1 — cockpit POV + 2-camera cleanup + SET COURSE direction indicator**. Then Commit 2 (control model + mouse/touchpad steering), Commit 3 (gravity + autopilot auto-throttle + enter-orbit). Plan + rationale in `docs/planning/session-21.md`. All 187 tests green at Commit 0.
+
 Entry template:
 ```
 ## Session N — YYYY-MM-DD
@@ -13,6 +15,14 @@ Entry template:
 ```
 
 ---
+
+## Session 21 — 2026-07-04 — Exploration polish B (cockpit, controls, orbital gravity) — IN PROGRESS
+- **Goal:** Make the exploration/flight leg playable by hand: immersive cockpit view, a real control model (SET COURSE / AUTOPILOT / LAND + manual-vs-autopilot modes + working mouse/touchpad steering), and deterministic patched-conic orbital gravity (the "middle rung"). Render + control + flight-physics only; the sim (colony/terraforming/population), the warp FSM, and the honest-scale body math are untouched. Determinism sacred; all tests green (target ~200+).
+- **Commit split:** (0) docs + `progress.md` + `docs/planning/` scaffolding — **done**; (1) cockpit POV + 2-camera cleanup + SET COURSE direction indicator; (2) control model + mouse/touchpad steering; (3) gravity + autopilot auto-throttle + enter-orbit.
+- **Did (Commit 0):** Added root `progress.md` (single start-here file) + `docs/planning/` (README explaining the BUILD-log vs PLANNING-log convention, a `session-template.md`, and `session-21.md` seeding this session's five planning decisions). Wired maintaining `progress.md` + `docs/planning/session-N.md` into the session-logging protocol in `CLAUDE.md`. Updated `docs/05` (Polish A complete, B active) and logged the gravity revision + control model + camera/steering + scaffolding decisions in `docs/09`.
+- **Decisions (see `docs/planning/session-21.md` + `docs/09` 2026-07-04 rows):** cockpit = canopy overlay (cheap, Direction 1); gravity = tuned-μ patched-conic feel model (sibling of the ship-avatar decision), revising Session-10 arcade-only; control model = SET COURSE/AUTOPILOT/LAND + manual/autopilot modes with thrust locked in autopilot; two cameras only (map leaves the cycle); pointer-lock steering + held-modifier free-look.
+- **Next:** Commit 1 — rebuild the cockpit as first-person canopy POV, drop the map from the `C` cycle, add the SET COURSE direction indicator.
+- **Open questions / to confirm in-browser (this session, when built):** steering feel + clean pointer-lock entry/exit that doesn't fight HUD clicks; the autopilot→manual gravity handoff (no fall-in/jump); a body visibly growing from the cockpit POV.
 
 ## Session 20 — 2026-06-25 — Exploration polish A FIX (ship scale + orbital insertion)
 - **Goal:** Fix the still-wrong exploration feel from polish A. Diagnosis-first (measured before changing): ship avatar 1:11 of a body (too big), autopilot parked at 2.75R = 1.75R altitude (distant marble, not a wall), bodies drift faster than the DOCK throttle (Mira 0.016 u/s > 0.004) so the body slid away / the ship rammed-and-bounced, and a range-dependent transparency. Render + autopilot-arrival behaviour only; determinism/sim untouched.
