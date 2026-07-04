@@ -234,6 +234,41 @@ describe("ship movement system", () => {
     expect(distToBody(world, id)).toBeCloseTo(rIns, 6);
   });
 
+  it("autopilot reliably spirals into orbit from an arbitrary start (no hovering)", () => {
+    // Regression: with velocity-matching the ship used to station-keep just
+    // OUTSIDE the arrival radius and never insert. The spiral + capture band must
+    // reliably reach a stable orbit from an off-axis start with a wrong heading.
+    const world = createStartingSystem();
+    step(world);
+    const { id, body } = firstPlanet(world);
+    const rIns = orbitInsertionRadius(body.renderRadius);
+    const bp = world.components.transform.get(id)!.position;
+    const ship = world.components.transform.get(world.shipId)!;
+    ship.position = { x: bp.x + 30, y: bp.y + 2, z: bp.z - 25 };
+    const ctrl = world.components.shipControl.get(world.shipId)!;
+    ctrl.heading = 2.0; ctrl.pitch = 0.3; // NOT aimed at the body
+    ctrl.autopilotActive = true;
+    ctrl.autopilotTargetId = id;
+    ctrl.autopilotSpeed = 0;
+
+    let inserted = false;
+    for (let i = 0; i < 3000 && !inserted; i++) {
+      step(world, mk({}));
+      if (ctrl.orbitingBodyId !== undefined) inserted = true;
+    }
+    expect(inserted).toBe(true);
+    expect(ctrl.autopilotActive).toBe(false);
+    // Holds a stable orbit at the insertion radius for a while (no drift out).
+    let minD = Infinity, maxD = 0;
+    for (let i = 0; i < 600; i++) {
+      step(world, mk({}));
+      const d = distToBody(world, id);
+      minD = Math.min(minD, d); maxD = Math.max(maxD, d);
+    }
+    expect(minD).toBeCloseTo(rIns, 4);
+    expect(maxD).toBeCloseTo(rIns, 4);
+  });
+
   it("manual flight feels gravity inside a body's SOI (falls toward the star)", () => {
     // The star sits at the sim origin and never drifts, so gravity pull is clean.
     const world = createStartingSystem();

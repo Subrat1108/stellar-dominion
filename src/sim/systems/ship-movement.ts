@@ -49,6 +49,17 @@ const AUTOPILOT: ApproachParams = {
   minRate: 3,         // floor = 3·R per second, so it still arrives (~20 s total)
 };
 
+// Orbital insertion (spiral): within ORBIT_BLEND_MULT·arriveDist the scripted
+// velocity blends from radial-approach toward the orbit TANGENT, so the ship
+// SLIDES into the orbit and is already moving tangentially at arrival — a single
+// continuous motion, no "fly to centre, stop, snap to orbit". The blend is capped
+// below 1 so a little radial closing always remains (otherwise the ship
+// station-keeps just outside arriveDist forever and never inserts); a small
+// capture band then triggers the analytic hold.
+const ORBIT_BLEND_MULT  = 5;    // blend zone = 5 × arrival radius
+const ORBIT_BLEND_MAX   = 0.9;  // max tangential fraction during approach (<1)
+const ORBIT_CAPTURE_BAND = 1.03; // insert when within 3% of the arrival radius
+
 /** Unit nose vector for a given yaw (heading) and pitch. */
 export function noseVector(heading: number, pitch: number): { x: number; y: number; z: number } {
   const cp = Math.cos(pitch);
@@ -142,56 +153,74 @@ export function shipMovementSystem(world: World, input: Input): void {
     }
   }
 
-  // Autopilot: steer the nose toward the target and fly a TRAPEZOIDAL speed
-  // profile (accelerate out → cruise → decelerate), inserting into a low orbit
-  // on arrival. Scripted (velocity set directly, no gravity/drag) so it is a
-  // deterministic point-to-point regime; `scripted` skips the manual physics tail.
+  // Autopilot: fly to the target and SPIRAL into orbit. The scripted velocity
+  // (set directly — no gravity/drag) blends from a body-velocity-matched radial
+  // approach into the orbit tangent as the ship nears, so it slides into orbit
+  // in one continuous motion and hands to the analytic hold moving tangentially.
   let scripted = false;
-  let apSpeed = 0;
+  let svx = 0, svy = 0, svz = 0; // scripted world velocity for this tick
   if (ctrl.autopilotActive && ctrl.autopilotTargetId !== undefined) {
     const tgt = transform.get(ctrl.autopilotTargetId);
     if (tgt) {
       const dx = tgt.position.x - pos.position.x;
       const dy = tgt.position.y - pos.position.y;
       const dz = tgt.position.z - pos.position.z;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-9;
 
       const targetBody = world.components.celestialBody.get(ctrl.autopilotTargetId);
       const bodyR = targetBody?.renderRadius ?? 0.01;
       const arriveDist = orbitInsertionRadius(bodyR);
 
-      if (dist > arriveDist) {
+      if (dist > arriveDist * ORBIT_CAPTURE_BAND) {
+        // Steer the nose to FACE the body (keeps it in view, growing).
         const targetHeading = Math.atan2(dx, dz);
         const targetPitch   = Math.asin(Math.max(-1, Math.min(1, dy / dist)));
-
         let yawDiff = targetHeading - ctrl.heading;
         while (yawDiff >  Math.PI) yawDiff -= 2 * Math.PI;
         while (yawDiff < -Math.PI) yawDiff += 2 * Math.PI;
         const pitchDiff = targetPitch - ctrl.pitch;
-
-        // yaw is negated below when applied to heading (yaw>0 = steer right),
-        // so to drive heading toward targetHeading we negate the sign here too.
+        // yaw is negated below when applied to heading (yaw>0 = steer right).
         yaw   = -Math.sign(yawDiff)  * Math.min(1, Math.abs(yawDiff)   / 0.2);
         pitch = Math.sign(pitchDiff) * Math.min(1, Math.abs(pitchDiff) / 0.2);
-
-        // Trapezoidal target speed by remaining distance; go slow until roughly
-        // pointed at the target so it turns before accelerating. Ramp actual
-        // speed toward the target within the accel limit (smooth accelerate-out).
-        // Turn in place (speed 0) until roughly pointed at the target, so the
-        // ship doesn't drift the wrong way while it swings onto its heading; then
-        // fly the two-phase body-scaled approach, ramping actual speed within the
-        // accel limit and never stepping past the arrival bubble in one tick.
         const facing = Math.abs(yawDiff) < Math.PI / 4;
-        let vTarget = facing ? approachSpeed(dist, arriveDist, bodyR, AUTOPILOT) : 0;
-        vTarget = Math.min(vTarget, (dist - arriveDist) / FIXED_DT); // no overshoot
-        // Ramp the RELATIVE closing speed (tracked in ctrl, not |vel|, which also
-        // carries the matched body velocity below).
-        apSpeed = moveToward(ctrl.autopilotSpeed ?? 0, vTarget, AUTOPILOT.accel * FIXED_DT);
+
+        // Radial closing speed: the two-phase body-scaled slow approach, ramped
+        // within the accel limit, never stepping past arrival in one tick.
+        let vApproach = facing ? approachSpeed(dist, arriveDist, bodyR, AUTOPILOT) : 0;
+        vApproach = Math.min(vApproach, (dist - arriveDist) / FIXED_DT);
+        const apSpeed = moveToward(ctrl.autopilotSpeed ?? 0, vApproach, AUTOPILOT.accel * FIXED_DT);
         ctrl.autopilotSpeed = apSpeed;
+
+        // Spiral blend: 0 (pure radial) at the blend-zone edge → ORBIT_BLEND_MAX
+        // (mostly tangential) near arrival, so the ship curves in and is moving
+        // along the orbit at insertion. Tangent direction matches ORBIT_DIRECTION.
+        const blendStart = arriveDist * ORBIT_BLEND_MULT;
+        const tb = Math.min(ORBIT_BLEND_MAX,
+          Math.max(0, (blendStart - dist) / (blendStart - arriveDist)));
+        const inv = 1 / dist;
+        const rinx = dx * inv, riny = dy * inv, rinz = dz * inv; // unit toward body
+        const ang = Math.atan2(pos.position.z - tgt.position.z, pos.position.x - tgt.position.x);
+        const tanx = -Math.sin(ang) * ORBIT_DIRECTION;
+        const tanz =  Math.cos(ang) * ORBIT_DIRECTION;
+        const orbitSpeed = arriveDist * ORBIT_RATE;
+
+        // Match the body's heliocentric velocity so it holds still on approach.
+        const T  = world.time * ORBITAL_TIME_RATE;
+        const dT = FIXED_DT * ORBITAL_TIME_RATE;
+        const p1 = bodyWorldPosition(world, ctrl.autopilotTargetId, T);
+        const p0 = bodyWorldPosition(world, ctrl.autopilotTargetId, T - dT);
+        const bvx = (p1.x - p0.x) / FIXED_DT;
+        const bvy = (p1.y - p0.y) / FIXED_DT;
+        const bvz = (p1.z - p0.z) / FIXED_DT;
+
+        svx = bvx + rinx * apSpeed * (1 - tb) + tanx * orbitSpeed * tb;
+        svy = bvy + riny * apSpeed * (1 - tb);
+        svz = bvz + rinz * apSpeed * (1 - tb) + tanz * orbitSpeed * tb;
         scripted = true;
       } else {
-        // Arrived → insert into orbit. Seed the phase from the current offset so
-        // X/Z don't jump; orbit-hold (above) takes over next tick.
+        // Arrived → hand to the analytic orbit hold. Position is continuous (seed
+        // the phase from the current offset) and the spiral already left the ship
+        // moving tangentially, so the hold continues it seamlessly — no snap.
         ctrl.orbitingBodyId = ctrl.autopilotTargetId;
         ctrl.orbitAngle = Math.atan2(
           pos.position.z - tgt.position.z,
@@ -200,8 +229,7 @@ export function shipMovementSystem(world: World, input: Input): void {
         ctrl.autopilotActive = false;
         delete ctrl.autopilotTargetId;
         delete ctrl.autopilotSpeed;
-        vel.vx = 0; vel.vy = 0; vel.vz = 0; // no drift-in before orbit-hold
-        return;
+        return; // keep velocity continuous; orbit-hold sets it next tick
       }
     }
   }
@@ -216,24 +244,12 @@ export function shipMovementSystem(world: World, input: Input): void {
   const nose = noseVector(ctrl.heading, ctrl.pitch);
 
   if (scripted) {
-    // Autopilot: MATCH the target body's velocity + close at the profile speed
-    // along the nose. The body is effectively stationary during approach, so the
-    // slow final approach isn't outrun by the body's own orbital drift (inner
-    // planets drift ~0.03 u/s — as fast as a slow approach). Auto-throttled (not
-    // capped to the player's gear); no gravity/drag; deterministic.
-    let bvx = 0, bvy = 0, bvz = 0;
-    if (ctrl.autopilotTargetId !== undefined) {
-      const T  = world.time * ORBITAL_TIME_RATE;
-      const dT = FIXED_DT * ORBITAL_TIME_RATE;
-      const p1 = bodyWorldPosition(world, ctrl.autopilotTargetId, T);
-      const p0 = bodyWorldPosition(world, ctrl.autopilotTargetId, T - dT);
-      bvx = (p1.x - p0.x) / FIXED_DT;
-      bvy = (p1.y - p0.y) / FIXED_DT;
-      bvz = (p1.z - p0.z) / FIXED_DT;
-    }
-    vel.vx = bvx + apSpeed * nose.x;
-    vel.vy = bvy + apSpeed * nose.y;
-    vel.vz = bvz + apSpeed * nose.z;
+    // Autopilot spiral: velocity was computed above (body-velocity-matched radial
+    // approach blended into the orbit tangent). Auto-throttled (not capped to the
+    // player's gear); no gravity/drag; deterministic point-to-point.
+    vel.vx = svx;
+    vel.vy = svy;
+    vel.vz = svz;
   } else {
     // Manual physics: thrust along the nose, then patched-conic gravity from any
     // body whose SOI contains the ship (semi-implicit: update velocity, then
