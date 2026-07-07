@@ -9,7 +9,6 @@ import { steerState } from "../app/steer-state.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import HUD from "./HUD.tsx";
 import SystemPanel from "./SystemPanel.tsx";
-import SectorPanel from "./SectorPanel.tsx";
 import MapView from "./MapView.tsx";
 import DebugPanel from "./DebugPanel.tsx";
 import Minimap from "./Minimap.tsx";
@@ -27,7 +26,6 @@ export default function App({ world, bus }: AppProps) {
     <>
       <HUD world={world} bus={bus} />
       <SystemPanel world={world} bus={bus} />
-      <SectorPanel world={world} bus={bus} />
       <MapView world={world} bus={bus} />
       <Minimap world={world} bus={bus} />
       <Scanner world={world} bus={bus} />

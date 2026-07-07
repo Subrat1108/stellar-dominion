@@ -7,15 +7,17 @@ import { describe, it, expect } from "vitest";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { step, run } from "../src/sim/loop.ts";
 import { beginWarpScan, commitWarp, cancelWarp } from "../src/sim/commands/warp.ts";
-import { warpSystem, SPOOL_TICKS, TRANSIT_TICKS } from "../src/sim/systems/warp.ts";
+import { warpSystem, SPOOL_TICKS, transitTicksForLy } from "../src/sim/systems/warp.ts";
 import { setActiveSystem } from "../src/sim/galaxy.ts";
 import { scanPreview } from "../src/sim/gen/scan.ts";
 import { foundColony } from "../src/sim/commands/colony.ts";
-import { systemIdFor, TAU_CETI_HYG_ID, YZ_CETI_HYG_ID } from "../src/sim/data/sector.ts";
+import { systemIdFor, distanceLyById, TAU_CETI_HYG_ID, YZ_CETI_HYG_ID } from "../src/sim/data/sector.ts";
 import type { World } from "../src/sim/ecs/world.ts";
 
 const TAU_CETI = systemIdFor(TAU_CETI_HYG_ID);
 const YZ_CETI = systemIdFor(YZ_CETI_HYG_ID);
+// Distance-proportional transit (Polish C): the Tau Ceti → YZ Ceti crossing.
+const YZ_TRANSIT_TICKS = transitTicksForLy(distanceLyById(TAU_CETI_HYG_ID, YZ_CETI_HYG_ID));
 
 function bodyNames(world: World): string[] {
   return [...world.components.celestialBody.values()].map((b) => b.name).sort();
@@ -36,11 +38,11 @@ describe("warp FSM transitions", () => {
     expect(world.warp.phase).toBe("spool");
     world.tick++; warpSystem(world);
     expect(world.warp.phase).toBe("transit");
-    expect(world.warp.ticksRemaining).toBe(TRANSIT_TICKS);
+    expect(world.warp.ticksRemaining).toBe(YZ_TRANSIT_TICKS);
 
     // Transit down to arrival.
     let arrived = false;
-    for (let i = 0; i < TRANSIT_TICKS; i++) {
+    for (let i = 0; i < YZ_TRANSIT_TICKS; i++) {
       world.tick++;
       const events = warpSystem(world);
       if (events.some((e) => e.kind === "ArrivedAtSystem")) arrived = true;
@@ -50,10 +52,15 @@ describe("warp FSM transitions", () => {
     expect(world.activeSystemId).toBe(YZ_CETI);
   });
 
-  it("rejects scanning a non-reachable / current system, and warping while landed", () => {
+  it("rejects the current system, out-of-range systems, and warping while landed", () => {
     const world = createStartingSystem("warp-reject");
     expect(beginWarpScan(world, TAU_CETI).ok).toBe(false); // current system
-    expect(beginWarpScan(world, "hyg:16496").ok).toBe(false); // Epsilon Eridani (locked)
+    // Reachability is now distance-based + ungated: Epsilon Eridani (5.46 ly) is
+    // within WARP_RANGE_LY, so it is reachable (was role-locked before Polish C).
+    expect(beginWarpScan(world, "hyg:16496").ok).toBe(true); // Epsilon Eridani
+    world.warp = { phase: "idle", destinationSystemId: null, ticksRemaining: 0 };
+    // A star not in the catalog (or beyond range) is rejected as out of range.
+    expect(beginWarpScan(world, "hyg:99999999").ok).toBe(false);
     world.components.shipControl.get(world.shipId)!.landedBodyId = 999;
     expect(beginWarpScan(world, YZ_CETI).ok).toBe(false); // landed
   });
@@ -167,8 +174,34 @@ describe("warp integration through the loop", () => {
     world.commandQueue.push({ kind: "CommitWarp" });
     step(world);
     expect(world.warp.phase).toBe("spool");
-    run(world, SPOOL_TICKS + TRANSIT_TICKS + 2);
+    run(world, SPOOL_TICKS + YZ_TRANSIT_TICKS + 2);
     expect(world.activeSystemId).toBe(YZ_CETI);
     expect(world.warp.phase).toBe("idle");
+  });
+
+  it("can warp BACK home after leaving (the return-home fix — a UI gate, not state)", () => {
+    const world = createStartingSystem("warp-return-home");
+    const homeBodies = bodyNames(world);
+
+    // Out to YZ Ceti.
+    world.commandQueue.push({ kind: "BeginWarpScan", systemId: YZ_CETI });
+    step(world);
+    world.commandQueue.push({ kind: "CommitWarp" });
+    step(world);
+    run(world, SPOOL_TICKS + YZ_TRANSIT_TICKS + 2);
+    expect(world.activeSystemId).toBe(YZ_CETI);
+
+    // …and back home. The command layer already supported this end-to-end; only
+    // the old SectorPanel UI gate hid the button (home role ≠ "reachable").
+    world.commandQueue.push({ kind: "BeginWarpScan", systemId: TAU_CETI });
+    step(world);
+    expect(world.warp.phase).toBe("scan"); // home accepted as a scan target
+    world.commandQueue.push({ kind: "CommitWarp" });
+    step(world);
+    const homeTransit = transitTicksForLy(distanceLyById(YZ_CETI_HYG_ID, TAU_CETI_HYG_ID));
+    run(world, SPOOL_TICKS + homeTransit + 2);
+    expect(world.activeSystemId).toBe(TAU_CETI);
+    expect(world.warp.phase).toBe("idle");
+    expect(bodyNames(world)).toEqual(homeBodies); // home restored intact
   });
 });

@@ -7,7 +7,7 @@
 
 import type { World } from "../ecs/world.ts";
 import type { CommandResult } from "./types.ts";
-import { isReachableSystem } from "../data/sector.ts";
+import { isWarpReachable } from "../data/sector.ts";
 import { SPOOL_TICKS } from "../systems/warp.ts";
 
 /** Begin (or re-target) a warp scan: select a destination + show its preview. */
@@ -20,8 +20,8 @@ export function beginWarpScan(world: World, systemId: string): CommandResult {
     return { ok: false, reason: "a warp is already in progress" };
   if (systemId === world.activeSystemId)
     return { ok: false, reason: "already in this system" };
-  if (!isReachableSystem(systemId))
-    return { ok: false, reason: "destination is not a reachable system" };
+  if (!isWarpReachable(world.activeSystemId, systemId))
+    return { ok: false, reason: "destination is out of warp range" };
 
   world.warp = { phase: "scan", destinationSystemId: systemId, ticksRemaining: 0 };
   return { ok: true, events: [{ kind: "WarpScanStarted", systemId, tick }] };

@@ -10,11 +10,16 @@ import {
   systemIdFor,
   hygIdFromSystemId,
   distanceLyById,
+  reachableSectorNodes,
+  isWarpReachable,
+  WARP_RANGE_LY,
+  MAX_MAP_NODES,
   TAU_CETI_HYG_ID,
   YZ_CETI_HYG_ID,
   LUYTEN_726_8_HYG_ID,
   EPSILON_ERIDANI_HYG_ID,
 } from "../src/sim/data/sector.ts";
+import { transitTicksForLy, TRANSIT_TICKS, TRANSIT_TICKS_MAX } from "../src/sim/systems/warp.ts";
 import {
   sectorScenePosition,
   sceneDistanceToLy,
@@ -95,5 +100,77 @@ describe("zoom-tier hysteresis", () => {
 
   it("the enter/exit thresholds leave a gap (no flapping at the boundary)", () => {
     expect(SYSTEM_TO_SECTOR_DIST).toBeGreaterThan(SECTOR_TO_SYSTEM_DIST);
+  });
+});
+
+describe("distance-based reachability (Polish C, ungated)", () => {
+  const TAU = systemIdFor(TAU_CETI_HYG_ID);
+  const YZ = systemIdFor(YZ_CETI_HYG_ID);
+
+  it("nearby stars are reachable; a star is never reachable from itself", () => {
+    expect(isWarpReachable(TAU, YZ)).toBe(true); // 1.60 ly ≤ WARP_RANGE_LY
+    expect(isWarpReachable(TAU, TAU)).toBe(false);
+  });
+
+  it("reachability is exactly the WARP_RANGE_LY distance test", () => {
+    for (const node of reachableSectorNodes(TAU)) {
+      if (node.systemId === TAU) continue;
+      expect(node.distanceLy).toBeLessThanOrEqual(WARP_RANGE_LY);
+      expect(isWarpReachable(TAU, node.systemId)).toBe(true);
+    }
+  });
+
+  it("return-home is reachable from a neighbour (the bug was a UI gate)", () => {
+    expect(isWarpReachable(YZ, TAU)).toBe(true);
+  });
+});
+
+describe("ego-centric sector node placement", () => {
+  const TAU = systemIdFor(TAU_CETI_HYG_ID);
+
+  it("centres on the active system (distance 0, listed first) and caps the count", () => {
+    const nodes = reachableSectorNodes(TAU);
+    expect(nodes.length).toBeGreaterThan(1);
+    expect(nodes.length).toBeLessThanOrEqual(MAX_MAP_NODES);
+    expect(nodes[0]!.systemId).toBe(TAU);
+    expect(nodes[0]!.distanceLy).toBe(0);
+  });
+
+  it("is sorted nearest-first and deterministic", () => {
+    const nodes = reachableSectorNodes(TAU);
+    for (let i = 1; i < nodes.length; i++) {
+      expect(nodes[i]!.distanceLy).toBeGreaterThanOrEqual(nodes[i - 1]!.distanceLy);
+    }
+    // Same input → identical ordering (catalog is fixed-order; ties break on id).
+    expect(reachableSectorNodes(TAU).map((n) => n.systemId)).toEqual(nodes.map((n) => n.systemId));
+  });
+
+  it("re-centres when the active system changes (ego-centric)", () => {
+    const yz = systemIdFor(YZ_CETI_HYG_ID);
+    expect(reachableSectorNodes(yz)[0]!.systemId).toBe(yz);
+  });
+
+  it("includes YZ Ceti among Tau Ceti's reachable neighbours", () => {
+    const ids = reachableSectorNodes(TAU).map((n) => n.systemId);
+    expect(ids).toContain(systemIdFor(YZ_CETI_HYG_ID));
+  });
+});
+
+describe("distance-proportional transit duration", () => {
+  it("is monotonic in distance and never below the base", () => {
+    expect(transitTicksForLy(0)).toBe(TRANSIT_TICKS);
+    expect(transitTicksForLy(2)).toBeGreaterThan(transitTicksForLy(1));
+    expect(transitTicksForLy(-5)).toBe(TRANSIT_TICKS); // clamped
+  });
+
+  it("clamps very long hops to the maximum", () => {
+    expect(transitTicksForLy(10_000)).toBe(TRANSIT_TICKS_MAX);
+  });
+
+  it("a farther system takes longer than a nearer one", () => {
+    const near = distanceLyById(TAU_CETI_HYG_ID, YZ_CETI_HYG_ID);
+    const far = distanceLyById(TAU_CETI_HYG_ID, LUYTEN_726_8_HYG_ID);
+    expect(far).toBeGreaterThan(near);
+    expect(transitTicksForLy(far)).toBeGreaterThan(transitTicksForLy(near));
   });
 });

@@ -246,7 +246,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   // shown when the map view is zoomed all the way out (docs/12). The same
   // perspective camera + OrbitControls drive both tiers; a tier flip reframes
   // the camera and kicks an eased fade (viewState.transitionT) for the overlay.
-  const sectorView = buildSectorScene(world.activeSystemId);
+  let sectorView = buildSectorScene(world.activeSystemId);
   let lastSyncMs = performance.now();
 
   // Reused scratch vectors.
@@ -328,6 +328,37 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     mapState.tier = "system";
   }
 
+  // Project the ego-centric sector node handles to screen for the map overlay.
+  function publishSectorNodes(): void {
+    camera.updateMatrixWorld();
+    const el = webgl.domElement;
+    const cw = el.clientWidth, ch = el.clientHeight;
+    const nodes: MapNode[] = [];
+    for (const h of sectorView.getNodes()) {
+      _mapWorld.copy(h.position);
+      const camZ = _mapCam.copy(_mapWorld).applyMatrix4(camera.matrixWorldInverse).z;
+      _mapWorld.project(camera);
+      const onScreen = camZ < 0 && Math.abs(_mapWorld.x) <= 1 && Math.abs(_mapWorld.y) <= 1;
+      const isActive = h.systemId === sectorView.activeSystemId;
+      const typeLabel = isActive
+        ? `${h.node.star.spect ?? "?"} · you are here`
+        : `${h.node.star.spect ?? "?"} · ${h.node.distanceLy.toFixed(2)} ly`;
+      nodes.push({
+        id: h.systemId,
+        systemId: h.systemId,
+        kind: "system",
+        label: h.node.name,
+        typeLabel,
+        screenX: (_mapWorld.x * 0.5 + 0.5) * cw,
+        screenY: (1 - (_mapWorld.y * 0.5 + 0.5)) * ch,
+        onScreen,
+        color: h.colorHex,
+      });
+    }
+    mapState.nodes = nodes;
+    mapState.tier = "sector";
+  }
+
   return {
     sync(w: World) {
       // Hidden by default; the flight path below re-shows it when a target exists.
@@ -384,11 +415,9 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         if (tier !== viewState.mapTier) applyTierFlip(tier);
 
         if (viewState.mapTier === "sector") {
-          // The sector scene is static geometry; just track the active node.
-          sectorView.setActiveSystem(w.activeSystemId);
+          // The sector scene is ego-centric static geometry (rebuilt on warp).
           shipMesh.visible = false;
-          mapState.nodes = []; // sector-tier map nodes wired in the next commit
-          mapState.tier = "sector";
+          publishSectorNodes(); // project star-system nodes → screen for the overlay
           return; // camera driven by OrbitControls; sectorView.scene rendered
         }
 
@@ -509,7 +538,9 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
     rebuildSystem(w: World) {
       buildSystemGraph(w);
-      sectorView.setActiveSystem(w.activeSystemId);
+      // Re-centre the ego-centric sector map on the new active system.
+      sectorView.dispose();
+      sectorView = buildSectorScene(w.activeSystemId);
     },
   };
 }

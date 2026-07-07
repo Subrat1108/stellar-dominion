@@ -70,6 +70,81 @@ export function isReachableSystem(systemId: string): boolean {
   return role === "reachable" || role === "home";
 }
 
+// --- Distance-based reachability (Polish C) -----------------------------------
+// Reachability is now a flat DISTANCE test, ungated ("god mode"): any catalog star
+// within WARP_RANGE_LY of the active system is warpable (the tech-tree gate stays
+// deferred). MAX_MAP_NODES caps how many populate the sector map so it stays
+// legible + cheap. Both are tunables.
+export const WARP_RANGE_LY = 10;   // light-year reach around the active system
+export const MAX_MAP_NODES = 12;   // max sector nodes drawn (incl. the active one)
+
+/** Whether `targetSystemId` is warp-reachable from `activeSystemId` (distance). */
+export function isWarpReachable(activeSystemId: string, targetSystemId: string): boolean {
+  if (targetSystemId === activeSystemId) return false;
+  const a = hygIdFromSystemId(activeSystemId);
+  const b = hygIdFromSystemId(targetSystemId);
+  if (a === undefined || b === undefined) return false;
+  return distanceLyById(a, b) <= WARP_RANGE_LY;
+}
+
+/** A clean display name for a catalog star: the curated name if we have one,
+ *  else the best available catalog identifier (Gliese / HD / HIP / id). */
+export function displayNameFor(star: CatalogStar): string {
+  const curated = SECTOR_STARS.find((s) => s.hygId === star.id);
+  if (curated) return curated.name;
+  const raw = star.name?.trim();
+  if (raw && !/^Gl\s+Gl\b/i.test(raw)) return raw; // skip the mangled "Gl Gl 54.1"
+  if (star.gl) return `Gliese ${star.gl.replace(/^Gl\s*/i, "").trim()}`;
+  if (star.hd) return `HD ${star.hd}`;
+  if (star.hip) return `HIP ${star.hip}`;
+  return `Star ${star.id}`;
+}
+
+/** A star system on the ego-centric sector map (active system + neighbours). */
+export interface MapStarNode {
+  systemId: string;
+  hygId: number;
+  name: string;
+  star: CatalogStar;
+  /** Light-years from the ACTIVE system (0 for the active system itself). */
+  distanceLy: number;
+  /** True if this star has a curated clean name / note (home + first destinations). */
+  curated: boolean;
+  note?: string;
+}
+
+/**
+ * The ego-centric sector node set: the active system (centre, distance 0) plus
+ * every catalog star within WARP_RANGE_LY, nearest first, capped at MAX_MAP_NODES.
+ * Deterministic (catalog is fixed-order; ties broken by hygId). Pure — no renderer.
+ */
+export function reachableSectorNodes(activeSystemId: string): MapStarNode[] {
+  const activeHyg = hygIdFromSystemId(activeSystemId);
+  const activeStar = activeHyg !== undefined ? starById(activeHyg) : undefined;
+  if (!activeStar) return [];
+
+  const curatedById = new Map(SECTOR_STARS.map((s) => [s.hygId, s]));
+  const out: MapStarNode[] = [];
+  for (const star of catalogStars) {
+    const d = star.id === activeStar.id ? 0 : distanceLy(activeStar, star);
+    if (d > WARP_RANGE_LY) continue;
+    const c = curatedById.get(star.id);
+    const node: MapStarNode = {
+      systemId: systemIdFor(star.id),
+      hygId: star.id,
+      name: displayNameFor(star),
+      star,
+      distanceLy: d,
+      curated: c !== undefined,
+    };
+    if (c?.note) node.note = c.note;
+    out.push(node);
+  }
+  // Active first (distance 0), then nearest-first; stable tiebreak on hygId.
+  out.sort((a, b) => a.distanceLy - b.distanceLy || a.hygId - b.hygId);
+  return out.slice(0, MAX_MAP_NODES);
+}
+
 /** Light-year distance between two catalog stars (Euclidean on parsec coords). */
 export function distanceLy(a: CatalogStar, b: CatalogStar): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) * LY_PER_PARSEC;

@@ -16,11 +16,26 @@
 import type { World } from "../ecs/world.ts";
 import type { GameEvent } from "../commands/types.ts";
 import { setActiveSystem } from "../galaxy.ts";
+import { distanceLyById, hygIdFromSystemId } from "../data/sector.ts";
 
 // Phase durations in ticks (60 ticks ≈ 1 s). Short enough to stay snappy, long
 // enough to read as a deliberate, committed sequence.
 export const SPOOL_TICKS = 180; // ~3 s committed countdown
-export const TRANSIT_TICKS = 240; // ~4 s locked sector crossing
+
+// Transit is DISTANCE-PROPORTIONAL (Polish C): a base crossing + a per-light-year
+// term, clamped, so a 1.6 ly hop and a 9 ly hop no longer feel identical. Pure
+// function of the committed distance, so warp stays deterministic. Display + real
+// duration only — no fuel/cost (deferred with the economy layer). `TRANSIT_TICKS`
+// is kept as the BASE (the minimum crossing) for callers that want a constant.
+export const TRANSIT_TICKS = 120;          // ~2 s minimum locked crossing
+export const TRANSIT_TICKS_PER_LY = 48;    // ~0.8 s added per light-year
+export const TRANSIT_TICKS_MAX = 900;      // ~15 s cap on the longest hops
+
+/** Locked-transit duration (ticks) for a jump of `ly` light-years. */
+export function transitTicksForLy(ly: number): number {
+  const raw = TRANSIT_TICKS + TRANSIT_TICKS_PER_LY * Math.max(0, ly);
+  return Math.round(Math.max(TRANSIT_TICKS, Math.min(TRANSIT_TICKS_MAX, raw)));
+}
 
 /** Advance the warp FSM by one tick. Returns any events produced this tick. */
 export function warpSystem(world: World): GameEvent[] {
@@ -33,9 +48,14 @@ export function warpSystem(world: World): GameEvent[] {
   if (w.ticksRemaining > 0) return events;
 
   if (w.phase === "spool") {
-    // Spool complete → enter the locked transit crossing.
+    // Spool complete → enter the locked transit crossing. Its duration scales with
+    // the departure→destination distance (world.activeSystemId is still the
+    // departure system until ARRIVE swaps it below).
     w.phase = "transit";
-    w.ticksRemaining = TRANSIT_TICKS;
+    const fromHyg = hygIdFromSystemId(world.activeSystemId);
+    const toHyg = hygIdFromSystemId(w.destinationSystemId ?? "");
+    const ly = fromHyg !== undefined && toHyg !== undefined ? distanceLyById(fromHyg, toHyg) : 0;
+    w.ticksRemaining = transitTicksForLy(ly);
     events.push({ kind: "WarpPhaseChanged", phase: "transit", systemId: w.destinationSystemId, tick });
     return events;
   }
