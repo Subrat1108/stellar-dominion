@@ -26,6 +26,7 @@ import {
 } from "../sim/data/sector.ts";
 import { SPOOL_TICKS, transitTicksForLy } from "../sim/systems/warp.ts";
 import { scanPreview } from "../sim/gen/scan.ts";
+import { galaxyNodeById } from "../sim/data/galaxies.ts";
 import BodyDetails, { ProvenanceTag } from "./BodyDetails.tsx";
 
 interface MapViewProps {
@@ -38,8 +39,6 @@ export default function MapView({ world, bus }: MapViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (viewState.view !== "map") return null;
-  // Galactic / intergalactic scaffold tiers are wired in the next commit.
-  if (viewState.mapTier !== "system" && viewState.mapTier !== "sector") return null;
 
   const nodes = mapState.nodes;
   const selected = selectedId ? nodes.find((n) => n.id === selectedId) ?? null : null;
@@ -61,6 +60,9 @@ export default function MapView({ world, bus }: MapViewProps) {
       )}
       {selected?.systemId !== undefined && (
         <SystemNodePopup world={world} systemId={selected.systemId} onClose={() => setSelectedId(null)} />
+      )}
+      {selected?.kind === "galaxy" && (
+        <GalaxyNodePopup nodeId={selected.id} onClose={() => setSelectedId(null)} />
       )}
 
       {showWarpStatus && <WarpStatusBanner world={world} />}
@@ -325,6 +327,32 @@ function ScanReadout({ world, systemId }: { world: World; systemId: string }) {
       </div>
       {p.hazardLabel && <div style={{ color: "#f9e2af", fontSize: 10, marginTop: 2 }}>⚠ {p.hazardLabel}</div>}
       <div style={{ color: "#45475a", fontSize: 9, marginTop: 2 }}>Detail resolves on arrival.</div>
+    </div>
+  );
+}
+
+// --- Galactic / intergalactic tier: a LOCKED scaffold node -------------------
+function GalaxyNodePopup({ nodeId, onClose }: { nodeId: string; onClose: () => void }) {
+  const node = galaxyNodeById(nodeId);
+  if (!node) return null;
+  return (
+    <div className="interactive" style={popupStyle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div>
+          <div style={{ fontWeight: "bold", fontSize: 14 }}>{node.name}</div>
+          <div style={{ color: "#585b70", fontSize: 11, marginTop: 2 }}>{node.typeLabel}</div>
+        </div>
+        <CloseButton onClose={onClose} />
+      </div>
+      <p style={{ color: "#a6adc8", fontSize: 11, lineHeight: 1.5, margin: "8px 0" }}>{node.description}</p>
+      <div
+        style={{
+          display: "inline-block", padding: "3px 8px", fontSize: 10, letterSpacing: 1,
+          color: "#585b70", background: "#1e2030", border: "1px solid #313244", borderRadius: 3,
+        }}
+      >
+        🔒 LOCKED — future expansion
+      </div>
     </div>
   );
 }

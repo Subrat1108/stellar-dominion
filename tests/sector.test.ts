@@ -24,9 +24,12 @@ import {
   sectorScenePosition,
   sceneDistanceToLy,
   nextMapTier,
+  tierDefaultCamDist,
+  TIER_ORDER,
   SYSTEM_TO_SECTOR_DIST,
   SECTOR_TO_SYSTEM_DIST,
 } from "../src/render/sector-layout.ts";
+import { GALACTIC_NODES, INTERGALACTIC_NODES, galaxyNodeById } from "../src/sim/data/galaxies.ts";
 
 describe("sector neighbourhood table", () => {
   it("has Tau Ceti (home), YZ Ceti + Luyten 726-8 (reachable), Epsilon Eridani (locked)", () => {
@@ -100,6 +103,56 @@ describe("zoom-tier hysteresis", () => {
 
   it("the enter/exit thresholds leave a gap (no flapping at the boundary)", () => {
     expect(SYSTEM_TO_SECTOR_DIST).toBeGreaterThan(SECTOR_TO_SYSTEM_DIST);
+  });
+});
+
+describe("full zoom continuum (intra → intergalactic)", () => {
+  it("has all five tiers, inner → outer", () => {
+    expect(TIER_ORDER).toEqual(["intra", "system", "sector", "galactic", "intergalactic"]);
+  });
+
+  it("flips one step at each boundary, with hysteresis", () => {
+    // intra ↔ system
+    expect(nextMapTier("intra", 100)).toBe("intra");
+    expect(nextMapTier("intra", 200)).toBe("system");
+    expect(nextMapTier("system", 100)).toBe("intra");
+    // sector ↔ galactic
+    expect(nextMapTier("sector", 5000)).toBe("galactic");
+    expect(nextMapTier("galactic", 300)).toBe("sector");
+    // galactic ↔ intergalactic
+    expect(nextMapTier("galactic", 15000)).toBe("intergalactic");
+    expect(nextMapTier("intergalactic", 1000)).toBe("galactic");
+  });
+
+  it("only ever moves ONE tier per call, even far past a threshold", () => {
+    expect(nextMapTier("intra", 999999)).toBe("system"); // not straight to sector
+    expect(nextMapTier("intergalactic", 0)).toBe("galactic"); // not straight to sector
+  });
+
+  it("each tier has a positive default framing distance", () => {
+    // Not monotonic across tiers — each tier frames its own content scale (the
+    // sector nodes are tighter than the system span, so its default is smaller).
+    for (const tier of TIER_ORDER) expect(tierDefaultCamDist(tier)).toBeGreaterThan(0);
+  });
+});
+
+describe("LOCKED galaxy scaffold", () => {
+  it("galactic tier has the Milky Way (home) + named galaxies", () => {
+    const ids = GALACTIC_NODES.map((n) => n.id);
+    expect(ids).toContain("gx:milkyway");
+    expect(GALACTIC_NODES.length).toBeGreaterThanOrEqual(3);
+    expect(GALACTIC_NODES.every((n) => n.tier === "galactic")).toBe(true);
+  });
+
+  it("intergalactic tier has the Local Group + clusters", () => {
+    const ids = INTERGALACTIC_NODES.map((n) => n.id);
+    expect(ids).toContain("ig:localgroup");
+    expect(INTERGALACTIC_NODES.every((n) => n.tier === "intergalactic")).toBe(true);
+  });
+
+  it("looks up any scaffold node by id", () => {
+    expect(galaxyNodeById("gx:andromeda")?.name).toBe("Andromeda (M31)");
+    expect(galaxyNodeById("nope")).toBeUndefined();
   });
 });
 

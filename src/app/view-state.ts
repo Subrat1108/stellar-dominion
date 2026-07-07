@@ -4,8 +4,12 @@
 
 export type CameraView = "cockpit" | "chase" | "map";
 
-/** Within the map view, which zoom tier is active (docs/12 multi-scale map). */
-export type MapTier = "system" | "sector";
+/**
+ * Within the map view, which zoom tier is active (docs/12 multi-scale map).
+ * One continuous zoom continuum (Polish C): a body + its moons → the active star
+ * system → the reachable stellar neighbourhood → the LOCKED galaxy scaffold.
+ */
+export type MapTier = "intra" | "system" | "sector" | "galactic" | "intergalactic";
 
 export const viewState: {
   view: CameraView;

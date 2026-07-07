@@ -37,26 +37,56 @@ export function sceneDistanceToLy(sceneDistance: number): number {
   return sceneDistance / SECTOR_SCALE_PER_LY;
 }
 
-export type MapTier = "system" | "sector";
+export type MapTier = "intra" | "system" | "sector" | "galactic" | "intergalactic";
 
-// Hysteresis: zooming the system map out past ENTER switches to the sector tier;
-// zooming the sector view back in past EXIT returns to the system tier. The gap
-// between the two (and the per-tier default camera distances) prevents flapping
-// at the boundary.
-export const SYSTEM_TO_SECTOR_DIST = 3000; // OrbitControls distance in the system tier
-export const SECTOR_TO_SYSTEM_DIST = 220; // OrbitControls distance in the sector tier
-export const SECTOR_DEFAULT_CAM_DIST = 900; // frames the curated nodes on entry
-export const SYSTEM_DEFAULT_CAM_DIST = 1080; // re-frames the system on return
+// The zoom continuum, inner → outer. nextMapTier walks ONE step along it per flip.
+export const TIER_ORDER: readonly MapTier[] = ["intra", "system", "sector", "galactic", "intergalactic"];
+
+// Legacy names kept (existing tests + scene.ts import these).
+export const SYSTEM_TO_SECTOR_DIST = 3000; // system → sector when zoomed out past this
+export const SECTOR_TO_SYSTEM_DIST = 220;  // sector → system when zoomed in past this
+
+// Per-tier default camera distances (used on a tier flip to reframe the view).
+export const INTRA_DEFAULT_CAM_DIST = 90;
+export const SYSTEM_DEFAULT_CAM_DIST = 1080;
+export const SECTOR_DEFAULT_CAM_DIST = 900;
+export const GALACTIC_DEFAULT_CAM_DIST = 2500;
+export const INTERGALACTIC_DEFAULT_CAM_DIST = 9000;
+
+/** Camera distance to frame a tier when it becomes active. */
+export function tierDefaultCamDist(tier: MapTier): number {
+  switch (tier) {
+    case "intra": return INTRA_DEFAULT_CAM_DIST;
+    case "system": return SYSTEM_DEFAULT_CAM_DIST;
+    case "sector": return SECTOR_DEFAULT_CAM_DIST;
+    case "galactic": return GALACTIC_DEFAULT_CAM_DIST;
+    case "intergalactic": return INTERGALACTIC_DEFAULT_CAM_DIST;
+  }
+}
+
+// Boundary between TIER_ORDER[i] (inner) and TIER_ORDER[i+1] (outer). `up` = zoom
+// OUT to the outer tier when cameraDistance exceeds it; `down` = zoom IN to the
+// inner tier when cameraDistance falls below it. up > down leaves a hysteresis gap.
+interface TierBoundary { up: number; down: number }
+const BOUNDARIES: readonly TierBoundary[] = [
+  { up: 150,   down: 120 },   // intra ↔ system
+  { up: SYSTEM_TO_SECTOR_DIST, down: SECTOR_TO_SYSTEM_DIST }, // system ↔ sector
+  { up: 4000,  down: 400 },    // sector ↔ galactic
+  { up: 12000, down: 1200 },   // galactic ↔ intergalactic
+];
 
 /**
  * Decide the map tier from the current camera distance, given the current tier
- * (hysteretic — only flips when the relevant threshold is crossed).
+ * (hysteretic — only flips one step when the relevant threshold is crossed).
  */
 export function nextMapTier(current: MapTier, cameraDistance: number): MapTier {
-  if (current === "system") {
-    return cameraDistance > SYSTEM_TO_SECTOR_DIST ? "sector" : "system";
-  }
-  return cameraDistance < SECTOR_TO_SYSTEM_DIST ? "system" : "sector";
+  const i = TIER_ORDER.indexOf(current);
+  if (i < 0) return current;
+  // Zoom out to the next-outer tier.
+  if (i < TIER_ORDER.length - 1 && cameraDistance > BOUNDARIES[i]!.up) return TIER_ORDER[i + 1]!;
+  // Zoom in to the next-inner tier.
+  if (i > 0 && cameraDistance < BOUNDARIES[i - 1]!.down) return TIER_ORDER[i - 1]!;
+  return current;
 }
 
 /** Eased 0→1 transition progress (smoothstep) for cross-fading the two tiers. */

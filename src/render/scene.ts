@@ -29,10 +29,12 @@ import { nearestBodyId, markerScreenPosition } from "../app/nav.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
 import { buildGasGiantRing, buildKuiperBelt } from "./debris-field.ts";
 import { buildSectorScene } from "./sector-scene.ts";
+import { buildGalaxyScene } from "./galaxy-scene.ts";
 import {
   nextMapTier,
-  SECTOR_DEFAULT_CAM_DIST,
-  SYSTEM_DEFAULT_CAM_DIST,
+  tierDefaultCamDist,
+  INTRA_DEFAULT_CAM_DIST,
+  type MapTier as LayoutTier,
 } from "./sector-layout.ts";
 
 export interface Renderer {
@@ -71,7 +73,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     // Honest scale spans ~0.001 u (ship) → 12000 u (starfield): a tiny near plane
     // plus a logarithmic depth buffer (below) keeps that huge range from z-fighting.
     0.0002,
-    12000, // far plane clears the ~700 u system + the distant starfield
+    60000, // far plane clears the ~700 u system, the starfield, + the galaxy tiers
   );
 
   const webgl = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
@@ -96,7 +98,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const controls = new OrbitControls(camera, webgl.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxDistance = 6000;
+  controls.maxDistance = 25000; // reaches the galactic / intergalactic scaffold tiers
   controls.enabled = false; // only in map view
 
   // --- Mouse / touchpad flight control (control redesign, Session 21) ---
@@ -157,9 +159,10 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
       if (e.deltaY > 0) { lastZoomSwitch = now; setView("map"); } // scroll out → map
       return;
     }
-    if (e.deltaY < 0 && viewState.mapTier === "system") {
+    if (e.deltaY < 0 && viewState.mapTier === "intra") {
+      // Deepest zoom-in resolves back into the flyable system view (docs/09).
       const camDist = camera.position.distanceTo(controls.target);
-      if (camDist < SYSTEM_DEFAULT_CAM_DIST * 0.5) { lastZoomSwitch = now; setView("cockpit"); }
+      if (camDist < INTRA_DEFAULT_CAM_DIST * 0.6) { lastZoomSwitch = now; setView("cockpit"); }
     }
   }, { passive: false });
 
@@ -247,6 +250,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   // perspective camera + OrbitControls drive both tiers; a tier flip reframes
   // the camera and kicks an eased fade (viewState.transitionT) for the overlay.
   let sectorView = buildSectorScene(world.activeSystemId);
+  // Galaxy scaffold (galactic + intergalactic tiers) — static, built once.
+  const galaxyView = buildGalaxyScene();
   let lastSyncMs = performance.now();
 
   // Reused scratch vectors.
@@ -279,13 +284,13 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     }
   }
 
-  // Reframe the camera when the map crosses between system and sector tiers,
-  // and kick the eased cross-fade overlay.
-  function applyTierFlip(tier: "system" | "sector"): void {
+  // Reframe the camera when the map crosses a zoom tier, and kick the eased
+  // cross-fade overlay. Works for the whole continuum (intra → intergalactic).
+  function applyTierFlip(tier: LayoutTier): void {
     viewState.mapTier = tier;
     viewState.transitionT = 1;
     controls.target.set(0, 0, 0);
-    const dist = tier === "sector" ? SECTOR_DEFAULT_CAM_DIST : SYSTEM_DEFAULT_CAM_DIST;
+    const dist = tierDefaultCamDist(tier);
     camera.position.set(0, dist * 0.55, dist * 0.83).setLength(dist);
     controls.update();
   }
@@ -359,6 +364,32 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     mapState.tier = "sector";
   }
 
+  // Project the LOCKED galaxy scaffold nodes for the active outer tier.
+  function publishGalaxyNodes(tier: "galactic" | "intergalactic"): void {
+    camera.updateMatrixWorld();
+    const el = webgl.domElement;
+    const cw = el.clientWidth, ch = el.clientHeight;
+    const nodes: MapNode[] = [];
+    for (const h of galaxyView.getNodes(tier)) {
+      _mapWorld.copy(h.position);
+      const camZ = _mapCam.copy(_mapWorld).applyMatrix4(camera.matrixWorldInverse).z;
+      _mapWorld.project(camera);
+      const onScreen = camZ < 0 && Math.abs(_mapWorld.x) <= 1 && Math.abs(_mapWorld.y) <= 1;
+      nodes.push({
+        id: h.id,
+        kind: "galaxy",
+        label: h.node.name,
+        typeLabel: h.node.typeLabel,
+        screenX: (_mapWorld.x * 0.5 + 0.5) * cw,
+        screenY: (1 - (_mapWorld.y * 0.5 + 0.5)) * ch,
+        onScreen,
+        color: h.colorHex,
+      });
+    }
+    mapState.nodes = nodes;
+    mapState.tier = tier;
+  }
+
   return {
     sync(w: World) {
       // Hidden by default; the flight path below re-shows it when a target exists.
@@ -414,19 +445,27 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         const tier = nextMapTier(viewState.mapTier, camDist);
         if (tier !== viewState.mapTier) applyTierFlip(tier);
 
-        if (viewState.mapTier === "sector") {
+        const t = viewState.mapTier;
+        if (t === "galactic" || t === "intergalactic") {
+          // LOCKED galaxy scaffold — static scene, project its nodes.
+          shipMesh.visible = false;
+          publishGalaxyNodes(t);
+          return; // galaxyView.scene rendered
+        }
+        if (t === "sector") {
           // The sector scene is ego-centric static geometry (rebuilt on warp).
           shipMesh.visible = false;
           publishSectorNodes(); // project star-system nodes → screen for the overlay
           return; // camera driven by OrbitControls; sectorView.scene rendered
         }
 
-        // System tier: true coordinates; ship drawn at real position as a marker.
+        // intra + system tiers: true coordinates; ship drawn at real position.
         worldRoot.position.set(0, 0, 0);
         shipMesh.position.set(sx, sy, sz);
         shipMesh.scale.setScalar(MAP_MARKER_SCALE); // reads at system scale
         shipMesh.visible = true;
         publishMapNodes(w); // project bodies → screen for the DOM map overlay
+        if (t === "intra") mapState.tier = "intra"; // publishMapNodes sets "system"
         return; // camera driven by OrbitControls
       }
 
@@ -512,8 +551,13 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 
     render() {
       if (viewState.view === "map") controls.update();
-      const useSector = viewState.view === "map" && viewState.mapTier === "sector";
-      webgl.render(useSector ? sectorView.scene : scene, camera);
+      let target = scene;
+      if (viewState.view === "map") {
+        const t = viewState.mapTier;
+        if (t === "sector") target = sectorView.scene;
+        else if (t === "galactic" || t === "intergalactic") target = galaxyView.scene;
+      }
+      webgl.render(target, camera);
     },
 
     resize(width: number, height: number) {
