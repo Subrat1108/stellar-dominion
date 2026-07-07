@@ -2,17 +2,20 @@
 //
 // Lets the player click a body to inspect its physical properties and
 // habitability. Pointer-events enabled only on the panel itself so that
-// OrbitControls keep working over the Three.js canvas.
+// OrbitControls keep working over the Three.js canvas. The detail FIELDS are
+// rendered by the shared <BodyDetails> (also used by the map popup, Polish C);
+// this panel owns the list + the flight-action buttons.
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import type { World } from "../sim/ecs/world.ts";
 import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { landingRange, enterOrbitRange } from "../sim/presentation.ts";
-import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
+import { habitabilityColor } from "../sim/math/habitability.ts";
 import { viewState } from "../app/view-state.ts";
+import BodyDetails, { ProvenanceTag, bodyHexColor } from "./BodyDetails.tsx";
 
 interface SystemPanelProps {
   world: World;
@@ -23,12 +26,6 @@ const KIND_ICON: Record<string, string> = {
   star: "★",
   planet: "◉",
   "gas-giant": "◎",
-};
-
-const TAG_STYLE: Record<string, CSSProperties> = {
-  real: { color: "#a6e3a1", fontSize: 10 },
-  derived: { color: "#89dceb", fontSize: 10 },
-  fictional: { color: "#cba6f7", fontSize: 10 },
 };
 
 export default function SystemPanel({ world, bus }: SystemPanelProps) {
@@ -187,16 +184,14 @@ function BodyRow({
         fontSize: 12,
       }}
     >
-      <span style={{ color: colorForBody(body), fontSize: 14 }}>
+      <span style={{ color: bodyHexColor(body), fontSize: 14 }}>
         {KIND_ICON[body.kind] ?? "·"}
       </span>
       <span style={{ flex: 1 }}>{body.name}</span>
       <span style={{ color: "#45475a", fontSize: 10, minWidth: 40, textAlign: "right" }}>
         {distFromShip.toFixed(0)}u
       </span>
-      {hab !== undefined && (
-        <HabBadge score={hab} />
-      )}
+      {hab !== undefined && <HabBadge score={hab} />}
     </button>
   );
 }
@@ -220,7 +215,7 @@ function HabBadge({ score }: { score: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Body inspector
+// Body inspector — actions + the shared <BodyDetails> field block.
 
 function BodyInspector({
   body,
@@ -271,15 +266,11 @@ function BodyInspector({
               ? "Gas Giant"
               : "Rocky Planet"}
           </span>
-          <span style={TAG_STYLE[body.dataTag] ?? {}}>
-            [{body.dataTag}]
-          </span>
+          <ProvenanceTag tag={body.dataTag} />
         </div>
       </div>
 
-      {/* Flight actions (Polish B control model) — not shown for the star.
-          SET COURSE marks the target (direction indicator); AUTOPILOT flies
-          there; ENTER ORBIT drops into a low orbit when close; LAND touches down. */}
+      {/* Flight actions (Polish B control model) — not shown for the star. */}
       {body.kind !== "star" && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <ActionButton label="▶ SET COURSE" color="#89b4fa" bg="#1e3a5f" border="#2a4a7f"
@@ -307,109 +298,12 @@ function BodyInspector({
         </div>
       )}
 
-      {/* Description */}
-      <p style={{ color: "#a6adc8", fontSize: 11, lineHeight: 1.55 }}>
-        {body.description}
-      </p>
-
-      <Divider />
-
-      {/* Star stats */}
-      {body.kind === "star" && (
-        <>
-          <Row label="Distance from ship" value={`${distFromShip.toFixed(1)} u`} valueColor="#89dceb" />
-          <Row label="Luminosity" value={`${body.luminositySol?.toFixed(3) ?? "?"} L☉`} />
-          <Row label="Temperature" value={`${body.tempK?.toLocaleString() ?? "?"} K`} />
-          <Row
-            label="Mass"
-            value={`${((body.massKg / 1.989e30)).toFixed(3)} M☉`}
-          />
-          <Row
-            label="Spectral type"
-            value={body.spectralType ?? "—"}
-          />
-        </>
-      )}
-
-      {/* Planet / gas-giant stats */}
-      {body.kind !== "star" && (
-        <>
-          <Row
-            label="Orbital distance"
-            value={`${body.orbitalDistanceAu?.toFixed(2) ?? "?"} AU`}
-          />
-          <Row
-            label="Distance from ship"
-            value={`${distFromShip.toFixed(1)} u`}
-            valueColor="#89dceb"
-          />
-          <Row
-            label="Mass"
-            value={`${((body.massKg / 5.972e24)).toFixed(2)} M⊕`}
-          />
-          <Row
-            label="Radius"
-            value={`${((body.radiusM / 6.371e6)).toFixed(2)} R⊕`}
-          />
-        </>
-      )}
-
-      {/* Planet-specific */}
-      {body.kind === "planet" && body.gravityMs2 !== undefined && (
-        <>
-          <Row
-            label="Gravity"
-            value={`${body.gravityMs2.toFixed(2)} m/s² (${(body.gravityMs2 / 9.81).toFixed(2)}g)`}
-          />
-          <Row
-            label="Surface temp"
-            value={`${body.surfaceTempK} K (${((body.surfaceTempK ?? 0) - 273).toFixed(0)} °C)`}
-          />
-
-          {body.atmosphere && (
-            <>
-              <Divider />
-              <div style={{ color: "#a6adc8", fontSize: 11, fontWeight: "bold" }}>
-                Atmosphere
-              </div>
-              <Row
-                label="Pressure"
-                value={`${(body.atmosphere.pressurePa / 101325).toFixed(2)} atm`}
-              />
-              <Row label="Composition" value={body.atmosphere.composition} />
-              <Row
-                label="Toxicity"
-                value={toxicityLabel(body.atmosphere.toxicity)}
-                valueColor={
-                  body.atmosphere.toxicity > 0.7
-                    ? "#f38ba8"
-                    : body.atmosphere.toxicity > 0.3
-                    ? "#fab387"
-                    : "#a6e3a1"
-                }
-              />
-              <Row
-                label="Liquid water"
-                value={body.atmosphere.hasLiquidWater ? "Present" : "None"}
-                valueColor={body.atmosphere.hasLiquidWater ? "#89dceb" : "#585b70"}
-              />
-            </>
-          )}
-
-          {body.habitability !== undefined && (
-            <>
-              <Divider />
-              <HabitabilityDisplay score={body.habitability} />
-            </>
-          )}
-        </>
-      )}
+      <BodyDetails body={body} distFromShip={distFromShip} showEsi />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Small helper components
 
 function ActionButton({
   label, color, bg, border, onClick, title, enabled = true,
@@ -442,73 +336,4 @@ function ActionButton({
       {label}
     </button>
   );
-}
-
-function Row({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-}) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-      <span style={{ color: "#585b70", fontSize: 11 }}>{label}</span>
-      <span style={{ color: valueColor ?? "#cdd6f4", fontSize: 11, textAlign: "right" }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Divider() {
-  return <div style={{ height: 1, background: "#1e2030" }} />;
-}
-
-function HabitabilityDisplay({ score }: { score: number }) {
-  const color = habitabilityColor(score);
-  const label = habitabilityLabel(score);
-  const pct = Math.round(score * 100);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, color: "#a6adc8" }}>Habitability</span>
-        <span style={{ fontSize: 11, color }}>{label}</span>
-      </div>
-      <div
-        style={{
-          height: 6,
-          background: "#1e2030",
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: color,
-            borderRadius: 3,
-          }}
-        />
-      </div>
-      <div style={{ textAlign: "right", fontSize: 10, color }}>
-        {pct}%
-      </div>
-    </div>
-  );
-}
-
-function toxicityLabel(t: number): string {
-  if (t >= 0.9) return "Lethal";
-  if (t >= 0.6) return "Very high";
-  if (t >= 0.3) return "Moderate";
-  if (t >= 0.1) return "Low";
-  return "Safe";
-}
-
-function colorForBody(body: CelestialBody): string {
-  return "#" + body.color.toString(16).padStart(6, "0");
 }

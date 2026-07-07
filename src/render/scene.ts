@@ -24,6 +24,7 @@ import { noseVector } from "../sim/systems/ship-movement.ts";
 import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
 import { steerState } from "../app/steer-state.ts";
+import { mapState, type MapNode, type MapNodeKind } from "../app/map-state.ts";
 import { nearestBodyId, markerScreenPosition } from "../app/nav.ts";
 import { makePlanetMaterial, updatePlanetMaterial } from "./planet-material.ts";
 import { buildGasGiantRing, buildKuiperBelt } from "./debris-field.ts";
@@ -256,6 +257,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const _lightDir = new THREE.Vector3();
   const _targetWorld = new THREE.Vector3();
   const _targetCam   = new THREE.Vector3();
+  const _mapWorld = new THREE.Vector3();
+  const _mapCam   = new THREE.Vector3();
   const _up     = new THREE.Vector3(0, 1, 0);
   const _qLook  = new THREE.Quaternion();
   const _qShip  = new THREE.Quaternion();
@@ -285,6 +288,44 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
     const dist = tier === "sector" ? SECTOR_DEFAULT_CAM_DIST : SYSTEM_DEFAULT_CAM_DIST;
     camera.position.set(0, dist * 0.55, dist * 0.83).setLength(dist);
     controls.update();
+  }
+
+  // Project every body's world position to screen pixels and publish them for the
+  // DOM map overlay (ui/MapView.tsx). System tier only: bodies live in worldRoot
+  // (at (0,0,0) in this tier), so their mesh world position IS their true coord.
+  function publishMapNodes(w: World): void {
+    camera.updateMatrixWorld();
+    const el = webgl.domElement;
+    const cw = el.clientWidth, ch = el.clientHeight;
+    const nodes: MapNode[] = [];
+    for (const [entity, mesh] of bodyMeshes) {
+      const body = w.components.celestialBody.get(entity);
+      if (!body) continue;
+      mesh.getWorldPosition(_mapWorld);
+      const camZ = _mapCam.copy(_mapWorld).applyMatrix4(camera.matrixWorldInverse).z;
+      _mapWorld.project(camera); // → NDC (mutates)
+      const onScreen = camZ < 0 && Math.abs(_mapWorld.x) <= 1 && Math.abs(_mapWorld.y) <= 1;
+      const orb = w.components.orbit.get(entity);
+      const isMoon = orb !== undefined && orb.parent !== starEntity;
+      const kind: MapNodeKind = body.kind === "planet" && isMoon ? "moon" : body.kind;
+      const typeLabel =
+        body.kind === "star" ? (body.spectralType ?? "Star")
+        : body.kind === "gas-giant" ? "Gas Giant"
+        : isMoon ? "Moon" : "Rocky Planet";
+      nodes.push({
+        id: String(entity),
+        entityId: entity,
+        kind,
+        label: body.name,
+        typeLabel,
+        screenX: (_mapWorld.x * 0.5 + 0.5) * cw,
+        screenY: (1 - (_mapWorld.y * 0.5 + 0.5)) * ch,
+        onScreen,
+        color: "#" + body.color.toString(16).padStart(6, "0"),
+      });
+    }
+    mapState.nodes = nodes;
+    mapState.tier = "system";
   }
 
   return {
@@ -346,6 +387,8 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
           // The sector scene is static geometry; just track the active node.
           sectorView.setActiveSystem(w.activeSystemId);
           shipMesh.visible = false;
+          mapState.nodes = []; // sector-tier map nodes wired in the next commit
+          mapState.tier = "sector";
           return; // camera driven by OrbitControls; sectorView.scene rendered
         }
 
@@ -354,6 +397,7 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
         shipMesh.position.set(sx, sy, sz);
         shipMesh.scale.setScalar(MAP_MARKER_SCALE); // reads at system scale
         shipMesh.visible = true;
+        publishMapNodes(w); // project bodies → screen for the DOM map overlay
         return; // camera driven by OrbitControls
       }
 
