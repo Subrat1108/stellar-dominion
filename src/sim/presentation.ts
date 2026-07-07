@@ -163,6 +163,27 @@ export function softStopRadius(renderRadius: number): number {
 export const SHIP_RADIUS = 0.0000034;
 export const SHIP_LENGTH = 0.000015;
 
+// --- Camera rig + depth range (Polish C, "zoom into the ship") ----------------
+// These live here (with the other avatar/scale knobs) so they are one tunable
+// place and unit-testable without the renderer. The ship stays honestly scaled
+// (SHIP_LENGTH above, ~1:470 of a planet); to make it READ as a real craft we
+// bring the third-person camera CLOSER (CHASE_DIST) rather than inflating the
+// ship. Because a close honest-scale ship sits near the render near plane, the
+// near plane is dropped in lock-step (NEAR_PLANE); the logarithmic depth buffer
+// keeps the huge near→far range from z-fighting. CHASE_DIST is THE feel knob;
+// the height/look-at offsets are proportional so the framing angle is preserved.
+//
+// Invariant (tested): the ship's near face (CHASE_DIST − SHIP_LENGTH/2) stays
+// several × NEAR_PLANE so it never clips; a true hero-shot beyond this needs the
+// deferred dedicated ship near-camera layer (2-pass render).
+export const NEAR_PLANE = 0.00002; // render near plane (was 0.0002 pre-Polish-C)
+export const FAR_PLANE  = 60000;   // clears the ~700 u system, starfield + galaxy tiers
+export const CHASE_DIST      = 0.0001;    // scene units behind the ship (THE knob)
+export const CHASE_HEIGHT    = 0.00004;   // scene units above the ship
+export const COCKPIT_FWD     = 0.0000125; // first-person camera just ahead of the nose
+export const CHASE_LOOK_AHEAD = 0.000118; // chase look-at point ahead of the ship
+export const CHASE_LOOK_UP    = 0.0000175; // chase look-at point raised slightly
+
 // --- Thrust / speed (control redesign, Session 21) ---------------------------
 // The speed GEARS are gone: W accelerates and the ship builds up speed over time
 // toward MAX_SPEED (thrust + light drag), S decelerates/reverses, A/D strafe.

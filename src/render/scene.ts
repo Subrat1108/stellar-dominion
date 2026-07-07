@@ -21,7 +21,11 @@ import type { World } from "../sim/ecs/world.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { positionAt } from "../sim/math/kepler.ts";
 import { noseVector } from "../sim/systems/ship-movement.ts";
-import { SHIP_RADIUS, SHIP_LENGTH } from "../sim/presentation.ts";
+import {
+  SHIP_RADIUS, SHIP_LENGTH,
+  NEAR_PLANE, FAR_PLANE,
+  CHASE_DIST, CHASE_HEIGHT, COCKPIT_FWD, CHASE_LOOK_AHEAD, CHASE_LOOK_UP,
+} from "../sim/presentation.ts";
 import { viewState, type CameraView } from "../app/view-state.ts";
 import { steerState } from "../app/steer-state.ts";
 import { mapState, type MapNode, type MapNodeKind } from "../app/map-state.ts";
@@ -48,16 +52,10 @@ export interface Renderer {
   rebuildSystem(world: World): void;
 }
 
-// Chase/cockpit camera constants (scene units). The camera sits ~20 ship-lengths
-// back (CHASE_DIST : SHIP_LENGTH ≈ 0.001 : 0.00005) so the ship reads as a tiny
-// speck, while CHASE_DIST stays ≪ a body radius so the body fills the view as a
-// wall on arrival, and ≥ 5× the near plane (0.0002) so the ship doesn't clip
-// (Session 20 fix). The look-at offsets keep the same framing angle.
-const CHASE_DIST   = 0.001;    // scene units behind ship
-const CHASE_HEIGHT = 0.0004;   // scene units above ship
-const COCKPIT_FWD  = 0.000125; // camera sits just ahead of the cone tip
-const CHASE_LOOK_AHEAD = 0.00118; // chase look-at point ahead of the ship
-const CHASE_LOOK_UP    = 0.000175; // chase look-at point raised slightly
+// Chase/cockpit camera constants now live in presentation.ts (feel knobs, tested).
+// Polish C brings the camera CLOSER (CHASE_DIST 0.001→0.0001) so the primitive
+// ship reads as a real craft, with the near plane dropped in lock-step; honest
+// scale is unchanged (SHIP_LENGTH untouched). See presentation.ts.
 const MAP_MARKER_SCALE = 150000; // enlarge the tiny ship in map view (~7.5 u marker)
 const MARKER_EDGE_MARGIN = 28; // px inset for the off-screen target chevron
 const TRANSITION_SECS = 0.45; // eased cross-fade duration on a map-tier flip
@@ -70,10 +68,12 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
   const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
-    // Honest scale spans ~0.001 u (ship) → 12000 u (starfield): a tiny near plane
-    // plus a logarithmic depth buffer (below) keeps that huge range from z-fighting.
-    0.0002,
-    60000, // far plane clears the ~700 u system, the starfield, + the galaxy tiers
+    // Honest scale spans ~1e-5 u (ship) → tens of thousands u (galaxy tiers): a
+    // tiny near plane + the logarithmic depth buffer (below) keep the huge range
+    // from z-fighting. Both live in presentation.ts (Polish C dropped the near
+    // plane to 0.00002 so the closer chase camera doesn't clip the ship).
+    NEAR_PLANE,
+    FAR_PLANE,
   );
 
   const webgl = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
@@ -593,18 +593,44 @@ export function createRenderer(world: World, canvasParent: HTMLElement): Rendere
 // Mesh builders
 // ---------------------------------------------------------------------------
 
-function buildShipMesh(): THREE.Mesh {
-  const geo = new THREE.ConeGeometry(SHIP_RADIUS, SHIP_LENGTH, 6);
-  geo.rotateX(Math.PI / 2); // point the tip toward +Z
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xcdd6f4,
-    roughness: 0.5,
-    metalness: 0.3,
-    emissive: new THREE.Color(0x89b4fa).multiplyScalar(0.15),
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.name = "ISS Prometheus";
-  return mesh;
+// A primitive-built stylized ship (Polish C) replacing the bare cone: a fuselage
+// (cylinder body + cone nose), two swept wing pods, a rear engine block, and an
+// emissive engine glow. One merged Group (a single avatar object), sized entirely
+// by SHIP_LENGTH/SHIP_RADIUS so honest scale is preserved and one constant tunes
+// it. Two-tone hull so the star-lighting/terminator gives it form as it turns.
+// The nose points +Z (the renderer aligns +Z to the heading via FORWARD_AXIS).
+function buildShipMesh(): THREE.Object3D {
+  const L = SHIP_LENGTH, R = SHIP_RADIUS;
+  const group = new THREE.Group();
+
+  const hull   = new THREE.MeshStandardMaterial({ color: 0xcdd6f4, roughness: 0.42, metalness: 0.55 });
+  const accent = new THREE.MeshStandardMaterial({ color: 0x5a6b8c, roughness: 0.5, metalness: 0.6 });
+  const glow   = new THREE.MeshBasicMaterial({ color: 0x89dceb }); // always-bright engine
+
+  const zAxis = (m: THREE.Mesh) => { m.rotation.x = Math.PI / 2; return m; }; // +Y geo → +Z
+
+  // Fuselage body (cylinder along Z) + nose cone (+Z).
+  const body = zAxis(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.6, R * 0.72, L * 0.5, 12), hull));
+  body.position.z = L * 0.02;
+  const nose = zAxis(new THREE.Mesh(new THREE.ConeGeometry(R * 0.6, L * 0.42, 12), hull));
+  nose.position.z = L * 0.48;
+
+  // Rear engine block (wider, accent) + emissive glow disc.
+  const engine = zAxis(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.85, R * 0.68, L * 0.16, 12), accent));
+  engine.position.z = -L * 0.31;
+  const flame = zAxis(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.5, R * 0.18, L * 0.1, 10), glow));
+  flame.position.z = -L * 0.42;
+
+  // Two swept wing pods (thin angled boxes).
+  const wingGeo = new THREE.BoxGeometry(R * 2.6, R * 0.16, L * 0.34);
+  const wingL = new THREE.Mesh(wingGeo, accent);
+  wingL.position.set(-R * 1.5, 0, -L * 0.06); wingL.rotation.y = 0.42;
+  const wingR = new THREE.Mesh(wingGeo, accent);
+  wingR.position.set(R * 1.5, 0, -L * 0.06); wingR.rotation.y = -0.42;
+
+  group.add(body, nose, engine, flame, wingL, wingR);
+  group.name = "ISS Prometheus";
+  return group;
 }
 
 function buildBodyMesh(body: CelestialBody): THREE.Mesh {
