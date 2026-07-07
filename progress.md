@@ -10,35 +10,36 @@
 The deterministic space-4X sim runs end-to-end: a seeded content engine generates
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
 found colonies, run the resource economy, and terraform (Phases 2–3A). **Exploration
-Polish B (Session 21) is complete + tuned:** an immersive cockpit canopy (cheap CSS
-overlay, first-person POV); a real control model (SET COURSE marks / AUTOPILOT flies
-/ ENTER ORBIT / LAND, manual-vs-autopilot modes, thrust locked in autopilot, the
-AUTOPILOT button toggles); **mouse/touchpad pointer-lock steering** (hold Space to
-free-look); two cameras only (map left the cycle); **deterministic patched-conic
-orbital gravity** (tuned-μ, real SOI/`v_circ`/`v_esc`, seamless autopilot→manual
-handoff, escape velocity); a **spiral orbital insertion** that slides in and orbits
-seamlessly; **solid procedural planets** (fixed the log-depth see-through); and
-**flyable icy planetary rings + a Kuiper belt** for a dramatic sense of scale (tiny
-ship, huge worlds). 221 tests green; typecheck + build + dev-boot clean.
-
-**Control model redesigned (Session 21, latest):** the speed **gears are gone** —
-**W accelerates / S decelerates+reverses / A/D strafe** (four keys, translate only;
-no keyboard steering, no ↑/↓). The ship **builds up speed** over time toward a cap
-(thrust + light drag). **Steering is hold-to-engage** — hold the **left mouse
-button** (or a trackpad **double-tap-and-hold**) and move to aim; release to stop.
-**Two-finger scroll** zooms the map scales when not steering. (Sim `Input` gained a
-`strafe` axis and now sources yaw/pitch only from steering; determinism intact,
-218 tests green.)
+Polish B (Session 21) is complete + tuned** — an immersive cockpit canopy, a real
+control model (SET COURSE / AUTOPILOT / ENTER ORBIT / LAND), pointer-lock steering,
+deterministic patched-conic orbital gravity, a spiral orbital insertion, solid
+procedural planets, and flyable rings + a Kuiper belt. **Exploration Polish C
+(Session 22) is now IN PROGRESS** — the slice that closes the exploration leg:
+the **unified clickable multi-scale map** (one continuous zoom `intra → system →
+sector → galactic(LOCKED) → intergalactic(LOCKED)`, ego-centric on the active
+system, every node labeled + clickable → a detail popup with valid context actions;
+absorbs the old Polish D body-detail panel and subsumes the separate SectorView),
+plus a bundled **primitive-built ship model + closer camera** (4a), a **deepened
+cockpit canopy + gradual manual acceleration** (4b), and the **return-home** fix
+(a UI gate, not a state bug). **218 tests green** at the start of the slice
+(the prior docs' "221" was inaccurate — `vitest run` reports 218).
 
 ## Active next step
 
-**In-browser confirmation of the new control model** (accelerate/strafe feel, top
-speed, hold-to-steer on mouse + trackpad double-tap, two-finger-scroll zoom). All
-feel is user-verified — no browser driver here. Feel knobs: `THRUST_ACCEL` /
-`MAX_SPEED` / `DRAG` (thrust) plus the orbit/framing constants from the earlier
-tuning. After confirmation: **Exploration Polish C** — the unified clickable
-multi-scale map (+ promoting the minimap). Design rationale in
-`docs/planning/session-21.md`.
+**Building Polish C in five commits:** (1) docs *(this commit)* → (2) **map core**
+(shared `app/map-state.ts` ref, `ui/MapView.tsx` labels/clicks/popup, pure
+`bodyActions` valid-actions fn, renderer node-projection, fold `SectorPanel`) →
+(3) **population + drill-down + galaxy scaffold + return-home** (ego-centric
+recenter, distance-based reachability `WARP_RANGE_LY`/`MAX_MAP_NODES`, 5-tier
+hysteresis, `data/galaxies.ts` locked scaffold, scan-gating, `transitTicksForLy`
++ ETA) → (4a) **primitive ship + near-plane/`CHASE_DIST` retune** (isolated so the
+near-plane drop is cleanly revertable; multi-body in-browser depth check) → (4b)
+**cockpit deepen + `thrustAccel` gradual accel**. New pure-fn tests: `bodyActions`,
+tier/placement, `transitTicksForLy`, `thrustAccel` ramp, camera-constant invariants.
+Determinism + honest-scale body math untouched; all 218 tests stay green. Design
+rationale in `docs/planning/session-22.md`. **Scope decision (locked): A** —
+interactive interior fly-through is the active system only; remote scanned-system
+interiors (Scope B) deferred.
 
 ## Links
 
@@ -47,5 +48,3 @@ multi-scale map (+ promoting the minimap). Design rationale in
 - [`docs/05-roadmap.md`](docs/05-roadmap.md) — phased vertical slices; the Exploration-polish A–D sub-phases live here.
 - [`docs/planning/`](docs/planning/) — PLANNING-room decisions per session (the design rationale that otherwise lives only in chat).
 - [`CLAUDE.md`](CLAUDE.md) — project root context + the canonical **Current status** block + working protocols.
-</content>
-</invoke>

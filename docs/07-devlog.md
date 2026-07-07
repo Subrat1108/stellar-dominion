@@ -2,7 +2,7 @@
 
 A running, append-only log. **One short entry per work session.** New entries go at the top. This is how any future session (or AI) reconstructs "where are we and why" cheaply.
 
-> **Resume point (Session 21 — Exploration Polish B — code + in-browser tuning COMPLETE):** Base slice (4 commits) + a **6-commit in-browser feel/fix arc** all done (see the fix-pass subsection in the Session 21 entry): watchable body-scaled approach; disc→close orbit framing (2 R, left bias) + AUTOPILOT-toggle/ENTER-ORBIT gating; slower reversed orbit + tinier ship; **planet log-depth fix (no see-through)** + eased orbit entry; **flyable icy rings + Kuiper belt**; **spiral orbital insertion** (reliable + seamless — fixed the station-keeping "never inserts" bug). **221 tests green**; typecheck + build + dev-boot clean. Debris + solid bodies confirmed in-browser by the user; remaining feel confirmation is the spiral-insertion slide + orbit direction. Next slice: **Exploration Polish C** (unified clickable multi-scale map).
+> **Resume point (Session 22 — Exploration Polish C — IN PROGRESS):** The slice that closes the exploration leg. Plan approved; **commit 1 (docs) done**. Five-commit split: (1) docs → (2) **map core** (shared `app/map-state.ts`, `ui/MapView.tsx` labels/clicks/popup, pure `bodyActions` + tests, renderer node-projection, fold `SectorPanel`) → (3) **population + drill-down + galaxy scaffold + return-home** (ego-centric recenter, distance reachability `WARP_RANGE_LY`/`MAX_MAP_NODES`, 5-tier hysteresis, `data/galaxies.ts` LOCKED scaffold, scan-gating, `transitTicksForLy` + ETA) → (4a) **primitive ship + near-plane/`CHASE_DIST` retune** (isolated; multi-body depth check) → (4b) **cockpit deepen + `thrustAccel` gradual accel**. **Scope A locked** (active-system interior only; remote scanned interiors deferred). New pure-fn tests: `bodyActions`, tier/placement, `transitTicksForLy`, `thrustAccel` ramp, camera-constant invariants. Start baseline **218 tests green** (the Session-21 docs' "221" was inaccurate — `vitest run` reports 218). **Next step: commit 2 (map core).** Rationale in `docs/planning/session-22.md`.
 
 Entry template:
 ```
@@ -15,6 +15,13 @@ Entry template:
 ```
 
 ---
+
+## Session 22 — 2026-07-07 — Exploration polish C (unified map + ship/camera/cockpit/feel) — IN PROGRESS
+- **Goal:** Close the exploration leg. Promote the M-view into THE strategic map — one continuous, clickable, labeled multi-scale map (`intra → system → sector → galactic(LOCKED) → intergalactic(LOCKED)`, ego-centric on the active system; click → detail popup with valid context actions; absorbs Polish D; subsumes the separate SectorView) — and bundle the ship-model / camera-in / cockpit-depth / gradual-accel fixes. No new sim mechanics; determinism + honest-scale body math untouched.
+- **Plan / commit split:** (1) docs → (2) map core → (3) population + drill-down + galaxy scaffold + return-home → (4a) ship model + near-plane/`CHASE_DIST` retune → (4b) cockpit deepen + gradual accel. Scope A locked (active-system interior only). Full rationale in `docs/planning/session-22.md`.
+- **Did (commit 1 — docs):** `docs/09` seven decision rows (unified map / Scope A / distance reachability / return-home-is-a-UI-gate / distance-proportional travel / ship-zoom-is-camera+near-plane / gradual accel); `docs/05` (Polish C active, absorbs D, with the full sub-phase spec); `docs/08` Session-22 subsection (unified map, ship model, camera-in, cockpit depth, gradual accel); `docs/12` Polish-C reconciliation note; `progress.md` rewritten to the in-progress state; `docs/planning/session-22.md` created; this devlog resume point + entry; `CLAUDE.md` Current status.
+- **Return-home root cause (confirmed):** a UI gate, not a state bug — `setActiveSystem` + `isReachableSystem(home)` already support warping home; only `SectorPanel.canScan` (requires `role === "reachable"`, excludes `home`) blocked it. Fixed by the map's per-node WARP action + distance reachability.
+- **Next:** commit 2 — map core.
 
 ## Session 21 — 2026-07-04 — Exploration polish B (cockpit, controls, orbital gravity)
 - **Goal:** Make the exploration/flight leg playable by hand: immersive cockpit view, a real control model (SET COURSE / AUTOPILOT / LAND + manual-vs-autopilot modes + working mouse/touchpad steering), and deterministic patched-conic orbital gravity (the "middle rung"). Render + control + flight-physics only; the sim (colony/terraforming/population), the warp FSM, and the honest-scale body math untouched. Determinism sacred.
