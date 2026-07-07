@@ -60,3 +60,25 @@ export function moveToward(current: number, target: number, maxDelta: number): n
   if (d < -maxDelta) return current - maxDelta;
   return target;
 }
+
+// --- Gradual manual acceleration (Exploration Polish C) ----------------------
+// Manual thrust was a flat acceleration, so a single held press jumped to high
+// speed — uncontrollable for docking. Instead the per-tick acceleration is
+// SPEED-SHAPED: gentle near zero (fine control onto a body) and ramping linearly
+// to a healthy cruise acceleration as the ship builds speed, reaching the full
+// value at `rampSpeed`. Pure + deterministic (a function of the current speed).
+
+export interface ThrustParams {
+  /** Acceleration at rest (scene u/s²) — the gentle docking floor. */
+  accelMin: number;
+  /** Acceleration once cruising (scene u/s²) — the healthy top-end. */
+  accelMax: number;
+  /** Speed (scene u/s) at which the acceleration reaches accelMax. */
+  rampSpeed: number;
+}
+
+/** Speed-shaped thrust acceleration (scene u/s²) for the current speed. */
+export function thrustAccel(speed: number, p: ThrustParams): number {
+  const t = Math.max(0, Math.min(1, Math.abs(speed) / p.rampSpeed));
+  return p.accelMin + (p.accelMax - p.accelMin) * t;
+}

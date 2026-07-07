@@ -190,5 +190,12 @@ export const CHASE_LOOK_UP    = 0.0000175; // chase look-at point raised slightl
 // THRUST_ACCEL sets how fast it builds; with the open-space drag the ship
 // naturally settles near MAX_SPEED after a few seconds of holding W (honest
 // distances are large, so the top speed crosses the ~700 u system in ~7 s).
-export const THRUST_ACCEL = 60; // scene u/s² applied along thrust/strafe
+// THRUST_ACCEL is the CRUISE (top-end) acceleration; manual thrust now RAMPS to
+// it from a gentler floor (Polish C, math/flight.thrustAccel) so a held press
+// builds speed over ~1–2 s and stays controllable for docking, instead of
+// jumping to high speed instantly. THRUST_ACCEL_MIN = the at-rest floor;
+// THRUST_RAMP_SPEED = the speed at which the acceleration reaches THRUST_ACCEL.
+export const THRUST_ACCEL = 60;      // scene u/s² — cruise (top-end) acceleration
+export const THRUST_ACCEL_MIN = 6;   // scene u/s² — gentle acceleration at rest
+export const THRUST_RAMP_SPEED = 40; // scene u/s — speed where accel reaches the max
 export const MAX_SPEED = 110;   // scene u/s hard cap (drag settles a touch below)

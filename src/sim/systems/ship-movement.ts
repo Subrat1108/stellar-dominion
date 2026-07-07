@@ -21,10 +21,12 @@ import {
   ORBIT_FRAME_YAW_BIAS,
   softStopRadius,
   THRUST_ACCEL,
+  THRUST_ACCEL_MIN,
+  THRUST_RAMP_SPEED,
   MAX_SPEED,
 } from "../presentation.ts";
 import { gravParameter, soiRadius, gravityAccel, type GravBody } from "../math/gravity.ts";
-import { approachSpeed, moveToward, type ApproachParams } from "../math/flight.ts";
+import { approachSpeed, moveToward, thrustAccel, type ApproachParams } from "../math/flight.ts";
 import { bodyWorldPosition, ORBITAL_TIME_RATE } from "./orbital.ts";
 
 const TURN_RATE     = Math.PI / 2;       // rad / sim-sec (quarter turn per second)
@@ -87,10 +89,11 @@ export function shipMovementSystem(world: World, input: Input): void {
   }
 
   let { thrust, strafe, yaw, pitch } = input;
-  // Fixed thrust acceleration + speed cap (no gears): W/S/A/D accelerate, the
-  // ship builds up speed toward MAX_SPEED and coasts under light drag.
+  // Speed cap (no gears): W/S/A/D accelerate, the ship builds up speed toward
+  // MAX_SPEED and coasts under light drag. The per-tick acceleration is
+  // speed-shaped (gentle at low speed for docking, ramping to cruise) — computed
+  // in the manual branch below from the current speed.
   const maxSpeed = MAX_SPEED;
-  const accel = THRUST_ACCEL;
 
   const hasManualInput =
     Math.abs(thrust) > 0.01 || Math.abs(strafe) > 0.01 ||
@@ -257,6 +260,15 @@ export function shipMovementSystem(world: World, input: Input): void {
     // integrate below). Drag applies ONLY in open space (outside all SOIs) as the
     // arcade slow-down; inside an SOI it is omitted so an orbit persists and the
     // gravity well is felt when you cut thrust.
+    // Speed-shaped acceleration: gentle near zero (precise docking), ramping to
+    // the cruise value as the ship builds speed, so a held press eases up over
+    // ~1–2 s instead of jumping (Polish C, math/flight.thrustAccel).
+    const curSpeed = Math.hypot(vel.vx, vel.vy, vel.vz);
+    const accel = thrustAccel(curSpeed, {
+      accelMin: THRUST_ACCEL_MIN,
+      accelMax: THRUST_ACCEL,
+      rampSpeed: THRUST_RAMP_SPEED,
+    });
     vel.vx += thrust * accel * nose.x * FIXED_DT;
     vel.vy += thrust * accel * nose.y * FIXED_DT;
     vel.vz += thrust * accel * nose.z * FIXED_DT;
