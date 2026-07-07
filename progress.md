@@ -14,32 +14,34 @@ Polish B (Session 21) is complete + tuned** — an immersive cockpit canopy, a r
 control model (SET COURSE / AUTOPILOT / ENTER ORBIT / LAND), pointer-lock steering,
 deterministic patched-conic orbital gravity, a spiral orbital insertion, solid
 procedural planets, and flyable rings + a Kuiper belt. **Exploration Polish C
-(Session 22) is now IN PROGRESS** — the slice that closes the exploration leg:
-the **unified clickable multi-scale map** (one continuous zoom `intra → system →
-sector → galactic(LOCKED) → intergalactic(LOCKED)`, ego-centric on the active
-system, every node labeled + clickable → a detail popup with valid context actions;
-absorbs the old Polish D body-detail panel and subsumes the separate SectorView),
-plus a bundled **primitive-built ship model + closer camera** (4a), a **deepened
+(Session 22) is CODE-COMPLETE** (in-browser confirmation pending) — the slice that
+closes the exploration leg: the **unified clickable multi-scale map** (one
+continuous zoom `intra → system → sector → galactic(LOCKED) → intergalactic(LOCKED)`,
+ego-centric on the active system, every node labeled + clickable → a detail popup
+with valid context actions; absorbs the old Polish D panel and subsumes the separate
+SectorView), a **primitive-built ship model + closer camera** (4a), a **deepened
 cockpit canopy + gradual manual acceleration** (4b), and the **return-home** fix
-(a UI gate, not a state bug). **218 tests green** at the start of the slice
-(the prior docs' "221" was inaccurate — `vitest run` reports 218).
+(a UI gate, not a state bug). Shipped in six commits (docs → map core → 3a sector
+map/return-home → 3b galaxy scaffold → 4a ship/camera → 4b canopy/accel). **265 tests
+green** (218 baseline + 47 new pure-fn); typecheck + build + dev-boot clean;
+determinism + honest-scale body math untouched.
 
 ## Active next step
 
-**Building Polish C in five commits:** (1) docs *(this commit)* → (2) **map core**
-(shared `app/map-state.ts` ref, `ui/MapView.tsx` labels/clicks/popup, pure
-`bodyActions` valid-actions fn, renderer node-projection, fold `SectorPanel`) →
-(3) **population + drill-down + galaxy scaffold + return-home** (ego-centric
-recenter, distance-based reachability `WARP_RANGE_LY`/`MAX_MAP_NODES`, 5-tier
-hysteresis, `data/galaxies.ts` locked scaffold, scan-gating, `transitTicksForLy`
-+ ETA) → (4a) **primitive ship + near-plane/`CHASE_DIST` retune** (isolated so the
-near-plane drop is cleanly revertable; multi-body in-browser depth check) → (4b)
-**cockpit deepen + `thrustAccel` gradual accel**. New pure-fn tests: `bodyActions`,
-tier/placement, `transitTicksForLy`, `thrustAccel` ramp, camera-constant invariants.
-Determinism + honest-scale body math untouched; all 218 tests stay green. Design
-rationale in `docs/planning/session-22.md`. **Scope decision (locked): A** —
-interactive interior fly-through is the active system only; remote scanned-system
-interiors (Scope B) deferred.
+**User in-browser confirmation of Polish C**, then the next roadmap slice. Confirm:
+(1) the **near-plane multi-body depth check** — nothing goes transparent / z-fights
+at the new 0.00002 near plane (the flagged regression surface; analysis says the
+margin only widened, but there's no display/headless browser in this env to
+screenshot); (2) the map — labels/clicks/popups, ego-centric sector population,
+LOCKED galaxy tiers, zoom-in resolves to flight; (3) **return-home** (warp out → map
+→ warp back to the caught-up colony); (4) the ship reads as a craft + cockpit ↔ chase
+symmetry; (5) the deepened cockpit console; (6) gradual accel (held W builds over
+~1–2 s, not an instant jump). Feel knobs: `CHASE_DIST`/`NEAR_PLANE`/`SHIP_LENGTH`/
+`THRUST_ACCEL*`/`THRUST_RAMP_SPEED` (`presentation.ts`), `WARP_RANGE_LY`/
+`MAX_MAP_NODES` (`sector.ts`), tier thresholds (`sector-layout.ts`). After
+confirmation: **3B terraforming depth** or the **economy/tech layer that gates warp**
+(both parked in `docs/05`). Rationale: `docs/planning/session-22.md`. **Scope A**
+(active-system interior only) shipped; remote scanned interiors (Scope B) deferred.
 
 ## Links
 

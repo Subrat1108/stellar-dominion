@@ -122,3 +122,17 @@ tests only wire to deterministic helpers.
 **Out:** honest-scale body math, determinism, and any economy/terraforming/colony/
 warp-FSM sim change beyond wiring existing commands to map clicks; a modeled 3D
 cockpit interior; real galaxy content; Scope B interiors.
+
+## Outcome
+
+Shipped code-complete in six commits (docs → map core → 3a sector map/return-home
+→ 3b galaxy scaffold → 4a ship/camera → 4b canopy/accel). **265 tests green** (218
+baseline + 47 new pure-fn); typecheck + build + dev-boot clean each commit;
+determinism + honest-scale body math untouched. Return-home confirmed as a UI gate
+(a round-trip test locks it). Remaining: user in-browser confirmation — chiefly the
+0.00002 near-plane multi-body depth check (no display/headless browser in this env
+to screenshot; the analysis is that the surface-to-near-plane margin only widened
+~10×). Notable in-flight decision: "camera closer" required a **near-plane drop**
+(honest scale can't be zoomed by distance alone at the ship's true size), isolated
+in commit 4a so it's cleanly revertable — the dedicated ship near-camera layer for a
+true hero-shot stays deferred.
