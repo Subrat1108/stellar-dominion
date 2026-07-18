@@ -28,6 +28,8 @@ determinism + honest-scale body math untouched.
 
 ## Active next step
 
+**Docs:** `docs/15-design-pillars.md` added (design-pillars authoring session, 2026-07-18) — the design spine (fun loop, player motivation stack, differentiated worlds, the economy spine, progression, and the production/architecture constraints incl. the multi-agent command-layer seam). Docs-only; no code changed. Rationale: `docs/planning/session-23.md`.
+
 **User in-browser confirmation of Polish C**, then the next roadmap slice. Confirm:
 (1) the **near-plane multi-body depth check** — nothing goes transparent / z-fights
 at the new 0.00002 near plane (the flagged regression surface; analysis says the
@@ -48,5 +50,6 @@ confirmation: **3B terraforming depth** or the **economy/tech layer that gates w
 - [`docs/07-devlog.md`](docs/07-devlog.md) — BUILD-room log: what changed each session (newest at top).
 - [`docs/09-decisions.md`](docs/09-decisions.md) — decision log: every architectural/design choice, dated, newest first.
 - [`docs/05-roadmap.md`](docs/05-roadmap.md) — phased vertical slices; the Exploration-polish A–D sub-phases live here.
+- [`docs/15-design-pillars.md`](docs/15-design-pillars.md) — the design spine: fun loop, motivation stack, economy intent, multi-agent seam.
 - [`docs/planning/`](docs/planning/) — PLANNING-room decisions per session (the design rationale that otherwise lives only in chat).
 - [`CLAUDE.md`](CLAUDE.md) — project root context + the canonical **Current status** block + working protocols.

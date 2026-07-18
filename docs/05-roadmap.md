@@ -1,5 +1,7 @@
 # 05 — Roadmap
 
+> **Design spine:** `docs/15-design-pillars.md` is the frame every slice below reads to stay aligned — the fun loop, the player motivation stack, why worlds must be differentiated, the bulk-local/strategic-scarce economy intent, and the multi-agent command-layer seam. Consult it before scoping a new phase.
+
 Built as **vertical slices**: each phase produces something playable end-to-end, not a half-finished layer. We do not start a phase until the previous slice actually works. Phases are deliberately ordered so the hardest scope (galaxy/universe scale, conquest) comes *after* the core loop is proven fun.
 
 > Time estimates are intentionally omitted — this is solo + AI, part-time, over months. Progress is measured by completed slices, logged in `docs/07-devlog.md`.

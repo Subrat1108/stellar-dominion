@@ -16,6 +16,13 @@ Entry template:
 
 ---
 
+## Session 23 — 2026-07-18 — design spine (`docs/15-design-pillars.md`)
+- **Goal:** Write the game's design spine — decisions made in the planning room (fun loop, player motivation stack, differentiated worlds, the economy spine, progression, production/architecture constraints incl. the multi-agent seam) that existed only in chat until now.
+- **Did:** Added `docs/15-design-pillars.md` (7 sections: core fantasy & fun loop; player motivation stack; differentiated worlds; the economy spine — bulk-local/strategic-scarce, soft-gated networked terraforming; progression — colony output → warp reach as the tech-tree seed; production & architecture constraints incl. the HARD multi-agent command-layer seam; pointer to the Deferred/parked list). Docs-only — no code touched.
+- **Decisions:** `docs/09` 2026-07-18 row — the multi-agent-seam HARD RULE (owner-scoped + command-total sim, player is AN owner never THE owner) logged as an architectural decision, generalizing the existing determinism/serializability groundwork (`docs/09` 2026-06-14) into a standing guardrail. `docs/05` now points to `docs/15` at the top. `CLAUDE.md` doc index updated.
+- **Next:** User in-browser confirmation of Exploration Polish C (unchanged, still pending — see the Session-22 resume point), then the next roadmap slice.
+- **Open questions:** none new; see `docs/planning/session-23.md`.
+
 ## Session 22 — 2026-07-07 — Exploration polish C (unified map + ship/camera/cockpit/feel) — IN PROGRESS
 - **Goal:** Close the exploration leg. Promote the M-view into THE strategic map — one continuous, clickable, labeled multi-scale map (`intra → system → sector → galactic(LOCKED) → intergalactic(LOCKED)`, ego-centric on the active system; click → detail popup with valid context actions; absorbs Polish D; subsumes the separate SectorView) — and bundle the ship-model / camera-in / cockpit-depth / gradual-accel fixes. No new sim mechanics; determinism + honest-scale body math untouched.
 - **Plan / commit split:** (1) docs → (2) map core → (3) population + drill-down + galaxy scaffold + return-home → (4a) ship model + near-plane/`CHASE_DIST` retune → (4b) cockpit deepen + gradual accel. Scope A locked (active-system interior only). Full rationale in `docs/planning/session-22.md`.
