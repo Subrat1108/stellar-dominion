@@ -8,6 +8,7 @@ import type { Colony, Terraforming } from "../ecs/components.ts";
 import type { CommandResult } from "./types.ts";
 import type { OwnerId } from "../owner.ts";
 import { hydrosphereGate } from "../math/terraforming.ts";
+import { CANDIDATE_SITE_COUNT } from "../gen/sites.ts";
 import {
   COLONY_SEED,
   FOUNDING_LIFE_SUPPORT_COST,
@@ -33,8 +34,13 @@ export function foundColony(
   world: World,
   bodyId: number,
   actorId: OwnerId = world.localOwnerId,
+  siteIndex = 0,
 ): CommandResult {
   const tick = world.tick;
+  // The chosen landing site (the landing arc, docs/14). Clamp to a valid index;
+  // the site itself is regenerated deterministically from the body seed for
+  // display/modifiers. (Modifier application lands with the site→modifier map.)
+  const chosenSite = Math.max(0, Math.min(CANDIDATE_SITE_COUNT - 1, Math.floor(siteIndex)));
   const ctrl = world.components.shipControl.get(world.shipId);
   if (!ctrl || ctrl.landedBodyId !== bodyId)
     return { ok: false, reason: "must be landed on the body to found a colony" };
@@ -83,6 +89,7 @@ export function foundColony(
     bodyId,
     ownerId: actorId,
     foundedTick: tick,
+    siteIndex: chosenSite,
     stockpiles,
     buildings,
     flows: {},

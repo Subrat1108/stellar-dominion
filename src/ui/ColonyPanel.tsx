@@ -12,6 +12,7 @@ import { dispatch } from "../app/command-bus.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { housingCapacity } from "../sim/systems/colony.ts";
 import TerraformingPanel from "./TerraformingPanel.tsx";
+import SiteSelection from "./SiteSelection.tsx";
 import {
   RESOURCES,
   RESOURCE_LABEL,
@@ -46,22 +47,10 @@ export default function ColonyPanel({ world, bus, bodyId }: ColonyPanelProps) {
 
   const colony = world.components.colony.get(bodyId);
 
-  // No colony yet — offer to found one.
+  // No colony yet — choose a landing site, which founds the colony (the landing
+  // arc, docs/14). The site shapes the founded colony's starting modifiers.
   if (!colony) {
-    return (
-      <div style={{ marginTop: 16 }}>
-        <button
-          onClick={() => dispatch(world, { kind: "FoundColony", bodyId })}
-          style={foundBtn}
-        >
-          ⛶ FOUND COLONY HERE
-        </button>
-        <div style={{ fontSize: 10, color: "#45475a", marginTop: 8 }}>
-          Seeds an outpost from ship supplies (metals, food, propellant, and
-          water + oxygen drawn from the life-support reserve).
-        </div>
-      </div>
-    );
+    return <SiteSelection world={world} bus={bus} bodyId={bodyId} />;
   }
 
   const metals = colony.stockpiles.metals ?? 0;
@@ -224,18 +213,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-const foundBtn: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 12px",
-  fontSize: 12,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  background: "#1e3a5f",
-  color: "#89b4fa",
-  border: "1px solid #2a4a7f",
-  borderRadius: 4,
-  letterSpacing: 0.5,
-};
 
 const buildBtn: React.CSSProperties = {
   padding: "3px 8px",

@@ -30,7 +30,13 @@ determinism + honest-scale body math untouched.
 
 **Active slice — the LANDING ARC (Session 25, in progress).** The first slice of the
 fun loop proper (`docs/15` §1 LAND): make landing a meaningful choice that shapes the
-colony you found. **Commits 1–2 done. Commit 2 (owner-scoping + save migration):**
+colony you found. **Commits 1–3 done. Commit 3 (candidate sites + selection UI):**
+`gen/sites.ts` — pure `generateCandidateSites(universeSeed, body)` (~3 deterministic
+sites from `bodyKey`; latitude/insolation/volatile/slope/radiation/thermal, body-biased);
+`Colony.siteIndex?`/`solarEfficiency?` (optional, additive under v3); `FoundColony` gains
+optional `siteIndex` (clamped, stored, save-round-trips); `ui/SiteSelection.tsx` cards
+wired into ColonyPanel's no-colony branch. **285 tests** (+8 sites, +2 founding). Modifiers
+themselves land in commit 4. **Commit 2 (owner-scoping + save migration):**
 `owner.ts` (`OwnerId`, `LOCAL_PLAYER_OWNER`); `Colony.ownerId`; `world.localOwnerId`; the
 **actor-envelope** command layer (`QueuedCommand {command, actorId}`, `applyCommand(world,
 cmd, actorId=world.localOwnerId)` — a command is identity-free, the actor rides alongside);

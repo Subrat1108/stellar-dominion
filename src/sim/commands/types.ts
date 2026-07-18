@@ -21,7 +21,7 @@ export type Command =
   | { kind: "CancelCourse" }
   | { kind: "LandAtBody"; bodyId: number }
   | { kind: "TakeOff" }
-  | { kind: "FoundColony"; bodyId: number }
+  | { kind: "FoundColony"; bodyId: number; siteIndex?: number }
   | { kind: "BuildStructure"; bodyId: number; building: BuildingType }
   | { kind: "SetTerraformAllocation"; bodyId: number; lever: TerraformLever; fraction: number }
   // Warp (Step 1B): select + preview a destination, commit the jump, or abort.

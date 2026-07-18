@@ -239,6 +239,20 @@ export interface Colony {
    */
   ownerId: string;
   foundedTick: number;
+  /**
+   * Index of the landing site chosen at founding (the landing arc, docs/14).
+   * The site itself is regenerated deterministically from the body seed +
+   * this index (gen/sites.ts) for display; its derived founding modifiers are
+   * applied at founding. Optional/absent for colonies founded before sites
+   * existed (legacy v3 saves) — treated as "no site chosen".
+   */
+  siteIndex?: number;
+  /**
+   * Persistent solar-generation efficiency multiplier from the chosen site
+   * (docs/14 — high insolation → efficient solar). Read on EVERY solar-generation
+   * path (systems/colony.ts). Absent = 1 (legacy/no-site colonies unaffected).
+   */
+  solarEfficiency?: number;
   /** Units in store, keyed by ResourceId (power is always 0 — it is a flow). */
   stockpiles: Record<string, number>;
   /** Count of each building type built, keyed by BuildingType. */
