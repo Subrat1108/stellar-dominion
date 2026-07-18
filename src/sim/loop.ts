@@ -55,12 +55,12 @@ export function step(world: World, input: Input = ZERO_INPUT): GameEvent[] {
   if (world.commandQueue.length > 0) {
     const pending = world.commandQueue;
     world.commandQueue = [];
-    for (const cmd of pending) {
-      const result = applyCommand(world, cmd);
+    for (const { command, actorId } of pending) {
+      const result = applyCommand(world, command, actorId);
       if (result.ok) {
         events.push(...result.events);
       } else {
-        events.push({ kind: "CommandRejected", command: cmd, reason: result.reason, tick: world.tick });
+        events.push({ kind: "CommandRejected", command, reason: result.reason, tick: world.tick });
       }
     }
   }

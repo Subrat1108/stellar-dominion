@@ -6,6 +6,7 @@
 import type { World } from "../ecs/world.ts";
 import type { Colony, Terraforming } from "../ecs/components.ts";
 import type { CommandResult } from "./types.ts";
+import type { OwnerId } from "../owner.ts";
 import { hydrosphereGate } from "../math/terraforming.ts";
 import {
   COLONY_SEED,
@@ -24,9 +25,15 @@ import {
  *   metals + food  ← ship inventory
  *   propellant     ← ship fuel
  *   water + oxygen ← offloaded from the ship's life-support reserve
- * Rejected if the ship is short on any of these.
+ * Rejected if the ship is short on any of these. The colony is stamped with the
+ * founding actor (`actorId`, defaults to the local player) — the multi-agent
+ * seam (docs/15 §6): the founder OWNS it, and owner-aware commands check that.
  */
-export function foundColony(world: World, bodyId: number): CommandResult {
+export function foundColony(
+  world: World,
+  bodyId: number,
+  actorId: OwnerId = world.localOwnerId,
+): CommandResult {
   const tick = world.tick;
   const ctrl = world.components.shipControl.get(world.shipId);
   if (!ctrl || ctrl.landedBodyId !== bodyId)
@@ -74,6 +81,7 @@ export function foundColony(world: World, bodyId: number): CommandResult {
 
   const colony: Colony = {
     bodyId,
+    ownerId: actorId,
     foundedTick: tick,
     stockpiles,
     buildings,
@@ -93,7 +101,12 @@ export function foundColony(world: World, bodyId: number): CommandResult {
  * colony's own stockpile. Requires the colony to exist, the ship to be landed on
  * it, and enough metals in store.
  */
-export function buildStructure(world: World, bodyId: number, building: BuildingType): CommandResult {
+export function buildStructure(
+  world: World,
+  bodyId: number,
+  building: BuildingType,
+  actorId: OwnerId = world.localOwnerId,
+): CommandResult {
   const tick = world.tick;
   const ctrl = world.components.shipControl.get(world.shipId);
   if (!ctrl || ctrl.landedBodyId !== bodyId)
@@ -101,6 +114,8 @@ export function buildStructure(world: World, bodyId: number, building: BuildingT
 
   const colony = world.components.colony.get(bodyId);
   if (!colony) return { ok: false, reason: "no colony here" };
+  if (colony.ownerId !== actorId)
+    return { ok: false, reason: "cannot build in a colony you do not own" };
 
   const def = BUILDINGS[building];
   if (!def) return { ok: false, reason: "unknown structure" };
@@ -127,6 +142,7 @@ export function setTerraformAllocation(
   bodyId: number,
   lever: TerraformLever,
   fraction: number,
+  actorId: OwnerId = world.localOwnerId,
 ): CommandResult {
   const tick = world.tick;
   const ctrl = world.components.shipControl.get(world.shipId);
@@ -135,6 +151,8 @@ export function setTerraformAllocation(
 
   const colony = world.components.colony.get(bodyId);
   if (!colony) return { ok: false, reason: "no colony here to fund terraforming" };
+  if (colony.ownerId !== actorId)
+    return { ok: false, reason: "cannot terraform from a colony you do not own" };
 
   if (!TERRAFORM_LEVER_DEFS[lever])
     return { ok: false, reason: "unknown terraforming lever" };

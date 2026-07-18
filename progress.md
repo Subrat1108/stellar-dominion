@@ -30,7 +30,15 @@ determinism + honest-scale body math untouched.
 
 **Active slice — the LANDING ARC (Session 25, in progress).** The first slice of the
 fun loop proper (`docs/15` §1 LAND): make landing a meaningful choice that shapes the
-colony you found. **Commit 1 (docs) done:** `docs/14-landing-and-surface.md` created
+colony you found. **Commits 1–2 done. Commit 2 (owner-scoping + save migration):**
+`owner.ts` (`OwnerId`, `LOCAL_PLAYER_OWNER`); `Colony.ownerId`; `world.localOwnerId`; the
+**actor-envelope** command layer (`QueuedCommand {command, actorId}`, `applyCommand(world,
+cmd, actorId=world.localOwnerId)` — a command is identity-free, the actor rides alongside);
+`foundColony` stamps the owner; `buildStructure`/`setTerraformAllocation` reject a
+non-owner; `coloniesOfOwner` helper; **`SAVE_VERSION` 2→3** with a reusable migrator chain
+(`save/migrate.ts`, v2→v3 backfills existing colonies to the local player) + `localOwnerId`
+in save meta. **275 tests green** (265 + 6 owner-scoping + 4 save-migration), typecheck +
+build clean. **Commit 1 (docs):** `docs/14-landing-and-surface.md` created
 (aggregate globe, NO tile/AP/rover layer; site science → scalar founding modifiers;
 owner-scoped founding; Fissiles interdependence seed) + `docs/05` (landing arc active),
 `docs/09` (5 rows: candidate-sites model, the **actor-envelope** canonical multi-agent

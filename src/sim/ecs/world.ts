@@ -29,7 +29,8 @@ import {
 } from "./components.ts";
 import type { SystemHazard } from "../gen/types.ts";
 import { makeRng, type Rng } from "../math/rng.ts";
-import type { Command } from "../commands/types.ts";
+import type { Command, QueuedCommand } from "../commands/types.ts";
+import { LOCAL_PLAYER_OWNER, type OwnerId } from "../owner.ts";
 
 export interface World {
   /** Monotonic simulation tick counter (whole ticks since start). */
@@ -46,6 +47,14 @@ export interface World {
    * exact same universe. Transient/identity, not part of the component state.
    */
   universeSeed: string | number;
+  /**
+   * The local player's owner id (the multi-agent seam, docs/15 §6). The player
+   * is AN owner, not THE owner: colonies are stamped with an owner and commands
+   * carry an actor envelope. Single-player uses LOCAL_PLAYER_OWNER; AI/network
+   * owners are additional ids issuing commands through the same layer. Identity/
+   * config (like universeSeed), carried in the save meta.
+   */
+  localOwnerId: OwnerId;
   /**
    * The system whose bodies currently populate the world (Step 1B). One system
    * is fully simulated at a time; warp swaps the world's contents. Stable id
@@ -69,11 +78,12 @@ export interface World {
   /** Entity id of the player's ship. Set by world-setup; 0 = not yet assigned. */
   shipId: number;
   /**
-   * Pending discrete player commands, drained FIFO at the start of each tick
-   * (loop.ts). Transient — not serialised (normally empty at save time); the
-   * resulting state lives in components, which are saved.
+   * Pending discrete commands, each with its issuing actor (the multi-agent
+   * envelope, docs/15 §6), drained FIFO at the start of each tick (loop.ts).
+   * Transient — not serialised (normally empty at save time); the resulting
+   * state lives in components, which are saved.
    */
-  commandQueue: Command[];
+  commandQueue: QueuedCommand[];
 }
 
 export interface WorldInit {
@@ -87,6 +97,7 @@ export function createWorld(init: WorldInit): World {
     nextId: 1,
     rng: makeRng(init.seed),
     universeSeed: init.seed,
+    localOwnerId: LOCAL_PLAYER_OWNER,
     activeSystemId: "",
     discovered: [],
     activeHazard: null,
@@ -103,9 +114,18 @@ export function createEntity(world: World): number {
   return world.nextId++;
 }
 
-/** Queue a discrete player command for application on the next tick. */
-export function enqueueCommand(world: World, command: Command): void {
-  world.commandQueue.push(command);
+/**
+ * Queue a discrete command for application on the next tick, tagged with the
+ * issuing actor (defaults to the local player). The actor rides alongside the
+ * command (the multi-agent envelope) rather than inside it, so the same command
+ * value can be issued by any owner. See owner.ts / docs/09 (2026-07-18).
+ */
+export function enqueueCommand(
+  world: World,
+  command: Command,
+  actorId: OwnerId = world.localOwnerId,
+): void {
+  world.commandQueue.push({ command, actorId });
 }
 
 // --- Serialisation -----------------------------------------------------------

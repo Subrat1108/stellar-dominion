@@ -442,6 +442,19 @@ export function colonyOnBody(world: World, bodyId: number): Colony | undefined {
 }
 
 /**
+ * Every colony owned by `ownerId` (the multi-agent seam, docs/15 §6). The owner-
+ * aware read for any actor-scoped view or AI query; single-player passes
+ * `world.localOwnerId`. Returns [bodyId, colony] pairs in stable iteration order.
+ */
+export function coloniesOfOwner(world: World, ownerId: string): [number, Colony][] {
+  const out: [number, Colony][] = [];
+  for (const [bodyId, colony] of world.components.colony) {
+    if (colony.ownerId === ownerId) out.push([bodyId, colony]);
+  }
+  return out;
+}
+
+/**
  * True when the crew is landed at a colony that still has oxygen — the condition
  * under which the ship's life-support reserve recovers instead of depleting.
  */

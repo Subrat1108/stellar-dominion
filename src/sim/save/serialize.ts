@@ -28,14 +28,29 @@ import type {
 import { createStartingSystem } from "../world-setup.ts";
 import { orbitalSystem } from "../systems/orbital.ts";
 import { collectSystemStash, applyStash, setActiveSystem } from "../galaxy.ts";
+import { LOCAL_PLAYER_OWNER } from "../owner.ts";
+import { migrate } from "./migrate.ts";
 
 export type { BodyOverride } from "../ecs/components.ts";
 
-/** Current save format version — bump when the payload shape changes. */
-export const SAVE_VERSION = 2;
+/**
+ * Current save format version — bump when the payload shape changes, and add a
+ * migrator (save/migrate.ts) so older saves load forward instead of breaking
+ * (the production save-migration rule, docs/15 §6; docs/09 2026-07-18).
+ *   v2 → v3: colonies gain `ownerId` (the multi-agent seam) + site fields.
+ */
+export const SAVE_VERSION = 3;
 
 export interface SaveDeltas {
-  meta: { tick: number; time: number; rngState: number; nextId: number; shipId: number };
+  meta: {
+    tick: number;
+    time: number;
+    rngState: number;
+    nextId: number;
+    shipId: number;
+    /** Local player's owner id (v3+). Older saves default to the local player. */
+    localOwnerId?: string;
+  };
   ship: {
     transform?: Transform;
     shipVelocity?: ShipVelocity;
@@ -101,6 +116,7 @@ export function extractDeltas(world: World): SavePayload {
         rngState: world.rng.state,
         nextId: world.nextId,
         shipId,
+        localOwnerId: world.localOwnerId,
       },
       ship,
       activeSystemId: world.activeSystemId,
@@ -112,9 +128,11 @@ export function extractDeltas(world: World): SavePayload {
 
 /** Rebuild a world from a SavePayload: regenerate from seed, then apply deltas. */
 export function reconstructWorld(payload: SavePayload): World {
-  if (payload.version !== SAVE_VERSION) {
-    throw new Error(`Unsupported save version ${payload.version} (expected ${SAVE_VERSION})`);
-  }
+  // Migrate an older payload forward to the current version (throws only if the
+  // payload is NEWER than we understand, or a migrator is missing). This is the
+  // reusable save-migration seam — old saves load, never break (docs/15 §6).
+  payload = migrate(payload, SAVE_VERSION);
+
   const world = createStartingSystem(payload.universeSeed);
   const c = world.components;
   const { meta, ship, activeSystemId, discovered, systems } = payload.deltas;
@@ -124,6 +142,7 @@ export function reconstructWorld(payload: SavePayload): World {
   world.tick = meta.tick;
   world.time = meta.time;
   world.rng.state = meta.rngState;
+  world.localOwnerId = meta.localOwnerId ?? LOCAL_PLAYER_OWNER;
   world.discovered = [...discovered];
 
   const systemsMap = new Map(systems);

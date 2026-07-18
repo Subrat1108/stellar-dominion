@@ -230,6 +230,14 @@ export interface BuildingStatus {
 export interface Colony {
   /** Body entity this colony sits on (mirrors the registry key). */
   bodyId: number;
+  /**
+   * Owning actor (the multi-agent seam, docs/15 §6). The local player is one
+   * owner id ("player"), never implicitly THE owner. Stamped at founding from
+   * the issuing actor; owner-aware commands (build/terraform) reject a non-owner.
+   * A colony's Terraforming program is owned by this same actor (it is 1:1 with
+   * the colony that funds it), so Terraforming carries no separate ownerId.
+   */
+  ownerId: string;
   foundedTick: number;
   /** Units in store, keyed by ResourceId (power is always 0 — it is a flow). */
   stockpiles: Record<string, number>;

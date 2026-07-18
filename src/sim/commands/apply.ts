@@ -11,6 +11,7 @@
 import type { World } from "../ecs/world.ts";
 import { landingRange, enterOrbitRange } from "../presentation.ts";
 import type { Command, CommandResult } from "./types.ts";
+import type { OwnerId } from "../owner.ts";
 import { foundColony, buildStructure, setTerraformAllocation } from "./colony.ts";
 import { beginWarpScan, commitWarp, cancelWarp } from "./warp.ts";
 
@@ -22,8 +23,17 @@ function distanceToBody(world: World, bodyId: number): number {
   return Math.hypot(ship.x - body.x, ship.y - body.y, ship.z - body.z);
 }
 
-/** Validate and apply a command. Mutates `world` only on success. */
-export function applyCommand(world: World, cmd: Command): CommandResult {
+/**
+ * Validate and apply a command on behalf of `actorId` (the multi-agent envelope,
+ * docs/15 §6; defaults to the local player so existing single-player callers are
+ * unchanged). Owner-scoped commands stamp/enforce ownership via `actorId`.
+ * Mutates `world` only on success.
+ */
+export function applyCommand(
+  world: World,
+  cmd: Command,
+  actorId: OwnerId = world.localOwnerId,
+): CommandResult {
   const tick = world.tick;
   const ctrl = world.components.shipControl.get(world.shipId);
   if (!ctrl) return { ok: false, reason: "ship has no control component" };
@@ -123,13 +133,13 @@ export function applyCommand(world: World, cmd: Command): CommandResult {
     }
 
     case "FoundColony":
-      return foundColony(world, cmd.bodyId);
+      return foundColony(world, cmd.bodyId, actorId);
 
     case "BuildStructure":
-      return buildStructure(world, cmd.bodyId, cmd.building);
+      return buildStructure(world, cmd.bodyId, cmd.building, actorId);
 
     case "SetTerraformAllocation":
-      return setTerraformAllocation(world, cmd.bodyId, cmd.lever, cmd.fraction);
+      return setTerraformAllocation(world, cmd.bodyId, cmd.lever, cmd.fraction, actorId);
 
     case "BeginWarpScan":
       return beginWarpScan(world, cmd.systemId);

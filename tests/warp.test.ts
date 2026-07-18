@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
+import { enqueueCommand } from "../src/sim/ecs/world.ts";
 import { step, run } from "../src/sim/loop.ts";
 import { beginWarpScan, commitWarp, cancelWarp } from "../src/sim/commands/warp.ts";
 import { warpSystem, SPOOL_TICKS, transitTicksForLy } from "../src/sim/systems/warp.ts";
@@ -169,9 +170,9 @@ describe("scan preview is coarse + never mutates the world", () => {
 describe("warp integration through the loop", () => {
   it("a committed warp arrives via step() and swaps the active system", () => {
     const world = createStartingSystem("warp-loop");
-    world.commandQueue.push({ kind: "BeginWarpScan", systemId: YZ_CETI });
+    enqueueCommand(world, { kind: "BeginWarpScan", systemId: YZ_CETI });
     step(world);
-    world.commandQueue.push({ kind: "CommitWarp" });
+    enqueueCommand(world, { kind: "CommitWarp" });
     step(world);
     expect(world.warp.phase).toBe("spool");
     run(world, SPOOL_TICKS + YZ_TRANSIT_TICKS + 2);
@@ -184,19 +185,19 @@ describe("warp integration through the loop", () => {
     const homeBodies = bodyNames(world);
 
     // Out to YZ Ceti.
-    world.commandQueue.push({ kind: "BeginWarpScan", systemId: YZ_CETI });
+    enqueueCommand(world, { kind: "BeginWarpScan", systemId: YZ_CETI });
     step(world);
-    world.commandQueue.push({ kind: "CommitWarp" });
+    enqueueCommand(world, { kind: "CommitWarp" });
     step(world);
     run(world, SPOOL_TICKS + YZ_TRANSIT_TICKS + 2);
     expect(world.activeSystemId).toBe(YZ_CETI);
 
     // …and back home. The command layer already supported this end-to-end; only
     // the old SectorPanel UI gate hid the button (home role ≠ "reachable").
-    world.commandQueue.push({ kind: "BeginWarpScan", systemId: TAU_CETI });
+    enqueueCommand(world, { kind: "BeginWarpScan", systemId: TAU_CETI });
     step(world);
     expect(world.warp.phase).toBe("scan"); // home accepted as a scan target
-    world.commandQueue.push({ kind: "CommitWarp" });
+    enqueueCommand(world, { kind: "CommitWarp" });
     step(world);
     const homeTransit = transitTicksForLy(distanceLyById(YZ_CETI_HYG_ID, TAU_CETI_HYG_ID));
     run(world, SPOOL_TICKS + homeTransit + 2);

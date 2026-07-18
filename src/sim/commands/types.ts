@@ -7,6 +7,7 @@
 // GameEvents through the GameBus. Nothing here imports the renderer or DOM.
 
 import type { BuildingType, TerraformLever } from "../data/colony.ts";
+import type { OwnerId } from "../owner.ts";
 
 /** A discrete player action queued for deterministic application in the tick. */
 export type Command =
@@ -51,3 +52,15 @@ export type GameEvent =
 export type CommandResult =
   | { ok: true; events: GameEvent[] }
   | { ok: false; reason: string };
+
+/**
+ * A command PLUS the actor that issued it (the multi-agent envelope, docs/15 §6).
+ * The `command` is identity-free — byte-identical whether issued by the player,
+ * an AI, or a network peer — and `actorId` rides alongside it on the queue,
+ * resolved by applyCommand. This is the canonical mechanism every owner-scoped
+ * mutation reuses; see owner.ts and docs/09 (2026-07-18, actor-envelope row).
+ */
+export interface QueuedCommand {
+  command: Command;
+  actorId: OwnerId;
+}

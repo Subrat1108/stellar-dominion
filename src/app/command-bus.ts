@@ -9,7 +9,14 @@
 import type { World } from "../sim/ecs/world.ts";
 import { enqueueCommand } from "../sim/ecs/world.ts";
 import type { Command } from "../sim/commands/types.ts";
+import type { OwnerId } from "../sim/owner.ts";
 
-export function dispatch(world: World, command: Command): void {
-  enqueueCommand(world, command);
+/**
+ * Enqueue a player action, tagged with the issuing actor (defaults to the local
+ * player). The `actorId` seam means the UI dispatches identical commands to what
+ * an AI/network owner would — identity rides the envelope (docs/15 §6), not the
+ * command. The sim drains + applies deterministically next tick (loop.ts).
+ */
+export function dispatch(world: World, command: Command, actorId?: OwnerId): void {
+  enqueueCommand(world, command, actorId);
 }
