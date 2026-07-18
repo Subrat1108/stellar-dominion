@@ -16,6 +16,12 @@ import { useLandingState } from "./hooks/useLandingState.ts";
 import ColonyPanel from "./ColonyPanel.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
 import { habitabilityLabel, habitabilityColor, esiTierLabel } from "../sim/math/habitability.ts";
+import {
+  localStrategicResources,
+  isStrategicallyIncomplete,
+  STRATEGIC_RESOURCES,
+  STRATEGIC_RESOURCE_LABEL,
+} from "../sim/gen/strategic.ts";
 
 interface SurfaceViewProps {
   world: World;
@@ -109,6 +115,10 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
             <StatRow label="ESI tier" value={esiTierLabel(body.habitability)} />
           )}
 
+          {/* Local strategic resources — the interdependence seed (docs/14 §5, docs/16).
+              Presence/absence only; an absent world will depend on imports later. */}
+          {body.kind === "planet" && <StrategicRow world={world} body={body} />}
+
           {/* Colony economy — found, manage resources, build structures. */}
           {displayId !== null && displayId !== undefined && (
             <ColonyPanel world={world} bus={bus} bodyId={displayId} />
@@ -119,6 +129,33 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
               ▲ TAKE OFF
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Local strategic-resource readout (the interdependence seed). Shows which
+ * Strategic-Core resources this world hosts locally — and, when it hosts none,
+ * that the colony here will depend on imports (the pull toward other worlds).
+ */
+function StrategicRow({ world, body }: { world: World; body: CelestialBody }) {
+  const avail = localStrategicResources(world.universeSeed, body);
+  const present = STRATEGIC_RESOURCES.filter((r) => avail[r]);
+  const incomplete = isStrategicallyIncomplete(avail);
+  return (
+    <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid #1e2030" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ color: "#585b70" }}>Local strategic</span>
+        <span style={{ color: incomplete ? "#f9e2af" : "#a6e3a1" }}>
+          {incomplete ? "none" : present.map((r) => STRATEGIC_RESOURCE_LABEL[r]).join(", ")}
+        </span>
+      </div>
+      {incomplete && (
+        <div style={{ fontSize: 10, color: "#7a6a4a", marginTop: 4 }}>
+          ⚠ No local Fissiles — a colony here will depend on imports for Tier-2
+          capability. (Trade routes arrive with the economy layer.)
         </div>
       )}
     </div>
