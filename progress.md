@@ -30,7 +30,14 @@ determinism + honest-scale body math untouched.
 
 **Active slice — the LANDING ARC (Session 25, in progress).** The first slice of the
 fun loop proper (`docs/15` §1 LAND): make landing a meaningful choice that shapes the
-colony you found. **Commits 1–3 done. Commit 3 (candidate sites + selection UI):**
+colony you found. **Commits 1–4 done. Commit 4 (site→modifiers + minimal EDL):**
+`siteModifiers(site)` (gen/sites.ts — volatile→water/O₂ head-start, insolation→persistent
+`solarEfficiency` 0.85–1.15, slope→setup + radiation→shielding metals costs); `math/edl.ts`
+`landingViability(body)` (vacuum/thin/nominal/thick; thin worst; `edlSetupCost` nudge);
+`foundColony` applies them (ship metals = seed + setup; colony water/O₂ = seed + in-situ
+head-start; `solarEfficiency` stored); **solar audit — the single generation read path ×
+`solarEfficiency ?? 1`** (catch-up shares it); `SiteSelection` shows per-site effect lines +
+EDL affordance. **295 tests** (+10 site-modifiers/EDL). **Commit 3 (candidate sites + selection UI):**
 `gen/sites.ts` — pure `generateCandidateSites(universeSeed, body)` (~3 deterministic
 sites from `bodyKey`; latitude/insolation/volatile/slope/radiation/thermal, body-biased);
 `Colony.siteIndex?`/`solarEfficiency?` (optional, additive under v3); `FoundColony` gains

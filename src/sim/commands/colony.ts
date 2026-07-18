@@ -8,7 +8,13 @@ import type { Colony, Terraforming } from "../ecs/components.ts";
 import type { CommandResult } from "./types.ts";
 import type { OwnerId } from "../owner.ts";
 import { hydrosphereGate } from "../math/terraforming.ts";
-import { CANDIDATE_SITE_COUNT } from "../gen/sites.ts";
+import {
+  CANDIDATE_SITE_COUNT,
+  generateCandidateSites,
+  siteModifiers,
+  NEUTRAL_SITE_MODIFIERS,
+} from "../gen/sites.ts";
+import { landingViability, edlSetupCost } from "../math/edl.ts";
 import {
   COLONY_SEED,
   FOUNDING_LIFE_SUPPORT_COST,
@@ -51,8 +57,21 @@ export function foundColony(
   const ls = world.components.lifeSupport.get(world.shipId);
   if (!inv || !ls) return { ok: false, reason: "ship is missing supplies" };
 
-  if (inv.metals < COLONY_SEED.metals)
-    return { ok: false, reason: "not enough metals to found a colony" };
+  // Site → founding modifiers (the landing arc, docs/14). The chosen site gives
+  // a persistent solar efficiency + in-situ volatile head-starts, and adds one-
+  // time Metals setup costs (rough terrain, radiation shielding, a hostile EDL).
+  // Deterministic: the site is regenerated from the body seed, not stored.
+  const body = world.components.celestialBody.get(bodyId);
+  const site = body ? generateCandidateSites(world.universeSeed, body)[chosenSite] : undefined;
+  const mods = site ? siteModifiers(site) : NEUTRAL_SITE_MODIFIERS;
+  const edlCost = body ? edlSetupCost(landingViability(body)) : 0;
+  // Metals drawn from the ship = the colony seed PLUS the site's setup costs
+  // (spent establishing infrastructure, not stored in the colony).
+  const setupMetals = mods.setupMetalsCost + mods.shieldingMetalsCost + edlCost;
+  const metalsNeeded = COLONY_SEED.metals + setupMetals;
+
+  if (inv.metals < metalsNeeded)
+    return { ok: false, reason: `not enough metals to found a colony (need ${metalsNeeded} incl. site setup)` };
   if (inv.food < COLONY_SEED.food)
     return { ok: false, reason: "not enough food to found a colony" };
   if (inv.fuel < COLONY_SEED.propellant)
@@ -60,8 +79,8 @@ export function foundColony(
   if (ls.current < FOUNDING_LIFE_SUPPORT_COST)
     return { ok: false, reason: "not enough life-support reserve to seed the colony" };
 
-  // Conserve: move supplies from ship to colony.
-  inv.metals -= COLONY_SEED.metals;
+  // Conserve: move supplies from ship to colony (site setup metals are consumed).
+  inv.metals -= metalsNeeded;
   inv.food -= COLONY_SEED.food;
   inv.fuel -= COLONY_SEED.propellant;
   ls.current -= FOUNDING_LIFE_SUPPORT_COST; // offloads water + oxygen consumables
@@ -71,8 +90,10 @@ export function foundColony(
   stockpiles.metals = COLONY_SEED.metals;
   stockpiles.food = COLONY_SEED.food;
   stockpiles.propellant = COLONY_SEED.propellant;
-  stockpiles.water = COLONY_SEED.water;
-  stockpiles.oxygen = COLONY_SEED.oxygen;
+  // Volatile head-start comes from the SITE's local ices (in-situ), not the ship,
+  // so the ship life-support debit is unchanged — the bonus is the planet's own.
+  stockpiles.water = COLONY_SEED.water + mods.startWaterBonus;
+  stockpiles.oxygen = COLONY_SEED.oxygen + mods.startOxygenBonus;
   stockpiles.power = 0;
 
   const buildings: Record<string, number> = {};
@@ -90,6 +111,7 @@ export function foundColony(
     ownerId: actorId,
     foundedTick: tick,
     siteIndex: chosenSite,
+    solarEfficiency: mods.solarEfficiency,
     stockpiles,
     buildings,
     flows: {},

@@ -102,9 +102,12 @@ function runColony(world: World, bodyId: number, colony: Colony): void {
   // Building statuses: recomputed fresh each economy tick (transient/derived).
   const buildingStatuses: Record<string, BuildingStatus> = {};
 
-  // 1. Power generation (solar arrays, scaled by insolation).
+  // 1. Power generation (solar arrays, scaled by insolation AND the colony's
+  //    site solar efficiency — the landing-site modifier, docs/14). This is the
+  //    ONLY solar-generation read path; `?? 1` keeps legacy/no-site colonies at 1.
   const solarCount = colony.buildings.solar ?? 0;
-  const generation = solarCount * (BUILDINGS.solar.powerOutputBase ?? 0) * insol;
+  const solarEff = colony.solarEfficiency ?? 1;
+  const generation = solarCount * (BUILDINGS.solar.powerOutputBase ?? 0) * insol * solarEff;
   flow("power").production = generation;
   if (solarCount > 0) {
     buildingStatuses.solar = { running: solarCount, total: solarCount, state: "running", reason: "" };

@@ -97,3 +97,56 @@ export function generateCandidateSites(
   }
   return sites;
 }
+
+// ---------------------------------------------------------------------------
+// Site → colony founding modifiers (the landing arc, docs/14)
+// ---------------------------------------------------------------------------
+//
+// A pure mapping from a chosen site to the scalar modifiers applied to the
+// EXISTING aggregate colony at founding — head-starts, a persistent efficiency,
+// and one-time setup costs. Deterministic (same site → same modifiers). No
+// spatial state; these just tune the aggregate colony (docs/14: NO tile/AP layer).
+
+/** Founding modifiers derived from a landing site. */
+export interface SiteModifiers {
+  /** Extra starting Water in the colony stockpile (in-situ volatiles — not from the ship). */
+  startWaterBonus: number;
+  /** Extra starting Oxygen in the colony stockpile (in-situ volatiles — not from the ship). */
+  startOxygenBonus: number;
+  /** Persistent solar-generation multiplier (~0.85–1.15). Stored on the colony. */
+  solarEfficiency: number;
+  /** One-time extra Metals spent at founding to establish on rough terrain (slope). */
+  setupMetalsCost: number;
+  /** One-time extra Metals spent at founding on radiation shielding. */
+  shieldingMetalsCost: number;
+}
+
+/** Tuning constants for the site→modifier mapping (kept small so founding stays affordable). */
+export const SITE_MOD = {
+  solarEffMin: 0.85,
+  solarEffSpan: 0.3, // → solarEfficiency in [0.85, 1.15]
+  maxWaterBonus: 80,
+  maxOxygenBonus: 40,
+  maxSlopeCost: 40,
+  maxShieldCost: 50,
+} as const;
+
+/** Pure site → founding modifiers. Same site → same modifiers. */
+export function siteModifiers(site: CandidateSite): SiteModifiers {
+  return {
+    startWaterBonus: Math.round(site.volatileProximity * SITE_MOD.maxWaterBonus),
+    startOxygenBonus: Math.round(site.volatileProximity * SITE_MOD.maxOxygenBonus),
+    solarEfficiency: SITE_MOD.solarEffMin + site.insolationFactor * SITE_MOD.solarEffSpan,
+    setupMetalsCost: Math.round(site.slope * SITE_MOD.maxSlopeCost),
+    shieldingMetalsCost: Math.round(site.radiation * SITE_MOD.maxShieldCost),
+  };
+}
+
+/** Neutral modifiers (no site chosen / no body) — nothing changes. */
+export const NEUTRAL_SITE_MODIFIERS: SiteModifiers = {
+  startWaterBonus: 0,
+  startOxygenBonus: 0,
+  solarEfficiency: 1,
+  setupMetalsCost: 0,
+  shieldingMetalsCost: 0,
+};

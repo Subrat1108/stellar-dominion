@@ -9,6 +9,8 @@ import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { step, run } from "../src/sim/loop.ts";
 import { colonySystem, housingCapacity } from "../src/sim/systems/colony.ts";
 import { foundColony } from "../src/sim/commands/colony.ts";
+import { generateCandidateSites, siteModifiers } from "../src/sim/gen/sites.ts";
+import { landingViability, edlSetupCost } from "../src/sim/math/edl.ts";
 import { ECONOMY_TICK_INTERVAL } from "../src/sim/constants.ts";
 import {
   COLONY_SEED,
@@ -58,21 +60,32 @@ function oneEconomyTick(world: World): void {
 }
 
 describe("FoundColony", () => {
-  it("conserves supplies — seeds the colony by drawing from the ship", () => {
+  it("conserves supplies — seeds the colony by drawing from the ship (site-modifier-aware)", () => {
     const world = startedWorld();
     const inv = world.components.inventory.get(world.shipId)!;
     const ls = world.components.lifeSupport.get(world.shipId)!;
     const m0 = inv.metals, f0 = inv.food, fuel0 = inv.fuel, ls0 = ls.current;
 
-    const colony = foundAt(world, planetId(world));
+    // The landing arc: founding draws the seed metals PLUS the chosen site's
+    // one-time setup costs, and the colony's starting water/oxygen include the
+    // site's in-situ volatile head-start. Compute the expected deltas from site 0.
+    const pid = planetId(world);
+    const body = world.components.celestialBody.get(pid)!;
+    const site = generateCandidateSites(world.universeSeed, body)[0]!;
+    const mods = siteModifiers(site);
+    const setupMetals = mods.setupMetalsCost + mods.shieldingMetalsCost + edlSetupCost(landingViability(body));
 
-    expect(inv.metals).toBe(m0 - COLONY_SEED.metals);
+    const colony = foundAt(world, pid);
+
+    // Ship: metals = seed + site setup; food/fuel = seed; life-support debit unchanged.
+    expect(inv.metals).toBe(m0 - COLONY_SEED.metals - setupMetals);
     expect(inv.food).toBe(f0 - COLONY_SEED.food);
     expect(inv.fuel).toBe(fuel0 - COLONY_SEED.propellant);
     expect(ls.current).toBe(ls0 - FOUNDING_LIFE_SUPPORT_COST);
-    expect(colony.stockpiles.water).toBe(COLONY_SEED.water);
-    expect(colony.stockpiles.oxygen).toBe(COLONY_SEED.oxygen);
+    // Colony: metals = seed (setup was consumed); water/oxygen = seed + in-situ head-start.
     expect(colony.stockpiles.metals).toBe(COLONY_SEED.metals);
+    expect(colony.stockpiles.water).toBe(COLONY_SEED.water + mods.startWaterBonus);
+    expect(colony.stockpiles.oxygen).toBe(COLONY_SEED.oxygen + mods.startOxygenBonus);
   });
 
   it("rejects a second colony on the same body", () => {
