@@ -2,7 +2,9 @@
 
 A running, append-only log. **One short entry per work session.** New entries go at the top. This is how any future session (or AI) reconstructs "where are we and why" cheaply.
 
-> **Resume point (Session 22 — Exploration Polish C — CODE COMPLETE, in-browser confirmation pending):** The exploration leg is closed. All six commits landed + pushed to `dev`: (1) docs → (2) map core → (3a) ego-centric sector map + return-home + distance transit → (3b) galaxy scaffold + intra tier → (4a) primitive ship + camera-in (near plane 0.0002→0.00002, isolated) → (4b) gradual accel + deepened cockpit. **265 tests green** (218 baseline + 47 new pure-fn), typecheck + build + dev-boot clean. Determinism + honest-scale body math untouched. **Next: user in-browser confirmation** (see the open-questions list in the Session-22 entry) — chiefly the near-plane multi-body depth check (no display/headless browser in this env to screenshot; analysis says the margin only widened), the map interaction, ship read, canopy, and accel feel. After that: the next roadmap slice (3B terraforming depth or the economy/tech layer that gates warp). Rationale in `docs/planning/session-22.md`.
+> **Resume point (Session 25 — the LANDING ARC, in progress):** Building the first slice of the fun loop (`docs/15` §1 LAND) in 5 commits: **(1) docs — DONE** (`docs/14` created; `docs/05`/`docs/09`/`CLAUDE.md`/`progress.md`/`session-25.md`). **Next: commit 2 — owner-scoping + save migration:** add `ownerId` to `Colony`; `world.localOwnerId` + `LOCAL_PLAYER_OWNER="player"` (set in `world-setup.ts`); actor-envelope command layer — `commandQueue: {command, actorId}[]`, `enqueueCommand(world, command, actorId?)`, `applyCommand(world, cmd, actorId = world.localOwnerId)`, drain in `loop.ts`, dispatch in `app/command-bus.ts`; `foundColony` stamps `ownerId = actorId`; owner-aware reject in `buildStructure`/`setTerraformAllocation`; **`SAVE_VERSION` 2→3** with a migrator chain in `save/serialize.ts` (v2→v3 assigns colonies to `"player"` + default `solarEfficiency=1`); tests (owner-scoping + v2→v3 round-trip). Then (3) candidate sites + selection UI, (4) site→modifiers + minimal EDL (audit `solarEfficiency ?? 1` on every solar read path), (5) Fissiles interdependence seed. Determinism sacred; all existing tests green + new pure-fn tests each commit. Rationale: `docs/planning/session-25.md`.
+>
+> **Prior resume point (Session 22 — Exploration Polish C — CODE COMPLETE, in-browser confirmation pending):** The exploration leg is closed. All six commits landed + pushed to `dev`. **265 tests green.** In-browser confirmation still open (near-plane depth, map interaction, ship/cockpit/accel feel) but NOT blocking the landing arc. See the Session-22 entry.
 
 Entry template:
 ```
@@ -15,6 +17,14 @@ Entry template:
 ```
 
 ---
+
+## Session 25 — 2026-07-18 — the landing arc — IN PROGRESS
+- **Goal:** Make landing a meaningful choice that shapes the founded colony (`docs/15` §1 LAND) — the first fun-loop slice + the first player-facing application of the multi-agent seam (`docs/15` §6) and the production save-migration discipline.
+- **Plan / commit split:** (1) docs → (2) owner-scoping (actor envelope + `ownerId` on Colony) + save v2→v3 migration → (3) candidate sites + selection UI → (4) site→founding modifiers + minimal EDL → (5) Fissiles interdependence seed. Full rationale: `docs/planning/session-25.md`.
+- **Did (commit 1 — docs):** Created `docs/14-landing-and-surface.md` (reconciliation header: aggregate globe, NO tile/AP/rover layer; site science → scalar modifiers; owner-scoped founding; soft-not-hard). Updated `docs/05` (landing arc active sub-section), `docs/09` (5 rows — candidate-sites model; the **actor-envelope** as the canonical multi-agent mechanism; the **migrator-chain** as the canonical save-migration pattern; minimal EDL; Fissiles seed), `CLAUDE.md` doc index, `progress.md`, `docs/planning/session-25.md`. Docs-only this commit.
+- **Decisions:** see `docs/09` 2026-07-18 landing-arc rows + `docs/planning/session-25.md`. Two are recorded as reusable PATTERNS (not one-offs): the actor-envelope multi-agent mechanism and the versioned migrator chain.
+- **Next:** commit 2 — owner-scoping + save v2→v3 migration (see the resume point at the top).
+- **Open questions:** none blocking; EDL is the flagged deferrable-to-display-only piece if commit 4 runs long.
 
 ## Session 24 — 2026-07-18 — economy & interdependence brief (`docs/16-economy-and-interdependence.md`)
 - **Goal:** File the Gemini interstellar-economy research brief into the repo as a reference for the deferred post-landing economy/interdependence slice, reconciled against `docs/15`'s soft-terraforming-dependency rule and hard multi-agent-seam rule.

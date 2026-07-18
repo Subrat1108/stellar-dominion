@@ -28,24 +28,30 @@ determinism + honest-scale body math untouched.
 
 ## Active next step
 
-**Docs:** `docs/15-design-pillars.md` added (design-pillars authoring session, 2026-07-18) — the design spine (fun loop, player motivation stack, differentiated worlds, the economy spine, progression, and the production/architecture constraints incl. the multi-agent command-layer seam). Docs-only; no code changed. Rationale: `docs/planning/session-23.md`.
+**Active slice — the LANDING ARC (Session 25, in progress).** The first slice of the
+fun loop proper (`docs/15` §1 LAND): make landing a meaningful choice that shapes the
+colony you found. **Commit 1 (docs) done:** `docs/14-landing-and-surface.md` created
+(aggregate globe, NO tile/AP/rover layer; site science → scalar founding modifiers;
+owner-scoped founding; Fissiles interdependence seed) + `docs/05` (landing arc active),
+`docs/09` (5 rows: candidate-sites model, the **actor-envelope** canonical multi-agent
+mechanism, the **migrator-chain** canonical save-migration pattern, minimal EDL,
+Fissiles seed), `CLAUDE.md` index, `docs/planning/session-25.md`. **Remaining commits:**
+(2) owner-scoping — `ownerId` on Colony, `world.localOwnerId`, actor-envelope command
+layer (`{command, actorId}`, `applyCommand(world, cmd, actorId)`), owner-aware
+build/terraform checks, **save v2→v3 migrator chain** (existing colonies → local player);
+(3) deterministic **candidate sites** (~3 from body seed) + selection UI; (4) **site →
+founding modifiers** (volatile→water/O₂ head-start, insolation→persistent solar
+efficiency, radiation→shielding cost, slope→setup cost) + **minimal EDL**
+(`landingViability` classifier + one light setup-cost hook); (5) **interdependence seed**
+— Fissiles presence/absence, surfaced legibly. Determinism sacred; all existing tests
+green + new pure-fn tests each commit. Rationale: `docs/planning/session-25.md`.
 
-**Docs:** `docs/16-economy-and-interdependence.md` added (economy-brief authoring session, 2026-07-18) — the deferred post-landing economy/interdependence reference brief (two-tier local-bulk/strategic split, virtual trade routes + distance trade-loss, the anti-snowball dependency trio, terraforming as a SOFT strategic sink, owner-scoped per the `docs/15` multi-agent seam), landed with a reconciliation header against `docs/15`/`docs/09`/`docs/12`. Docs-only; no code changed. Rationale: `docs/planning/session-24.md`.
+**Deferred (Polish C in-browser confirmation still open):** near-plane multi-body depth,
+map labels/clicks/popups, return-home, ship/cockpit/accel feel — see the Session-22
+resume point in `docs/07-devlog.md`. Not blocking the landing arc.
 
-**User in-browser confirmation of Polish C**, then the next roadmap slice. Confirm:
-(1) the **near-plane multi-body depth check** — nothing goes transparent / z-fights
-at the new 0.00002 near plane (the flagged regression surface; analysis says the
-margin only widened, but there's no display/headless browser in this env to
-screenshot); (2) the map — labels/clicks/popups, ego-centric sector population,
-LOCKED galaxy tiers, zoom-in resolves to flight; (3) **return-home** (warp out → map
-→ warp back to the caught-up colony); (4) the ship reads as a craft + cockpit ↔ chase
-symmetry; (5) the deepened cockpit console; (6) gradual accel (held W builds over
-~1–2 s, not an instant jump). Feel knobs: `CHASE_DIST`/`NEAR_PLANE`/`SHIP_LENGTH`/
-`THRUST_ACCEL*`/`THRUST_RAMP_SPEED` (`presentation.ts`), `WARP_RANGE_LY`/
-`MAX_MAP_NODES` (`sector.ts`), tier thresholds (`sector-layout.ts`). After
-confirmation: **3B terraforming depth** or the **economy/tech layer that gates warp**
-(both parked in `docs/05`). Rationale: `docs/planning/session-22.md`. **Scope A**
-(active-system interior only) shipped; remote scanned interiors (Scope B) deferred.
+**Earlier docs (2026-07-18):** `docs/15-design-pillars.md` (design spine; session-23),
+`docs/16-economy-and-interdependence.md` (deferred economy reference; session-24).
 
 ## Links
 
@@ -54,5 +60,6 @@ confirmation: **3B terraforming depth** or the **economy/tech layer that gates w
 - [`docs/05-roadmap.md`](docs/05-roadmap.md) — phased vertical slices; the Exploration-polish A–D sub-phases live here.
 - [`docs/15-design-pillars.md`](docs/15-design-pillars.md) — the design spine: fun loop, motivation stack, economy intent, multi-agent seam.
 - [`docs/16-economy-and-interdependence.md`](docs/16-economy-and-interdependence.md) — deferred post-landing economy reference: bulk/strategic split, trade routes, anti-snowball trio.
+- [`docs/14-landing-and-surface.md`](docs/14-landing-and-surface.md) — landing-arc reference: aggregate globe, candidate sites → founding modifiers, owner-scoping, Fissiles seed.
 - [`docs/planning/`](docs/planning/) — PLANNING-room decisions per session (the design rationale that otherwise lives only in chat).
 - [`CLAUDE.md`](CLAUDE.md) — project root context + the canonical **Current status** block + working protocols.
