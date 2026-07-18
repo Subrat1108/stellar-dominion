@@ -16,6 +16,13 @@ Entry template:
 
 ---
 
+## Session 24 — 2026-07-18 — economy & interdependence brief (`docs/16-economy-and-interdependence.md`)
+- **Goal:** File the Gemini interstellar-economy research brief into the repo as a reference for the deferred post-landing economy/interdependence slice, reconciled against `docs/15`'s soft-terraforming-dependency rule and hard multi-agent-seam rule.
+- **Did:** Added `docs/16-economy-and-interdependence.md` with a reconciliation header (soft terraforming sink, deferred socio-political/military consequences, owner-scoped resource network, corrected stale "Step 1B" label) followed by the brief's content: the local-bulk/strategic-core/strategic-exotic resource-tier table, virtual trade routes with distance-based trade-loss, the anti-snowball dependency trio (bootstrap infusion, scaling upkeep, logistical fragility), terraforming as a soft strategic sink, the forward-looking AI-competition substrate, and a minimal first version (Fissiles + one route + a static distance tax + break-route-powers-down-Tier-2). Epistemic [ESTABLISHED]/[EXTRAPOLATION] tags preserved throughout. Docs-only — no code touched.
+- **Decisions:** `docs/09` 2026-07-18 row — `docs/16` landed reconciled, not adopted wholesale. `docs/05`'s Deferred/parked list now points to `docs/16` for the "dedicated economy / anti-snowball pass" entry. `CLAUDE.md` doc index updated.
+- **Next:** User in-browser confirmation of Exploration Polish C (unchanged, still pending — see the Session-22 resume point), then the next roadmap slice.
+- **Open questions:** none new; see `docs/planning/session-24.md`.
+
 ## Session 23 — 2026-07-18 — design spine (`docs/15-design-pillars.md`)
 - **Goal:** Write the game's design spine — decisions made in the planning room (fun loop, player motivation stack, differentiated worlds, the economy spine, progression, production/architecture constraints incl. the multi-agent seam) that existed only in chat until now.
 - **Did:** Added `docs/15-design-pillars.md` (7 sections: core fantasy & fun loop; player motivation stack; differentiated worlds; the economy spine — bulk-local/strategic-scarce, soft-gated networked terraforming; progression — colony output → warp reach as the tech-tree seed; production & architecture constraints incl. the HARD multi-agent command-layer seam; pointer to the Deferred/parked list). Docs-only — no code touched.

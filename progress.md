@@ -30,6 +30,8 @@ determinism + honest-scale body math untouched.
 
 **Docs:** `docs/15-design-pillars.md` added (design-pillars authoring session, 2026-07-18) — the design spine (fun loop, player motivation stack, differentiated worlds, the economy spine, progression, and the production/architecture constraints incl. the multi-agent command-layer seam). Docs-only; no code changed. Rationale: `docs/planning/session-23.md`.
 
+**Docs:** `docs/16-economy-and-interdependence.md` added (economy-brief authoring session, 2026-07-18) — the deferred post-landing economy/interdependence reference brief (two-tier local-bulk/strategic split, virtual trade routes + distance trade-loss, the anti-snowball dependency trio, terraforming as a SOFT strategic sink, owner-scoped per the `docs/15` multi-agent seam), landed with a reconciliation header against `docs/15`/`docs/09`/`docs/12`. Docs-only; no code changed. Rationale: `docs/planning/session-24.md`.
+
 **User in-browser confirmation of Polish C**, then the next roadmap slice. Confirm:
 (1) the **near-plane multi-body depth check** — nothing goes transparent / z-fights
 at the new 0.00002 near plane (the flagged regression surface; analysis says the
@@ -51,5 +53,6 @@ confirmation: **3B terraforming depth** or the **economy/tech layer that gates w
 - [`docs/09-decisions.md`](docs/09-decisions.md) — decision log: every architectural/design choice, dated, newest first.
 - [`docs/05-roadmap.md`](docs/05-roadmap.md) — phased vertical slices; the Exploration-polish A–D sub-phases live here.
 - [`docs/15-design-pillars.md`](docs/15-design-pillars.md) — the design spine: fun loop, motivation stack, economy intent, multi-agent seam.
+- [`docs/16-economy-and-interdependence.md`](docs/16-economy-and-interdependence.md) — deferred post-landing economy reference: bulk/strategic split, trade routes, anti-snowball trio.
 - [`docs/planning/`](docs/planning/) — PLANNING-room decisions per session (the design rationale that otherwise lives only in chat).
 - [`CLAUDE.md`](CLAUDE.md) — project root context + the canonical **Current status** block + working protocols.
