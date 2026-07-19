@@ -31,21 +31,28 @@ determinism + honest-scale body math untouched.
 **Active slice — LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26, in progress).**
 Fixes a real bug: the save system (serialize/migrate/SaveStore) existed and was tested but
 was never wired into the app — every refresh silently regenerated a fresh universe.
-**Commit 1 done (autosave + boot-load):** `SavePayload.savedAtMs?`; `app/persistence.ts`
+**Commits 1–2 done. Commit 2 (offline progression + clamp):** `sim/save/offline.ts` —
+`offlineEconTicks`/`applyOfflineProgress`, reusing `runColonyEconomy` (the exact call the
+off-view catch-up makes) — **VERIFIED terraforming advances** via a dedicated test (a body's
+surface temperature climbs during offline progress, not just population); ship life-support
+deliberately excluded (frozen at save time — closing the tab must never kill the crew). Rate
+is deliberately SLOWER than active play: `OFFLINE_ECON_TICKS_PER_REAL_HOUR = 240` (≈4
+active-minutes-equivalent per real hour away, far below the ~3600/active-hour online rate),
+elapsed clamped to `MAX_OFFLINE_ELAPSED_MS = 12h`. `app/visibility-offline.ts`
+(`handleVisibilityResume`) covers a backgrounded tab — the accumulator-reset is
+**unconditional in every branch** (tested directly), preventing the live loop from
+double-counting a hidden→visible gap the offline catch-up already credited. `main.ts` wires
+both boot-load offline progress and the visibility handler (pause hardcoded `false` pending
+commit 3's settings). **323 tests green** (+17: tick conversion, determinism, clamp,
+terraforming-verification, pause, no-double-count), typecheck + build clean. **Commit 1
+(autosave + boot-load):** `SavePayload.savedAtMs?`; `app/persistence.ts`
 (`saveGame`/`loadGame`/`clearGame`/`tryReconstruct` — never throws, bad saves fall back to
 a fresh game; `startAutosave` — 15s timer + 1s-debounced state-changing events + page-hide);
 `main.ts` boot is now async (load-or-new); `ui/SettingsMenu.tsx` (⚙ gear button, confirm-
-guarded **New Game**, bad-save notice). **306 tests green** (+6 persistence round-trip/
-clear/bad-save), typecheck + build clean. **Next: commit 2 — offline progression + clamp:**
-`sim/save/offline.ts` (`offlineEconTicks`/`applyOfflineProgress`, reusing `runColonyEconomy`
-— VERIFIED terraforming advances via a dedicated test; ship life-support deliberately
-excluded); rate deliberately SLOWER than active play (`OFFLINE_ECON_TICKS_PER_REAL_HOUR`,
-proposed 240 ≈ 4 active-minutes/real-hour), clamped to 12h elapsed; `app/visibility-
-offline.ts` (`handleVisibilityResume` — unconditional accumulator reset in every branch,
-preventing a backgrounded tab from double-counting the same gap via the live loop replay).
-Then **commit 3 — pause toggle + summary:** `app/settings.ts`, a persisted pause checkbox in
-`SettingsMenu`, and a dismissible "while you were away" toast headlining terraforming/water
-alongside population + habitability deltas. Rationale: `docs/planning/session-26.md`.
+guarded **New Game**, bad-save notice). **Next: commit 3 — pause toggle + summary:**
+`app/settings.ts`, a persisted pause checkbox in `SettingsMenu`, and a dismissible "while you
+were away" toast headlining terraforming/water alongside population + habitability deltas.
+Rationale: `docs/planning/session-26.md`.
 
 **Prior slice — the LANDING ARC (Session 25) is CODE-COMPLETE — still needs user
 in-browser confirmation** (not blocking this session):

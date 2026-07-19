@@ -9,7 +9,11 @@
 // Boot is async: it tries to load the current save (app/persistence.ts) before
 // building anything, so a refresh RESUMES instead of silently regenerating a
 // fresh universe (the bug this closes). A corrupt/unsupported save never
-// crashes boot — it falls back to a new game with a visible notice.
+// crashes boot — it falls back to a new game with a visible notice. On a
+// successful load, offline progression (sim/save/offline.ts) fast-forwards the
+// colony economy for the real time spent away; the same mechanism covers a
+// backgrounded tab (visibility-offline.ts), with the fixed-tick accumulator
+// always reset on resume so the live loop never double-counts the same span.
 
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -29,7 +33,14 @@ import {
   startAutosave,
   AUTOSAVE_EVENT_KINDS,
 } from "./persistence.ts";
+import { applyOfflineProgress } from "../sim/save/offline.ts";
+import { handleVisibilityResume } from "./visibility-offline.ts";
+import { offlineSummaryState } from "./offline-summary-state.ts";
 import type { World } from "../sim/ecs/world.ts";
+
+/** Offline-progression pause setting. Real toggle lands with app/settings.ts
+ *  (commit 3); hardcoded false until then — offline progression is always on. */
+const OFFLINE_PROGRESSION_PAUSED = false;
 
 async function boot(): Promise<void> {
   const saved = await loadGame();
@@ -40,6 +51,14 @@ async function boot(): Promise<void> {
     const restored = tryReconstruct(saved);
     if (restored) {
       world = restored;
+      // Fast-forward the colony economy (incl. terraforming) for the real time
+      // spent away, reusing the same runColonyEconomy loop the off-view catch-up
+      // uses. Older saves without savedAtMs simply resume with no offline credit.
+      if (saved.savedAtMs !== undefined) {
+        const elapsedMs = Date.now() - saved.savedAtMs;
+        const progress = applyOfflineProgress(world, elapsedMs, OFFLINE_PROGRESSION_PAUSED);
+        if (progress.econTicksRun > 0) offlineSummaryState.current = progress;
+      }
     } else {
       loadNotice = "Couldn't load your save — started a new game.";
       world = createStartingSystem();
@@ -68,12 +87,6 @@ async function boot(): Promise<void> {
   bus.onEvent((event) => {
     if (AUTOSAVE_EVENT_KINDS.has(event.kind)) autosave.onEvent();
   });
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") void saveGame(world);
-  });
-  window.addEventListener("pagehide", () => {
-    void saveGame(world);
-  });
 
   // Mount the React UI overlay.
   const uiEl = document.getElementById("ui");
@@ -87,6 +100,31 @@ async function boot(): Promise<void> {
   const STEP_MS = FIXED_DT * 1000;
   const MAX_STEPS_PER_FRAME = 240; // spiral-of-death guard
   const STEER_SENSITIVITY = 0.06; // pointer-pixel → yaw/pitch Input gain
+
+  // Backgrounded-tab offline progression: record when we went hidden, and on
+  // return apply the same offline fast-forward for the hidden span. The
+  // accumulator/`last` reset is UNCONDITIONAL on every visible transition (not
+  // just when offline progress actually ran) — see visibility-offline.ts for
+  // why: without it, a huge stale accumulator would let the live loop replay
+  // the same span the offline catch-up already credited (double-counting it).
+  let hiddenAtMs: number | null = null;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      hiddenAtMs = Date.now();
+      void saveGame(world);
+    } else if (document.visibilityState === "visible") {
+      if (hiddenAtMs !== null) {
+        const result = handleVisibilityResume(world, hiddenAtMs, Date.now(), OFFLINE_PROGRESSION_PAUSED);
+        hiddenAtMs = null;
+        if (result.summary) offlineSummaryState.current = result.summary;
+        accumulator = result.resetAccumulatorMs;
+        last = performance.now();
+      }
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    void saveGame(world);
+  });
 
   function frame(now: number): void {
     accumulator += now - last;
