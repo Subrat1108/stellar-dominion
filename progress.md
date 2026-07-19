@@ -27,22 +27,29 @@ covered the same way, with an **unconditional accumulator reset** that prevents 
 live tick loop from double-counting the same gap. A persisted **pause toggle** and a
 dismissible **"while you were away"** toast (population/habitability/**water**
 deltas — the terraforming payoff line) close the loop. Shipped in three commits
-(autosave+boot-load → offline progression+clamp → pause toggle+summary). **327 tests
-green** (300 baseline + 27 new pure-fn); typecheck + build clean; determinism +
+(autosave+boot-load → offline progression+clamp → pause toggle+summary), plus a
+**fourth bugfix commit**: reloading while landed restored the sim correctly (MODE
+showed LANDED) but the surface UI (TAKE OFF / colony / site panel) never appeared —
+`SurfaceView` was gated on an event-driven ref (`landingState`) that a reload never
+updates, unlike everything else (Cockpit/MapView/SystemPanel/ship-movement), which
+already reads ship state live and was unaffected; fixed with a one-time
+`syncLandingStateFromWorld` call at boot. **332 tests green** (300 baseline + 27 new
+persistence pure-fn + 5 bugfix regression); typecheck + build clean; determinism +
 sim mechanics untouched — only persisted and fast-forwarded what already existed.
 
 ## Active next step
 
 **LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26) is CODE-COMPLETE — next: user
 in-browser confirmation,** then the tile/surface layer this fix unblocks, or the next
-roadmap slice. Confirm in-browser: refresh mid-game resumes instead of resetting;
-closing the tab, waiting real time, and reopening shows the "while you were away" toast
-with sensible population/habitability/water deltas (and the 12h-cap note on a very long
-gap); the ⚙ Settings pause-offline-progression checkbox actually suppresses it; New Game
-is confirm-guarded and genuinely resets; a deliberately-corrupted localStorage value
-falls back to a fresh game with the notice rather than a blank screen. No display/
-headless browser in this env to screenshot; the mechanics are unit-tested (327 green).
-Tuning knobs: `OFFLINE_ECON_TICKS_PER_REAL_HOUR`/`MAX_OFFLINE_ELAPSED_MS`
+roadmap slice. Confirm in-browser: refresh mid-game resumes instead of resetting; land →
+refresh → TAKE OFF and the colony/site panel are present (the just-fixed bug); refresh
+while orbiting still shows correct MODE/actions; closing the tab, waiting real time, and
+reopening shows the "while you were away" toast with sensible population/habitability/water
+deltas (and the 12h-cap note on a very long gap); the ⚙ Settings pause-offline-progression
+checkbox actually suppresses it; New Game is confirm-guarded and genuinely resets; a
+deliberately-corrupted localStorage value falls back to a fresh game with the notice rather
+than a blank screen. No display/headless browser in this env to screenshot; the mechanics
+are unit-tested (332 green). Tuning knobs: `OFFLINE_ECON_TICKS_PER_REAL_HOUR`/`MAX_OFFLINE_ELAPSED_MS`
 (`sim/save/offline.ts`), `VISIBILITY_OFFLINE_THRESHOLD_MS` (`app/visibility-offline.ts`),
 autosave timer/debounce (`app/persistence.ts`). Rationale: `docs/planning/session-26.md`.
 

@@ -23,7 +23,7 @@ import { createRenderer } from "../render/scene.ts";
 import { GameBus } from "./game-bus.ts";
 import { steerState } from "./steer-state.ts";
 import { pointerToSteering } from "./steering.ts";
-import { landingState } from "./landing-state.ts";
+import { landingState, syncLandingStateFromWorld } from "./landing-state.ts";
 import App from "../ui/App.tsx";
 import { getSimInput, consumeMapToggle, consumeViewCycle } from "./input.ts";
 import {
@@ -63,6 +63,12 @@ async function boot(): Promise<void> {
   } else {
     world = createStartingSystem();
   }
+
+  // Seed the landing-state ref from the restored/fresh world's ACTUAL ship
+  // state — not just the Landed/TookOff event stream (which never fires on a
+  // reload). Without this, reloading while landed leaves SurfaceView hidden
+  // (no TAKE OFF / colony UI) even though the sim state is correctly landed.
+  syncLandingStateFromWorld(world);
 
   const bus = new GameBus();
   const renderer = createRenderer(world, document.body);
