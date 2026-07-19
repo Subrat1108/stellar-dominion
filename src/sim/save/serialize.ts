@@ -71,6 +71,13 @@ export interface SavePayload {
   version: number;
   universeSeed: string | number;
   deltas: SaveDeltas;
+  /**
+   * Wall-clock time (Date.now()) this payload was saved, if known — persistence
+   * metadata, NOT sim state (reconstructWorld ignores it). Older payloads may
+   * lack it (no offline progression is computed for them). Set by the
+   * persistence layer (app/persistence.ts), not by extractDeltas.
+   */
+  savedAtMs?: number;
 }
 
 /** bodyKey → entity id for the bodies currently in the world. */

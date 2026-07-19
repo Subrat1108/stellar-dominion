@@ -28,7 +28,27 @@ determinism + honest-scale body math untouched.
 
 ## Active next step
 
-**The LANDING ARC (Session 25) is CODE-COMPLETE — next: user in-browser confirmation,**
+**Active slice — LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26, in progress).**
+Fixes a real bug: the save system (serialize/migrate/SaveStore) existed and was tested but
+was never wired into the app — every refresh silently regenerated a fresh universe.
+**Commit 1 done (autosave + boot-load):** `SavePayload.savedAtMs?`; `app/persistence.ts`
+(`saveGame`/`loadGame`/`clearGame`/`tryReconstruct` — never throws, bad saves fall back to
+a fresh game; `startAutosave` — 15s timer + 1s-debounced state-changing events + page-hide);
+`main.ts` boot is now async (load-or-new); `ui/SettingsMenu.tsx` (⚙ gear button, confirm-
+guarded **New Game**, bad-save notice). **306 tests green** (+6 persistence round-trip/
+clear/bad-save), typecheck + build clean. **Next: commit 2 — offline progression + clamp:**
+`sim/save/offline.ts` (`offlineEconTicks`/`applyOfflineProgress`, reusing `runColonyEconomy`
+— VERIFIED terraforming advances via a dedicated test; ship life-support deliberately
+excluded); rate deliberately SLOWER than active play (`OFFLINE_ECON_TICKS_PER_REAL_HOUR`,
+proposed 240 ≈ 4 active-minutes/real-hour), clamped to 12h elapsed; `app/visibility-
+offline.ts` (`handleVisibilityResume` — unconditional accumulator reset in every branch,
+preventing a backgrounded tab from double-counting the same gap via the live loop replay).
+Then **commit 3 — pause toggle + summary:** `app/settings.ts`, a persisted pause checkbox in
+`SettingsMenu`, and a dismissible "while you were away" toast headlining terraforming/water
+alongside population + habitability deltas. Rationale: `docs/planning/session-26.md`.
+
+**Prior slice — the LANDING ARC (Session 25) is CODE-COMPLETE — still needs user
+in-browser confirmation** (not blocking this session):
 then the next roadmap slice. Confirm in-browser: land a rocky world → the ~3 candidate
 site cards read clearly (attributes + effect lines + a body-level EDL line) → choosing a
 site founds a colony reflecting its head-start/efficiency/setup cost → the surface view

@@ -15,13 +15,16 @@ import Minimap from "./Minimap.tsx";
 import Scanner from "./Scanner.tsx";
 import Cockpit from "./Cockpit.tsx";
 import SurfaceView from "./SurfaceView.tsx";
+import SettingsMenu from "./SettingsMenu.tsx";
 
 interface AppProps {
   world: World;
   bus: GameBus;
+  /** Set when boot couldn't load an existing save and started fresh instead. */
+  loadNotice?: string | null;
 }
 
-export default function App({ world, bus }: AppProps) {
+export default function App({ world, bus, loadNotice = null }: AppProps) {
   return (
     <>
       <HUD world={world} bus={bus} />
@@ -35,6 +38,7 @@ export default function App({ world, bus }: AppProps) {
       <SteerHint bus={bus} />
       <TransitionFade bus={bus} />
       <HazardBanner world={world} bus={bus} />
+      <SettingsMenu loadNotice={loadNotice} />
     </>
   );
 }
