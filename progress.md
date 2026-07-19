@@ -9,73 +9,53 @@
 
 The deterministic space-4X sim runs end-to-end: a seeded content engine generates
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
-found colonies, run the resource economy, and terraform (Phases 2–3A); the
-exploration leg is closed (Polish A–C). **The LANDING ARC (Session 25) is
-CODE-COMPLETE** (in-browser confirmation pending) — the first slice of the fun loop
-proper (`docs/15` §1 LAND): landing is now a *meaningful choice that shapes the
-colony you found*. Colonies are **owner-scoped** (the first player-facing use of the
-multi-agent seam — the player is AN owner; commands ride an **actor envelope**
-`{command, actorId}`), saves migrate **v2→v3** via a reusable migrator chain, landing
-offers **~3 deterministic candidate sites** whose attributes derive **founding
-modifiers** (volatile→water/O₂ head-start, insolation→persistent solar efficiency,
-slope→setup + radiation→shielding costs), a **minimal EDL** classifier reads landing
-viability, and a founded colony surfaces its **local strategic-resource (Fissiles)**
-presence — the first appearance of the two-tier economy, creating the pull toward
-other worlds with zero economy machinery. Shipped in five commits (docs →
-owner-scoping+migration → sites+UI → modifiers+EDL → strategic seed). **300 tests
-green** (265 baseline + 35 new pure-fn); typecheck + build + dev-boot clean;
-determinism + honest-scale body math untouched.
+found colonies (with a site choice, owner-scoped, per the landing arc), run the
+resource economy, and terraform (Phases 2–3A); the exploration leg is closed
+(Polish A–C). **LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26) is
+CODE-COMPLETE** (in-browser confirmation pending) — fixes a real bug: the save system
+(serialize/migrate/SaveStore) existed and was fully tested but was never wired into the
+app, so every browser refresh silently regenerated a fresh universe. The game now
+**autosaves** (a 15s timer + debounced state-changing events + page-hide) to a single
+local save slot and **loads it on boot** (a corrupt/incompatible save never crashes
+boot — it falls back to a fresh game with a visible notice); an explicit,
+confirm-guarded **New Game** is the only way to erase it. Real time spent away is
+credited as **offline progression** — a deterministic fast-forward of the colony
+economy (incl. terraforming) reusing the existing off-view catch-up mechanism,
+deliberately **slower than active play** (~4 active-minutes-equivalent per real hour
+away, clamped at 12h) so idling never substitutes for playing; a backgrounded tab is
+covered the same way, with an **unconditional accumulator reset** that prevents the
+live tick loop from double-counting the same gap. A persisted **pause toggle** and a
+dismissible **"while you were away"** toast (population/habitability/**water**
+deltas — the terraforming payoff line) close the loop. Shipped in three commits
+(autosave+boot-load → offline progression+clamp → pause toggle+summary). **327 tests
+green** (300 baseline + 27 new pure-fn); typecheck + build clean; determinism +
+sim mechanics untouched — only persisted and fast-forwarded what already existed.
 
 ## Active next step
 
-**Active slice — LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26, in progress).**
-Fixes a real bug: the save system (serialize/migrate/SaveStore) existed and was tested but
-was never wired into the app — every refresh silently regenerated a fresh universe.
-**Commits 1–2 done. Commit 2 (offline progression + clamp):** `sim/save/offline.ts` —
-`offlineEconTicks`/`applyOfflineProgress`, reusing `runColonyEconomy` (the exact call the
-off-view catch-up makes) — **VERIFIED terraforming advances** via a dedicated test (a body's
-surface temperature climbs during offline progress, not just population); ship life-support
-deliberately excluded (frozen at save time — closing the tab must never kill the crew). Rate
-is deliberately SLOWER than active play: `OFFLINE_ECON_TICKS_PER_REAL_HOUR = 240` (≈4
-active-minutes-equivalent per real hour away, far below the ~3600/active-hour online rate),
-elapsed clamped to `MAX_OFFLINE_ELAPSED_MS = 12h`. `app/visibility-offline.ts`
-(`handleVisibilityResume`) covers a backgrounded tab — the accumulator-reset is
-**unconditional in every branch** (tested directly), preventing the live loop from
-double-counting a hidden→visible gap the offline catch-up already credited. `main.ts` wires
-both boot-load offline progress and the visibility handler (pause hardcoded `false` pending
-commit 3's settings). **323 tests green** (+17: tick conversion, determinism, clamp,
-terraforming-verification, pause, no-double-count), typecheck + build clean. **Commit 1
-(autosave + boot-load):** `SavePayload.savedAtMs?`; `app/persistence.ts`
-(`saveGame`/`loadGame`/`clearGame`/`tryReconstruct` — never throws, bad saves fall back to
-a fresh game; `startAutosave` — 15s timer + 1s-debounced state-changing events + page-hide);
-`main.ts` boot is now async (load-or-new); `ui/SettingsMenu.tsx` (⚙ gear button, confirm-
-guarded **New Game**, bad-save notice). **Next: commit 3 — pause toggle + summary:**
-`app/settings.ts`, a persisted pause checkbox in `SettingsMenu`, and a dismissible "while you
-were away" toast headlining terraforming/water alongside population + habitability deltas.
-Rationale: `docs/planning/session-26.md`.
+**LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26) is CODE-COMPLETE — next: user
+in-browser confirmation,** then the tile/surface layer this fix unblocks, or the next
+roadmap slice. Confirm in-browser: refresh mid-game resumes instead of resetting;
+closing the tab, waiting real time, and reopening shows the "while you were away" toast
+with sensible population/habitability/water deltas (and the 12h-cap note on a very long
+gap); the ⚙ Settings pause-offline-progression checkbox actually suppresses it; New Game
+is confirm-guarded and genuinely resets; a deliberately-corrupted localStorage value
+falls back to a fresh game with the notice rather than a blank screen. No display/
+headless browser in this env to screenshot; the mechanics are unit-tested (327 green).
+Tuning knobs: `OFFLINE_ECON_TICKS_PER_REAL_HOUR`/`MAX_OFFLINE_ELAPSED_MS`
+(`sim/save/offline.ts`), `VISIBILITY_OFFLINE_THRESHOLD_MS` (`app/visibility-offline.ts`),
+autosave timer/debounce (`app/persistence.ts`). Rationale: `docs/planning/session-26.md`.
 
 **Prior slice — the LANDING ARC (Session 25) is CODE-COMPLETE — still needs user
-in-browser confirmation** (not blocking this session):
-then the next roadmap slice. Confirm in-browser: land a rocky world → the ~3 candidate
-site cards read clearly (attributes + effect lines + a body-level EDL line) → choosing a
-site founds a colony reflecting its head-start/efficiency/setup cost → the surface view
-shows local-strategic (Fissiles) presence or an import-dependent warning → a volatile-rich
-vs a sun-drenched site produce visibly different colonies. No display/headless browser in
-this env to screenshot; the mechanics are unit-tested (300 green). **After confirmation:**
-the economy/interdependence layer (`docs/16` — the Fissiles seed's payoff: bulk-local vs
-strategic split, virtual trade routes, dependency-as-brake) or 3B terraforming depth.
-Feel/tuning knobs: `SITE_MOD` (gen/sites.ts), `EDL_SETUP_PENALTY` (math/edl.ts), the
-Fissiles probability (gen/strategic.ts). Rationale: `docs/planning/session-25.md`.
-
-The five commits (all pushed to `dev`): (1) **docs** — `docs/14` + `docs/05`/`docs/09`
-(5 rows incl. the **actor-envelope** + **migrator-chain** reusable patterns)/`CLAUDE.md`/
-`session-25.md`; (2) **owner-scoping + save v2→v3 migration** — `owner.ts`, `Colony.ownerId`,
-`world.localOwnerId`, actor-envelope command layer, owner-aware build/terraform checks,
-`save/migrate.ts` chain; (3) **candidate sites + selection UI** — `gen/sites.ts`,
-`FoundColony{siteIndex?}`, `ui/SiteSelection.tsx`; (4) **site→modifiers + minimal EDL** —
-`siteModifiers`, `math/edl.ts`, the single solar read path × `solarEfficiency ?? 1`;
-(5) **interdependence seed** — `gen/strategic.ts` Fissiles presence + the surface readout.
-Determinism sacred; 300 tests green + typecheck + build clean each commit.
+in-browser confirmation** (not blocking; unaffected by this session): land a rocky
+world → the ~3 candidate site cards read clearly (attributes + effect lines + EDL) →
+choosing a site founds a colony reflecting its head-start/efficiency/setup cost → the
+surface view shows local-strategic (Fissiles) presence or an import-dependent warning.
+After both confirmations: the economy/interdependence layer (`docs/16`) or 3B
+terraforming depth. Its five commits (docs → owner-scoping+migration → sites+UI →
+modifiers+EDL → strategic seed) left **300 tests green**; tuning knobs `SITE_MOD`
+(gen/sites.ts), `EDL_SETUP_PENALTY` (math/edl.ts), the Fissiles probability
+(gen/strategic.ts). Rationale: `docs/planning/session-25.md`.
 
 **Deferred (Polish C in-browser confirmation still open):** near-plane multi-body depth,
 map labels/clicks/popups, return-home, ship/cockpit/accel feel — see the Session-22

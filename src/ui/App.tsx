@@ -16,6 +16,7 @@ import Scanner from "./Scanner.tsx";
 import Cockpit from "./Cockpit.tsx";
 import SurfaceView from "./SurfaceView.tsx";
 import SettingsMenu from "./SettingsMenu.tsx";
+import OfflineSummary from "./OfflineSummary.tsx";
 
 interface AppProps {
   world: World;
@@ -39,6 +40,7 @@ export default function App({ world, bus, loadNotice = null }: AppProps) {
       <TransitionFade bus={bus} />
       <HazardBanner world={world} bus={bus} />
       <SettingsMenu loadNotice={loadNotice} />
+      <OfflineSummary bus={bus} />
     </>
   );
 }

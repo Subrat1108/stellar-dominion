@@ -6,6 +6,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { clearGame } from "../app/persistence.ts";
+import { loadSettings, saveSettings, type GameSettings } from "../app/settings.ts";
 
 interface SettingsMenuProps {
   /** Set when boot failed to load an existing save and started fresh instead. */
@@ -16,10 +17,20 @@ export default function SettingsMenu({ loadNotice = null }: SettingsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [noticeVisible, setNoticeVisible] = useState(!!loadNotice);
+  const [settings, setSettings] = useState<GameSettings>(() => loadSettings());
 
   async function newGame(): Promise<void> {
     await clearGame();
     location.reload();
+  }
+
+  function togglePauseOffline(): void {
+    const next: GameSettings = {
+      ...settings,
+      offlineProgressionPaused: !settings.offlineProgressionPaused,
+    };
+    setSettings(next);
+    saveSettings(next);
   }
 
   return (
@@ -39,7 +50,29 @@ export default function SettingsMenu({ loadNotice = null }: SettingsMenuProps) {
             SETTINGS
           </div>
 
-          <div style={{ borderTop: "1px solid #2a2c3f", paddingTop: 10 }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: "#cdd6f4",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={settings.offlineProgressionPaused}
+              onChange={togglePauseOffline}
+            />
+            Pause offline progression
+          </label>
+          <div style={{ fontSize: 10, color: "#585b70", marginTop: 4, lineHeight: 1.4 }}>
+            When paused, no time is credited while you're away — you resume exactly
+            where you left off.
+          </div>
+
+          <div style={{ borderTop: "1px solid #2a2c3f", marginTop: 14, paddingTop: 10 }}>
             {!confirmReset ? (
               <button onClick={() => setConfirmReset(true)} style={dangerBtn}>
                 NEW GAME…

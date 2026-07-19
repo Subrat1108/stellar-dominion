@@ -36,11 +36,8 @@ import {
 import { applyOfflineProgress } from "../sim/save/offline.ts";
 import { handleVisibilityResume } from "./visibility-offline.ts";
 import { offlineSummaryState } from "./offline-summary-state.ts";
+import { loadSettings } from "./settings.ts";
 import type { World } from "../sim/ecs/world.ts";
-
-/** Offline-progression pause setting. Real toggle lands with app/settings.ts
- *  (commit 3); hardcoded false until then — offline progression is always on. */
-const OFFLINE_PROGRESSION_PAUSED = false;
 
 async function boot(): Promise<void> {
   const saved = await loadGame();
@@ -56,7 +53,7 @@ async function boot(): Promise<void> {
       // uses. Older saves without savedAtMs simply resume with no offline credit.
       if (saved.savedAtMs !== undefined) {
         const elapsedMs = Date.now() - saved.savedAtMs;
-        const progress = applyOfflineProgress(world, elapsedMs, OFFLINE_PROGRESSION_PAUSED);
+        const progress = applyOfflineProgress(world, elapsedMs, loadSettings().offlineProgressionPaused);
         if (progress.econTicksRun > 0) offlineSummaryState.current = progress;
       }
     } else {
@@ -114,7 +111,7 @@ async function boot(): Promise<void> {
       void saveGame(world);
     } else if (document.visibilityState === "visible") {
       if (hiddenAtMs !== null) {
-        const result = handleVisibilityResume(world, hiddenAtMs, Date.now(), OFFLINE_PROGRESSION_PAUSED);
+        const result = handleVisibilityResume(world, hiddenAtMs, Date.now(), loadSettings().offlineProgressionPaused);
         hiddenAtMs = null;
         if (result.summary) offlineSummaryState.current = result.summary;
         accumulator = result.resetAccumulatorMs;
