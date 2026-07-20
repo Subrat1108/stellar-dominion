@@ -9,49 +9,42 @@
 
 The deterministic space-4X sim runs end-to-end: a seeded content engine generates
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
-found colonies (with a site choice, owner-scoped, per the landing arc), run the
-resource economy, and terraform (Phases 2–3A); the exploration leg is closed
-(Polish A–C). **LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26) is
-CODE-COMPLETE** (in-browser confirmation pending) — fixes a real bug: the save system
-(serialize/migrate/SaveStore) existed and was fully tested but was never wired into the
-app, so every browser refresh silently regenerated a fresh universe. The game now
-**autosaves** (a 15s timer + debounced state-changing events + page-hide) to a single
-local save slot and **loads it on boot** (a corrupt/incompatible save never crashes
-boot — it falls back to a fresh game with a visible notice); an explicit,
-confirm-guarded **New Game** is the only way to erase it. Real time spent away is
-credited as **offline progression** — a deterministic fast-forward of the colony
-economy (incl. terraforming) reusing the existing off-view catch-up mechanism,
-deliberately **slower than active play** (~4 active-minutes-equivalent per real hour
-away, clamped at 12h) so idling never substitutes for playing; a backgrounded tab is
-covered the same way, with an **unconditional accumulator reset** that prevents the
-live tick loop from double-counting the same gap. A persisted **pause toggle** and a
-dismissible **"while you were away"** toast (population/habitability/**water**
-deltas — the terraforming payoff line) close the loop. Shipped in three commits
-(autosave+boot-load → offline progression+clamp → pause toggle+summary), plus a
-**fourth bugfix commit**: reloading while landed restored the sim correctly (MODE
-showed LANDED) but the surface UI (TAKE OFF / colony / site panel) never appeared —
-`SurfaceView` was gated on an event-driven ref (`landingState`) that a reload never
-updates, unlike everything else (Cockpit/MapView/SystemPanel/ship-movement), which
-already reads ship state live and was unaffected; fixed with a one-time
-`syncLandingStateFromWorld` call at boot. **332 tests green** (300 baseline + 27 new
-persistence pure-fn + 5 bugfix regression); typecheck + build clean; determinism +
-sim mechanics untouched — only persisted and fast-forwarded what already existed.
+found colonies (owner-scoped), run the resource economy, and terraform (Phases 2–3A);
+the exploration leg is closed (Polish A–C); local persistence + offline progression
+work (Session 26). **Now building the SURFACE LAYER (Session 27, Phase 1)** — a
+deliberate pillar change (`docs/09` 2026-07-20, `docs/17`) that **reverses `docs/14`'s
+"no tile layer, ever"**: the planet gets a real 2D tile surface you land on and place
+your first colony on (the front of the fun loop). **Load-bearing boundary:** tiles are
+terrain + placement + site-modifiers; the colony ECONOMY stays aggregate; tiles are NOT
+a per-tile economy sim. **Commit 1 done (docs + generator):** `docs/17` created,
+`docs/14`/`docs/09`/`docs/05`/`CLAUDE.md` reconciled; `gen/surface.ts` — pure
+`generateSurface(universeSeed, body)` producing a 96×48 grid of immutable seed-derived
+tiles `{ altitude (coherent value-noise, archetype-biased), resources (sparse+clustered
+veins, absolute count ~6–14, Fissiles iff the body hosts them), baseTerrain }`, plus
+`tileToCandidateSite`/`tileModifiers` reusing the tested `siteModifiers()`. Terrain is a
+pure fn of seed, stored nowhere. **347 tests green** (332 baseline + 15 surface pure-fn);
+typecheck + build clean.
 
 ## Active next step
 
-**LOCAL PERSISTENCE + OFFLINE PROGRESSION (Session 26) is CODE-COMPLETE — next: user
-in-browser confirmation,** then the tile/surface layer this fix unblocks, or the next
-roadmap slice. Confirm in-browser: refresh mid-game resumes instead of resetting; land →
-refresh → TAKE OFF and the colony/site panel are present (the just-fixed bug); refresh
-while orbiting still shows correct MODE/actions; closing the tab, waiting real time, and
-reopening shows the "while you were away" toast with sensible population/habitability/water
-deltas (and the 12h-cap note on a very long gap); the ⚙ Settings pause-offline-progression
-checkbox actually suppresses it; New Game is confirm-guarded and genuinely resets; a
-deliberately-corrupted localStorage value falls back to a fresh game with the notice rather
-than a blank screen. No display/headless browser in this env to screenshot; the mechanics
-are unit-tested (332 green). Tuning knobs: `OFFLINE_ECON_TICKS_PER_REAL_HOUR`/`MAX_OFFLINE_ELAPSED_MS`
-(`sim/save/offline.ts`), `VISIBILITY_OFFLINE_THRESHOLD_MS` (`app/visibility-offline.ts`),
-autosave timer/debounce (`app/persistence.ts`). Rationale: `docs/planning/session-26.md`.
+**SURFACE LAYER Phase 1 — commit 1 (docs + generator) done; next: commit 2 (2D canvas
+map).** Remaining commits: (2) `SurfaceMap.tsx` — a full-screen HTML5 Canvas 2D grid
+(altitude shading + base terrain + sparse resource icons + hover/click select), cheap
+(static repaint, sub-ms), restructured `SurfaceView` to host it; (3) tile selection →
+`FoundColony{tile}` replacing `FoundColony{siteIndex}`, `Colony.tile?` (additive-optional,
+owner-scoped, no version bump), replace `SiteSelection.tsx`, mark claimable/resource tiles
++ the founded site distinctly, save round-trip test; (4) habitable climate skin — pure
+`tileAppearance(tile, latitude, planetClimate)` deriving water (low tiles; waterline rises
+with hydrosphere) / vegetation / snow from current planet state, wired into the map + tests.
+Determinism sacred (terrain pure-fn-of-seed; only `colony.tile` persists); economy/
+terraforming untouched. Reference: `docs/17`; rationale: `docs/planning/session-27.md`.
+Immutable-terrain-vs-derived-climate-skin split is the key idea (altitude-driven water
+with no per-tile save state).
+
+**Prior slice — Local persistence + offline progression (Session 26) is CODE-COMPLETE,
+still needs in-browser confirmation** (not blocking): refresh resumes; land→refresh→TAKE
+OFF present (bugfix); away-toast shows deltas; pause checkbox suppresses; New Game resets;
+corrupt save falls back. 332 tests at that point. Rationale: `docs/planning/session-26.md`.
 
 **Prior slice — the LANDING ARC (Session 25) is CODE-COMPLETE — still needs user
 in-browser confirmation** (not blocking; unaffected by this session): land a rocky
