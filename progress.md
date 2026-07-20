@@ -44,19 +44,19 @@ determinism untouched.
 
 ## Active next step
 
-**SURFACE UI REDESIGN (Session 28, Slice 1) — commit 0 (roadmap/docs) done; next: commit 1
-(full-screen surface mode + pan/zoom).** Remaining commits: (1) `App` gates flight overlays
-on `!landed`; `SurfaceView` → a full-screen `SurfaceMode` shell (top bar: name + compact stats
-+ TAKE OFF) + a pan/zoom canvas map (pure `ui/surface/viewport.ts` + tests; drag-pan, wheel/
-+– zoom-to-cursor, visible-tile culling, rAF-coalesced repaint) + preserved hover-inspect +
-a temporary COLONY drawer so economy/terraforming stay reachable; (2) top-bar toggle panels
-(TERRAFORMING / ECONOMY / TECH-stub / CIVIC-stub, single `activePanel`, default map-only) —
-**removes the temp COLONY drawer**; (3) named founding flow — `Colony.name?` + `FoundColony
-{name}` + pure `ui/surface/founding.ts` (select-existing vs found-new, second colony gated) +
-name round-trip test. Determinism/sim untouched (UI/view slice). New pure tests: viewport
-math (screen↔tile round-trips under zoom+pan), founding-flow actions incl. the gated case,
-colony-name persistence. Reference: `docs/17`, `docs/05` Slice 1; rationale:
-`docs/planning/session-28.md`.
+**SURFACE UI REDESIGN (Session 28, Slice 1) — commits 0–1 done; next: commit 2 (top-bar
+toggle panels).** Done: (0) roadmap/docs; (1) full-screen surface mode + pan/zoom — pure
+`ui/surface/viewport.ts` (+13 tests: screen↔tile round-trips under zoom+pan, zoom-to-cursor,
+pan clamp, culling); `App` gates flight overlays on `!landed` and renders `SurfaceMode`
+instead (HUD never overlays the surface); `SurfaceView` deleted → `SurfaceMode.tsx`
+full-screen shell (top bar name + stats + TAKE OFF + a temp COLONY drawer) + reworked
+`SurfaceMap.tsx` (full-container canvas, drag-pan + wheel/±/fit zoom-to-cursor, imperative
+viewport ref, rAF-coalesced culled repaint, hover-inspect). **382 tests green.** **Next:
+commit 2 — top-bar toggle panels** (TERRAFORMING / ECONOMY / TECH-stub / CIVIC-stub, single
+`activePanel`, default map-only) — **removes the temp COLONY drawer**. Then (3) named founding
+flow — `Colony.name?` + `FoundColony{name}` + pure `ui/surface/founding.ts` (select-existing
+vs found-new, second colony gated) + name round-trip test. Determinism/sim untouched (UI/view
+slice). Reference: `docs/17`, `docs/05` Slice 1; rationale: `docs/planning/session-28.md`.
 
 **Prior — SURFACE LAYER Phase 1 (Session 27) is CODE-COMPLETE, in-browser confirmation still
 open** (not blocking): land → 96×48 map; hostile bare / habitable alive; sparse resource

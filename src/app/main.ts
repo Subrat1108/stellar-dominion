@@ -66,7 +66,7 @@ async function boot(): Promise<void> {
 
   // Seed the landing-state ref from the restored/fresh world's ACTUAL ship
   // state — not just the Landed/TookOff event stream (which never fires on a
-  // reload). Without this, reloading while landed leaves SurfaceView hidden
+  // reload). Without this, reloading while landed skips the surface mode
   // (no TAKE OFF / colony UI) even though the sim state is correctly landed.
   syncLandingStateFromWorld(world);
 
