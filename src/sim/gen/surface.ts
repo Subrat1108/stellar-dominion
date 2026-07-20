@@ -16,7 +16,7 @@
 // current planet state — that split is what lets hydrosphere rise flood low
 // tiles later without any per-tile save state.
 
-import type { CelestialBody } from "../ecs/components.ts";
+import type { CelestialBody, TileCoord } from "../ecs/components.ts";
 import { makeRng, hashSeed, type Rng } from "../math/rng.ts";
 import { xxHashString } from "./hash.ts";
 import { localStrategicResources } from "./strategic.ts";
@@ -38,10 +38,8 @@ export type SurfaceResourceId =
   | "organics"
   | "fissiles";
 
-export interface TileCoord {
-  x: number;
-  y: number;
-}
+/** Re-exported so surface consumers can import the coord type from one place. */
+export type { TileCoord };
 
 /** One immutable, seed-derived surface tile. */
 export interface SurfaceTile {

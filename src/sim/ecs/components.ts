@@ -13,6 +13,12 @@ import type { OrbitalElements, Vec3 } from "../math/kepler.ts";
 export type DataTag = "real" | "derived" | "fictional";
 export type BodyKind = "star" | "planet" | "gas-giant";
 
+/** A tile coordinate on a body's surface grid (the surface layer, docs/17). */
+export interface TileCoord {
+  x: number;
+  y: number;
+}
+
 /** Atmosphere record — always present on planets, absent on stars. */
 export interface Atmosphere {
   /** Pascals. Earth ≈ 101 325. */
@@ -247,6 +253,14 @@ export interface Colony {
    * existed (legacy v3 saves) — treated as "no site chosen".
    */
   siteIndex?: number;
+  /**
+   * Grid coordinate of the tile this colony was founded on (the surface layer,
+   * docs/17). Replaces `siteIndex` as the placement delta: terrain regenerates
+   * from the body seed, and only this claimed tile persists (owner-scoped via
+   * `ownerId`). Absent for legacy colonies founded before the tile surface
+   * (they render at no particular tile) or founded without a chosen tile.
+   */
+  tile?: TileCoord;
   /**
    * Persistent solar-generation efficiency multiplier from the chosen site
    * (docs/14 — high insolation → efficient solar). Read on EVERY solar-generation

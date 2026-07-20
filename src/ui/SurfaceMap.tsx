@@ -34,11 +34,12 @@ interface SurfaceMapProps {
   bodyId: number;
   /** The tile a colony has been founded on (marked distinctly), if any. */
   foundedTile?: TileCoord | null;
-  /** Called when the player selects a tile (commit 3 wires founding through this). */
-  onSelectTile?: (tile: TileCoord) => void;
+  /** When provided (no colony yet), selecting a tile offers a SETTLE HERE action
+   *  that founds the colony on it. Absent once a colony exists. */
+  onFound?: (tile: TileCoord) => void;
 }
 
-export default function SurfaceMap({ world, bodyId, foundedTile = null, onSelectTile }: SurfaceMapProps) {
+export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound }: SurfaceMapProps) {
   const body = world.components.celestialBody.get(bodyId);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hover, setHover] = useState<TileCoord | null>(null);
@@ -125,7 +126,6 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onSelect
     const t = tileFromEvent(e);
     if (!t) return;
     setSelected(t);
-    onSelectTile?.(t);
   }
 
   return (
@@ -147,23 +147,35 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onSelect
           background: "#05060a",
         }}
       />
-      <TileInfo world={world} bodyId={bodyId} grid={grid} tile={selected ?? hover} />
+      <TileInfo
+        world={world}
+        bodyId={bodyId}
+        grid={grid}
+        tile={selected ?? hover}
+        selected={selected}
+        {...(onFound ? { onFound } : {})}
+      />
     </div>
   );
 }
 
-/** Readout for the hovered/selected tile: terrain, resources, and a preview of
- *  the founding modifiers settling there would give. */
+/** Readout for the hovered/selected tile: terrain, resources, a preview of the
+ *  founding modifiers, and (when a tile is SELECTED + founding is available) a
+ *  SETTLE HERE action that founds the colony on it. */
 function TileInfo({
   world,
   bodyId,
   grid,
   tile,
+  selected,
+  onFound,
 }: {
   world: World;
   bodyId: number;
   grid: ReturnType<typeof generateSurface>;
   tile: TileCoord | null;
+  selected: TileCoord | null;
+  onFound?: (tile: TileCoord) => void;
 }) {
   const body = world.components.celestialBody.get(bodyId);
   if (!tile || !body) {
@@ -176,6 +188,9 @@ function TileInfo({
   const t = tileAt(grid, tile.x, tile.y);
   const mods = tileModifiers(grid, tile.x, tile.y, body);
   const setup = mods.setupMetalsCost + mods.shieldingMetalsCost;
+  // Offer SETTLE HERE only for the SELECTED tile (not a transient hover), and
+  // only when founding is available (no colony yet).
+  const canSettle = !!onFound && !!selected && selected.x === tile.x && selected.y === tile.y;
   return (
     <div style={infoStyle}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
@@ -189,15 +204,33 @@ function TileInfo({
           </span>
         )}
       </div>
-      <div style={{ marginTop: 4, fontSize: 10, color: "#a6e3a1", display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <span>found here → solar ×{mods.solarEfficiency.toFixed(2)}</span>
-        {mods.startWaterBonus > 0 && <span>+{mods.startWaterBonus} water</span>}
-        {mods.startOxygenBonus > 0 && <span>+{mods.startOxygenBonus} O₂</span>}
-        {setup > 0 && <span style={{ color: "#f9e2af" }}>setup −{setup} metals</span>}
+      <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 10, color: "#a6e3a1", display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span>found here → solar ×{mods.solarEfficiency.toFixed(2)}</span>
+          {mods.startWaterBonus > 0 && <span>+{mods.startWaterBonus} water</span>}
+          {mods.startOxygenBonus > 0 && <span>+{mods.startOxygenBonus} O₂</span>}
+          {setup > 0 && <span style={{ color: "#f9e2af" }}>setup −{setup} metals</span>}
+        </span>
+        {canSettle && (
+          <button onClick={() => onFound!(selected!)} style={settleBtn}>⛶ SETTLE HERE</button>
+        )}
       </div>
     </div>
   );
 }
+
+const settleBtn: CSSProperties = {
+  marginLeft: "auto",
+  padding: "4px 12px",
+  fontSize: 11,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  background: "#1e3a5f",
+  color: "#89b4fa",
+  border: "1px solid #2a4a7f",
+  borderRadius: 4,
+  letterSpacing: 0.5,
+};
 
 const infoStyle: CSSProperties = {
   width: "min(90vw, 940px)",

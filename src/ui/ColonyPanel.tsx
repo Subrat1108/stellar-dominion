@@ -12,7 +12,6 @@ import { dispatch } from "../app/command-bus.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import { housingCapacity } from "../sim/systems/colony.ts";
 import TerraformingPanel from "./TerraformingPanel.tsx";
-import SiteSelection from "./SiteSelection.tsx";
 import {
   RESOURCES,
   RESOURCE_LABEL,
@@ -50,7 +49,15 @@ export default function ColonyPanel({ world, bus, bodyId }: ColonyPanelProps) {
   // No colony yet — choose a landing site, which founds the colony (the landing
   // arc, docs/14). The site shapes the founded colony's starting modifiers.
   if (!colony) {
-    return <SiteSelection world={world} bus={bus} bodyId={bodyId} />;
+    // Founding now happens by selecting a tile on the surface map (docs/17):
+    // pick a tile → SETTLE HERE. This panel just prompts until a colony exists.
+    return (
+      <div style={{ marginTop: 16, fontSize: 11, color: "#585b70", lineHeight: 1.5 }}>
+        No colony yet. Pick a landing tile on the surface map, then{" "}
+        <span style={{ color: "#a6e3a1" }}>SETTLE HERE</span> to found your first colony —
+        the tile shapes its head-starts, solar efficiency, and setup cost.
+      </div>
+    );
   }
 
   const metals = colony.stockpiles.metals ?? 0;

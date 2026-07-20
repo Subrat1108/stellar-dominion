@@ -27,19 +27,19 @@ typecheck + build clean.
 
 ## Active next step
 
-**SURFACE LAYER Phase 1 — commit 1 (docs + generator) done; next: commit 2 (2D canvas
-map).** Remaining commits: (2) `SurfaceMap.tsx` — a full-screen HTML5 Canvas 2D grid
-(altitude shading + base terrain + sparse resource icons + hover/click select), cheap
-(static repaint, sub-ms), restructured `SurfaceView` to host it; (3) tile selection →
-`FoundColony{tile}` replacing `FoundColony{siteIndex}`, `Colony.tile?` (additive-optional,
-owner-scoped, no version bump), replace `SiteSelection.tsx`, mark claimable/resource tiles
-+ the founded site distinctly, save round-trip test; (4) habitable climate skin — pure
-`tileAppearance(tile, latitude, planetClimate)` deriving water (low tiles; waterline rises
-with hydrosphere) / vegetation / snow from current planet state, wired into the map + tests.
-Determinism sacred (terrain pure-fn-of-seed; only `colony.tile` persists); economy/
-terraforming untouched. Reference: `docs/17`; rationale: `docs/planning/session-27.md`.
-Immutable-terrain-vs-derived-climate-skin split is the key idea (altitude-driven water
-with no per-tile save state).
+**SURFACE LAYER Phase 1 — commits 1–3 done; next: commit 4 (habitable climate skin).**
+Done: (1) `gen/surface.ts` generator + docs reversal; (2) `SurfaceMap.tsx` HTML5 Canvas 2D
+grid (altitude + base terrain + resource icons + hover/select) + `render/surface-appearance.ts`
++ restructured full-screen `SurfaceView`; (3) `FoundColony{tile}` replaces `{siteIndex}`,
+`Colony.tile?` (owner-scoped, additive-optional, no version bump), `SiteSelection.tsx`
+deleted, SETTLE HERE on the selected map tile, founded tile marked, owner-scoped save
+round-trip. **Next: commit 4 — habitable climate skin:** a pure `tileAppearance(tile,
+latitude, planetClimate)` deriving water (low tiles; waterline rises with hydrosphere) /
+vegetation / snow from *current* planet state (`surfaceTempK`/`hydrosphere`/pressure),
+wired into the map so habitable worlds render alive + hostile worlds stay bare + terraforming
+visibly changes the surface; + tests. Determinism sacred (terrain pure-fn-of-seed; only
+`colony.tile` persists); economy/terraforming untouched. Reference: `docs/17`; rationale:
+`docs/planning/session-27.md`. **358 tests green** through commit 3.
 
 **Prior slice — Local persistence + offline progression (Session 26) is CODE-COMPLETE,
 still needs in-browser confirmation** (not blocking): refresh resumes; land→refresh→TAKE

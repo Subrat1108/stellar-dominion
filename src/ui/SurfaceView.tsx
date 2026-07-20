@@ -13,6 +13,7 @@ import type { GameBus } from "../app/game-bus.ts";
 import type { CelestialBody } from "../sim/ecs/components.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { useLandingState } from "./hooks/useLandingState.ts";
+import { useGameTick } from "./hooks/useGameTick.ts";
 import ColonyPanel from "./ColonyPanel.tsx";
 import SurfaceMap from "./SurfaceMap.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
@@ -37,6 +38,10 @@ const KIND_LABEL: Record<string, string> = {
 
 export default function SurfaceView({ world, bus }: SurfaceViewProps) {
   const landedBodyId = useLandingState(bus);
+  // Re-render on tick so the founded-colony marker + founding availability stay
+  // current (founding a colony is a next-tick state change, not a landing event).
+  // Cheap: SurfaceMap only repaints its canvas when its own deps actually change.
+  useGameTick(bus, 10);
 
   // Remember the last landed body so its stats stay visible during the fade-out.
   const lastIdRef = useRef<number | null>(null);
@@ -47,6 +52,13 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
   const body: CelestialBody | undefined =
     displayId !== null && displayId !== undefined
       ? world.components.celestialBody.get(displayId)
+      : undefined;
+  // The colony on this body (if founded) — drives the founded-tile marker + whether
+  // the map offers founding. Read live from world state (re-rendered by useGameTick
+  // in ColonyPanel; SurfaceView reads it fresh each render via useLandingState events).
+  const colony =
+    displayId !== null && displayId !== undefined
+      ? world.components.colony.get(displayId)
       : undefined;
 
   function takeOff() {
@@ -86,7 +98,14 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
             style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: "1 1 auto", minWidth: 0 }}
           >
             {displayId !== null && displayId !== undefined && body.kind === "planet" && (
-              <SurfaceMap world={world} bodyId={displayId} />
+              <SurfaceMap
+                world={world}
+                bodyId={displayId}
+                foundedTile={colony?.tile ?? null}
+                {...(colony
+                  ? {}
+                  : { onFound: (tile) => dispatch(world, { kind: "FoundColony", bodyId: displayId, tile }) })}
+              />
             )}
           </div>
 

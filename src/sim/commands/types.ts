@@ -8,6 +8,7 @@
 
 import type { BuildingType, TerraformLever } from "../data/colony.ts";
 import type { OwnerId } from "../owner.ts";
+import type { TileCoord } from "../ecs/components.ts";
 
 /** A discrete player action queued for deterministic application in the tick. */
 export type Command =
@@ -21,7 +22,7 @@ export type Command =
   | { kind: "CancelCourse" }
   | { kind: "LandAtBody"; bodyId: number }
   | { kind: "TakeOff" }
-  | { kind: "FoundColony"; bodyId: number; siteIndex?: number }
+  | { kind: "FoundColony"; bodyId: number; tile?: TileCoord }
   | { kind: "BuildStructure"; bodyId: number; building: BuildingType }
   | { kind: "SetTerraformAllocation"; bodyId: number; lever: TerraformLever; fraction: number }
   // Warp (Step 1B): select + preview a destination, commit the jump, or abort.

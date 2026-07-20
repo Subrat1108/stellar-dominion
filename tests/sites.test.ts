@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { generateCandidateSites, CANDIDATE_SITE_COUNT } from "../src/sim/gen/sites.ts";
+import { SURFACE_WIDTH, SURFACE_HEIGHT } from "../src/sim/gen/surface.ts";
 import type { CelestialBody } from "../src/sim/ecs/components.ts";
 import { createStartingSystem } from "../src/sim/world-setup.ts";
 import { run } from "../src/sim/loop.ts";
@@ -96,29 +97,42 @@ describe("candidate landing sites — attribute ranges + body bias", () => {
   });
 });
 
-describe("FoundColony records the chosen site", () => {
-  it("stores the selected siteIndex on the colony and it survives a save round-trip", () => {
+describe("FoundColony records the chosen tile (the surface layer, docs/17)", () => {
+  it("stores the selected tile on the colony and it survives a save round-trip", () => {
     const world = createStartingSystem("site-found");
     run(world, 120);
     const bodyId = [...world.components.celestialBody.entries()].find(([, b]) => b.kind === "planet")![0];
     world.components.shipControl.get(world.shipId)!.landedBodyId = bodyId;
-    const r = applyCommand(world, { kind: "FoundColony", bodyId, siteIndex: 2 });
+    const r = applyCommand(world, { kind: "FoundColony", bodyId, tile: { x: 12, y: 20 } });
     expect(r.ok).toBe(true);
-    expect(world.components.colony.get(bodyId)!.siteIndex).toBe(2);
+    expect(world.components.colony.get(bodyId)!.tile).toEqual({ x: 12, y: 20 });
 
     const restored = reconstructWorld(extractDeltas(world));
     const restoredColony = [...restored.components.colony.values()][0]!;
-    expect(restoredColony.siteIndex).toBe(2);
+    expect(restoredColony.tile).toEqual({ x: 12, y: 20 });
   });
 
-  it("clamps an out-of-range siteIndex to a valid site", () => {
+  it("clamps an out-of-range tile to a valid grid coordinate", () => {
     const world = createStartingSystem("site-clamp");
     run(world, 120);
     const bodyId = [...world.components.celestialBody.entries()].find(([, b]) => b.kind === "planet")![0];
     world.components.shipControl.get(world.shipId)!.landedBodyId = bodyId;
-    applyCommand(world, { kind: "FoundColony", bodyId, siteIndex: 99 });
-    const idx = world.components.colony.get(bodyId)!.siteIndex!;
-    expect(idx).toBeGreaterThanOrEqual(0);
-    expect(idx).toBeLessThan(CANDIDATE_SITE_COUNT);
+    applyCommand(world, { kind: "FoundColony", bodyId, tile: { x: 9999, y: -5 } });
+    const tile = world.components.colony.get(bodyId)!.tile!;
+    expect(tile.x).toBeGreaterThanOrEqual(0);
+    expect(tile.x).toBeLessThan(SURFACE_WIDTH);
+    expect(tile.y).toBeGreaterThanOrEqual(0);
+    expect(tile.y).toBeLessThan(SURFACE_HEIGHT);
+  });
+
+  it("founding WITHOUT a tile (headless/legacy) still succeeds with neutral modifiers", () => {
+    const world = createStartingSystem("no-tile");
+    run(world, 120);
+    const bodyId = [...world.components.celestialBody.entries()].find(([, b]) => b.kind === "planet")![0];
+    world.components.shipControl.get(world.shipId)!.landedBodyId = bodyId;
+    expect(applyCommand(world, { kind: "FoundColony", bodyId }).ok).toBe(true);
+    const colony = world.components.colony.get(bodyId)!;
+    expect(colony.tile).toBeUndefined();
+    expect(colony.solarEfficiency).toBe(1); // neutral
   });
 });

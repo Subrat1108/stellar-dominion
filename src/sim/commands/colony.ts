@@ -4,16 +4,12 @@
 // deterministically, returning a CommandResult (events on success).
 
 import type { World } from "../ecs/world.ts";
-import type { Colony, Terraforming } from "../ecs/components.ts";
+import type { Colony, Terraforming, TileCoord } from "../ecs/components.ts";
 import type { CommandResult } from "./types.ts";
 import type { OwnerId } from "../owner.ts";
 import { hydrosphereGate } from "../math/terraforming.ts";
-import {
-  CANDIDATE_SITE_COUNT,
-  generateCandidateSites,
-  siteModifiers,
-  NEUTRAL_SITE_MODIFIERS,
-} from "../gen/sites.ts";
+import { NEUTRAL_SITE_MODIFIERS } from "../gen/sites.ts";
+import { generateSurface, tileModifiers } from "../gen/surface.ts";
 import { landingViability, edlSetupCost } from "../math/edl.ts";
 import {
   COLONY_SEED,
@@ -40,13 +36,9 @@ export function foundColony(
   world: World,
   bodyId: number,
   actorId: OwnerId = world.localOwnerId,
-  siteIndex = 0,
+  tile?: TileCoord,
 ): CommandResult {
   const tick = world.tick;
-  // The chosen landing site (the landing arc, docs/14). Clamp to a valid index;
-  // the site itself is regenerated deterministically from the body seed for
-  // display/modifiers. (Modifier application lands with the site→modifier map.)
-  const chosenSite = Math.max(0, Math.min(CANDIDATE_SITE_COUNT - 1, Math.floor(siteIndex)));
   const ctrl = world.components.shipControl.get(world.shipId);
   if (!ctrl || ctrl.landedBodyId !== bodyId)
     return { ok: false, reason: "must be landed on the body to found a colony" };
@@ -57,13 +49,21 @@ export function foundColony(
   const ls = world.components.lifeSupport.get(world.shipId);
   if (!inv || !ls) return { ok: false, reason: "ship is missing supplies" };
 
-  // Site → founding modifiers (the landing arc, docs/14). The chosen site gives
+  // Tile → founding modifiers (the surface layer, docs/17): the chosen tile gives
   // a persistent solar efficiency + in-situ volatile head-starts, and adds one-
-  // time Metals setup costs (rough terrain, radiation shielding, a hostile EDL).
-  // Deterministic: the site is regenerated from the body seed, not stored.
+  // time Metals setup costs (rough terrain, radiation shielding). Terrain is
+  // regenerated deterministically from the body seed — only the claimed tile is
+  // stored. Founding WITHOUT a tile (legacy/headless) uses neutral modifiers.
   const body = world.components.celestialBody.get(bodyId);
-  const site = body ? generateCandidateSites(world.universeSeed, body)[chosenSite] : undefined;
-  const mods = site ? siteModifiers(site) : NEUTRAL_SITE_MODIFIERS;
+  let chosenTile: TileCoord | undefined;
+  let mods = NEUTRAL_SITE_MODIFIERS;
+  if (body && tile) {
+    const grid = generateSurface(world.universeSeed, body);
+    const x = Math.max(0, Math.min(grid.width - 1, Math.floor(tile.x)));
+    const y = Math.max(0, Math.min(grid.height - 1, Math.floor(tile.y)));
+    chosenTile = { x, y };
+    mods = tileModifiers(grid, x, y, body);
+  }
   const edlCost = body ? edlSetupCost(landingViability(body)) : 0;
   // Metals drawn from the ship = the colony seed PLUS the site's setup costs
   // (spent establishing infrastructure, not stored in the colony).
@@ -110,7 +110,6 @@ export function foundColony(
     bodyId,
     ownerId: actorId,
     foundedTick: tick,
-    siteIndex: chosenSite,
     solarEfficiency: mods.solarEfficiency,
     stockpiles,
     buildings,
@@ -120,6 +119,7 @@ export function foundColony(
     popLimitingFactor: "stable",
     buildingStatuses: {},
   };
+  if (chosenTile) colony.tile = chosenTile; // the claimed placement (owner-scoped via ownerId)
   world.components.colony.set(bodyId, colony);
 
   return { ok: true, events: [{ kind: "ColonyFounded", bodyId, tick }] };

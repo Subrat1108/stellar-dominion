@@ -133,7 +133,7 @@ export function applyCommand(
     }
 
     case "FoundColony":
-      return foundColony(world, cmd.bodyId, actorId, cmd.siteIndex);
+      return foundColony(world, cmd.bodyId, actorId, cmd.tile);
 
     case "BuildStructure":
       return buildStructure(world, cmd.bodyId, cmd.building, actorId);
