@@ -21,7 +21,8 @@ import {
   type TileCoord,
 } from "../sim/gen/surface.ts";
 import {
-  baseTileColorCss,
+  tileAppearanceCss,
+  planetClimateOf,
   RESOURCE_GLYPH,
   RESOURCE_LABEL,
 } from "../render/surface-appearance.ts";
@@ -51,16 +52,25 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound 
     [world.universeSeed, body],
   );
 
+  // Live climate skin — recomputed only when the body's climate fields move
+  // (terraforming), so the canvas repaints when water/temp change (docs/17).
+  const climate = useMemo(
+    () => (body ? planetClimateOf(body) : null),
+    [body?.surfaceTempK, body?.hydrosphere, body?.atmosphere?.pressurePa, body?.atmosphere?.hasLiquidWater],
+  );
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !grid) return;
+    if (!canvas || !grid || !climate) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // 1. Base terrain (bare substrate + altitude shading).
+    // 1. Visible surface — climate skin (water/veg/snow) over the bare substrate,
+    //    derived from the body's current state + tile altitude/latitude.
     for (let y = 0; y < grid.height; y++) {
+      const lat = absLatitudeDeg(y, grid.height);
       for (let x = 0; x < grid.width; x++) {
-        ctx.fillStyle = baseTileColorCss(tileAt(grid, x, y));
+        ctx.fillStyle = tileAppearanceCss(tileAt(grid, x, y), lat, climate);
         ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
       }
     }
@@ -104,7 +114,7 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound 
       ctx.lineWidth = 2;
       ctx.strokeRect(selected.x * CELL + 1, selected.y * CELL + 1, CELL - 2, CELL - 2);
     }
-  }, [grid, hover, selected, foundedTile]);
+  }, [grid, climate, hover, selected, foundedTile]);
 
   if (!body || !grid) return null;
 
