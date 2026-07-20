@@ -16,6 +16,8 @@ import { dispatch } from "../app/command-bus.ts";
 import { useLandingState } from "./hooks/useLandingState.ts";
 import { useGameTick } from "./hooks/useGameTick.ts";
 import ColonyPanel from "./ColonyPanel.tsx";
+import TerraformingPanel from "./TerraformingPanel.tsx";
+import { TechPanel, CivicPanel } from "./SurfacePanelStubs.tsx";
 import SurfaceMap from "./SurfaceMap.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
@@ -31,12 +33,23 @@ interface SurfaceModeProps {
   bus: GameBus;
 }
 
+/** Which top-bar toggle panel is open (one at a time; null = clean map-only). */
+type SurfacePanel = "terraforming" | "economy" | "tech" | "civic";
+
+const PANEL_LABEL: Record<SurfacePanel, string> = {
+  terraforming: "☼ TERRAFORMING",
+  economy: "▤ ECONOMY",
+  tech: "⚙ TECH",
+  civic: "⚖ CIVIC",
+};
+const PANEL_ORDER: SurfacePanel[] = ["terraforming", "economy", "tech", "civic"];
+
 export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
   const landedBodyId = useLandingState(bus);
   // Re-render on tick so the founded marker / founding availability stay current.
   useGameTick(bus, 10);
   const [mounted, setMounted] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<SurfacePanel | null>(null);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
@@ -83,12 +96,15 @@ export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setDrawerOpen((o) => !o)}
-            style={{ ...topBtn, ...(drawerOpen ? topBtnActive : null) }}
-          >
-            ▤ COLONY
-          </button>
+          {PANEL_ORDER.map((p) => (
+            <button
+              key={p}
+              onClick={() => setActivePanel((cur) => (cur === p ? null : p))}
+              style={{ ...topBtn, ...(activePanel === p ? topBtnActive : null) }}
+            >
+              {PANEL_LABEL[p]}
+            </button>
+          ))}
           <button onClick={() => dispatch(world, { kind: "TakeOff" })} style={takeOffBtn}>
             ▲ TAKE OFF
           </button>
@@ -110,11 +126,19 @@ export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
           </div>
         )}
 
-        {drawerOpen && (
+        {activePanel && (
           <div style={drawer}>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: "#585b70", marginBottom: 10 }}>COLONY & TERRAFORMING</div>
-            {body.kind === "planet" && <StrategicRow world={world} body={body} />}
-            <ColonyPanel world={world} bus={bus} bodyId={bodyId} />
+            <button onClick={() => setActivePanel(null)} style={drawerClose} title="Close">×</button>
+            {activePanel === "terraforming" && <TerraformingPanel world={world} bodyId={bodyId} />}
+            {activePanel === "economy" && (
+              <>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: "#585b70", marginBottom: 10 }}>ECONOMY / RESOURCES</div>
+                {body.kind === "planet" && <StrategicRow world={world} body={body} />}
+                <ColonyPanel world={world} bus={bus} bodyId={bodyId} />
+              </>
+            )}
+            {activePanel === "tech" && <TechPanel />}
+            {activePanel === "civic" && <CivicPanel />}
           </div>
         )}
       </div>
@@ -178,4 +202,10 @@ const drawer: CSSProperties = {
   background: "rgba(5,6,10,0.96)", borderLeft: "1px solid #2a2c3f",
   font: "13px/1.6 ui-monospace, monospace", color: "#cdd6f4",
   boxShadow: "-8px 0 40px rgba(0,0,0,0.5)",
+};
+
+const drawerClose: CSSProperties = {
+  position: "absolute", top: 8, right: 10, width: 24, height: 24,
+  fontSize: 14, fontFamily: "inherit", cursor: "pointer",
+  background: "transparent", color: "#585b70", border: "1px solid #2a2c3f", borderRadius: 4,
 };
