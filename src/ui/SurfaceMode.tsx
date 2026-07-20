@@ -19,6 +19,8 @@ import ColonyPanel from "./ColonyPanel.tsx";
 import TerraformingPanel from "./TerraformingPanel.tsx";
 import { TechPanel, CivicPanel } from "./SurfacePanelStubs.tsx";
 import SurfaceMap from "./SurfaceMap.tsx";
+import type { TileCoord } from "../sim/gen/surface.ts";
+import { tileFoundingAction, defaultColonyName } from "./surface/founding.ts";
 import { surfaceGravityG } from "../sim/math/physics.ts";
 import { habitabilityLabel, habitabilityColor } from "../sim/math/habitability.ts";
 import {
@@ -44,12 +46,18 @@ const PANEL_LABEL: Record<SurfacePanel, string> = {
 };
 const PANEL_ORDER: SurfacePanel[] = ["terraforming", "economy", "tech", "civic"];
 
+/** Slice 1 enforces one colony per planet; Slice 2 (per-body colony list) flips
+ *  this to true and the SAME founding flow creates additional colonies. */
+const CAN_FOUND_ANOTHER = false;
+
 export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
   const landedBodyId = useLandingState(bus);
   // Re-render on tick so the founded marker / founding availability stay current.
   useGameTick(bus, 10);
   const [mounted, setMounted] = useState(false);
   const [activePanel, setActivePanel] = useState<SurfacePanel | null>(null);
+  const [selectedTile, setSelectedTile] = useState<TileCoord | null>(null);
+  const [naming, setNaming] = useState<{ tile: TileCoord; name: string } | null>(null);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
@@ -60,6 +68,22 @@ export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
   const body: CelestialBody | undefined = world.components.celestialBody.get(bodyId);
   if (!body) return null;
   const colony = world.components.colony.get(bodyId);
+
+  // The founding/enter action for the selected tile (pure logic, ui/surface/founding.ts).
+  const action = tileFoundingAction({
+    hasColony: !!colony,
+    foundedTile: colony?.tile ?? null,
+    selectedTile,
+    canFoundAnother: CAN_FOUND_ANOTHER,
+  });
+
+  function confirmFound(): void {
+    if (!naming) return;
+    const name = naming.name.trim();
+    dispatch(world, { kind: "FoundColony", bodyId, tile: naming.tile, ...(name ? { name } : {}) });
+    setNaming(null);
+    setSelectedTile(null);
+  }
 
   const gravityG = surfaceGravityG(body.massKg, body.radiusM);
   const habColor = body.habitability !== undefined ? habitabilityColor(body.habitability) : "#cdd6f4";
@@ -118,11 +142,65 @@ export default function SurfaceMode({ world, bus }: SurfaceModeProps) {
             world={world}
             bodyId={bodyId}
             foundedTile={colony?.tile ?? null}
-            {...(colony ? {} : { onFound: (tile) => dispatch(world, { kind: "FoundColony", bodyId, tile }) })}
+            onSelectTile={setSelectedTile}
           />
         ) : (
           <div style={{ display: "grid", placeItems: "center", height: "100%", color: "#585b70" }}>
             No walkable surface here.
+          </div>
+        )}
+
+        {/* Founding / enter action bar (bottom-centre) for the selected tile. */}
+        {!naming && action.kind !== "none" && (
+          <div style={actionBar}>
+            {action.kind === "found" && (
+              <button
+                onClick={() => setNaming({ tile: action.tile, name: defaultColonyName(body.name) })}
+                style={foundBtn}
+              >
+                ⛶ FOUND COLONY HERE · tile {action.tile.x},{action.tile.y}
+              </button>
+            )}
+            {action.kind === "enter" && (
+              <button onClick={() => setActivePanel("economy")} style={foundBtn}>
+                ▤ ENTER {colony?.name ?? body.name}
+              </button>
+            )}
+            {action.kind === "found-blocked" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button disabled style={foundBtnDisabled}>⛶ FOUND ANOTHER</button>
+                <span style={{ color: "#f9e2af", fontSize: 10, maxWidth: 380 }}>{action.reason}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Naming dialog (modal) — name the colony/site, then found it. */}
+        {naming && (
+          <div style={modalOverlay} onClick={() => setNaming(null)}>
+            <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "#585b70", marginBottom: 6 }}>NAME YOUR COLONY</div>
+              <div style={{ fontSize: 11, color: "#585b70", marginBottom: 10 }}>
+                {body.name} · tile {naming.tile.x},{naming.tile.y}
+              </div>
+              <input
+                autoFocus
+                value={naming.name}
+                onChange={(e) => setNaming({ tile: naming.tile, name: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && naming.name.trim()) confirmFound();
+                  else if (e.key === "Escape") setNaming(null);
+                }}
+                maxLength={40}
+                style={nameInput}
+              />
+              <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
+                <button onClick={() => setNaming(null)} style={cancelBtn}>CANCEL</button>
+                <button onClick={confirmFound} disabled={!naming.name.trim()} style={naming.name.trim() ? foundBtn : foundBtnDisabled}>
+                  ⛶ FOUND
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -208,4 +286,37 @@ const drawerClose: CSSProperties = {
   position: "absolute", top: 8, right: 10, width: 24, height: 24,
   fontSize: 14, fontFamily: "inherit", cursor: "pointer",
   background: "transparent", color: "#585b70", border: "1px solid #2a2c3f", borderRadius: 4,
+};
+
+const actionBar: CSSProperties = {
+  position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)",
+  display: "flex", alignItems: "center", gap: 10,
+  padding: "8px 12px", background: "rgba(5,6,10,0.9)", border: "1px solid #2a2c3f",
+  borderRadius: 6, boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+};
+
+const foundBtn: CSSProperties = {
+  padding: "8px 16px", fontSize: 12, fontFamily: "inherit", cursor: "pointer",
+  background: "#1e3a5f", color: "#89b4fa", border: "1px solid #2a4a7f", borderRadius: 4, letterSpacing: 0.5,
+};
+const foundBtnDisabled: CSSProperties = {
+  ...foundBtn, cursor: "not-allowed", background: "transparent", color: "#45475a", borderColor: "#1e2030",
+};
+const cancelBtn: CSSProperties = {
+  padding: "8px 14px", fontSize: 12, fontFamily: "inherit", cursor: "pointer",
+  background: "#1e2030", color: "#a6adc8", border: "1px solid #313244", borderRadius: 4, letterSpacing: 0.5,
+};
+
+const modalOverlay: CSSProperties = {
+  position: "absolute", inset: 0, display: "grid", placeItems: "center",
+  background: "rgba(3,4,10,0.6)", zIndex: 10,
+};
+const modalCard: CSSProperties = {
+  width: 360, maxWidth: "90vw", padding: "20px 22px",
+  background: "rgba(8,9,15,0.98)", border: "1px solid #2a2c3f", borderRadius: 8,
+  font: "13px/1.5 ui-monospace, monospace", color: "#cdd6f4", boxShadow: "0 12px 50px rgba(0,0,0,0.6)",
+};
+const nameInput: CSSProperties = {
+  width: "100%", boxSizing: "border-box", padding: "8px 10px", fontSize: 13, fontFamily: "inherit",
+  background: "#12131f", color: "#cdd6f4", border: "1px solid #2a2c3f", borderRadius: 4, outline: "none",
 };

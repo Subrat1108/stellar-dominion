@@ -42,14 +42,14 @@ interface SurfaceMapProps {
   bodyId: number;
   /** The tile a colony has been founded on (marked distinctly), if any. */
   foundedTile?: TileCoord | null;
-  /** When provided (no colony yet), selecting a tile offers a SETTLE HERE action
-   *  that founds the colony on it. Absent once a colony exists. */
-  onFound?: (tile: TileCoord) => void;
+  /** Reports the selected tile (or null) up to the parent, which owns the
+   *  founding/enter affordance + naming flow (SurfaceMode). */
+  onSelectTile?: (tile: TileCoord | null) => void;
 }
 
 const CLICK_MOVE_THRESHOLD = 4; // px of drag under which a pointerup counts as a click
 
-export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound }: SurfaceMapProps) {
+export default function SurfaceMap({ world, bodyId, foundedTile = null, onSelectTile }: SurfaceMapProps) {
   const body = world.components.celestialBody.get(bodyId);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -240,6 +240,7 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound 
       const { sx, sy } = pointerToScreen(e);
       const t = tileFromScreen(vp, sx, sy, grid.width, grid.height);
       setSelected(t);
+      onSelectTile?.(t);
     }
   }
 
@@ -261,29 +262,21 @@ export default function SurfaceMap({ world, bodyId, foundedTile = null, onFound 
         <button onClick={fit} style={zoomBtn} title="Fit whole planet">⤢</button>
       </div>
 
-      {/* Tile inspector (bottom-left) — hover to inspect, click to select. */}
-      <TileInfo
-        world={world}
-        bodyId={bodyId}
-        grid={grid}
-        tile={selected ?? hover}
-        selected={selected}
-        {...(onFound ? { onFound } : {})}
-      />
+      {/* Tile inspector (bottom-left) — hover to inspect, click to select. The
+          founding/enter action lives in SurfaceMode (driven by world state). */}
+      <TileInfo world={world} bodyId={bodyId} grid={grid} tile={selected ?? hover} />
     </div>
   );
 }
 
-/** Readout for the hovered/selected tile + a SETTLE HERE action when founding. */
+/** Readout for the hovered/selected tile: terrain, resources, founding-modifier preview. */
 function TileInfo({
-  world, bodyId, grid, tile, selected, onFound,
+  world, bodyId, grid, tile,
 }: {
   world: World;
   bodyId: number;
   grid: ReturnType<typeof generateSurface>;
   tile: TileCoord | null;
-  selected: TileCoord | null;
-  onFound?: (tile: TileCoord) => void;
 }) {
   const body = world.components.celestialBody.get(bodyId);
   if (!tile || !body) {
@@ -296,7 +289,6 @@ function TileInfo({
   const t = tileAt(grid, tile.x, tile.y);
   const mods = tileModifiers(grid, tile.x, tile.y, body);
   const setup = mods.setupMetalsCost + mods.shieldingMetalsCost;
-  const canSettle = !!onFound && !!selected && selected.x === tile.x && selected.y === tile.y;
   return (
     <div style={infoStyle}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
@@ -310,16 +302,11 @@ function TileInfo({
           </span>
         )}
       </div>
-      <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: "#a6e3a1", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span>found here → solar ×{mods.solarEfficiency.toFixed(2)}</span>
-          {mods.startWaterBonus > 0 && <span>+{mods.startWaterBonus} water</span>}
-          {mods.startOxygenBonus > 0 && <span>+{mods.startOxygenBonus} O₂</span>}
-          {setup > 0 && <span style={{ color: "#f9e2af" }}>setup −{setup} metals</span>}
-        </span>
-        {canSettle && (
-          <button onClick={() => onFound!(selected!)} style={settleBtn}>⛶ SETTLE HERE</button>
-        )}
+      <div style={{ marginTop: 4, fontSize: 10, color: "#a6e3a1", display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <span>found here → solar ×{mods.solarEfficiency.toFixed(2)}</span>
+        {mods.startWaterBonus > 0 && <span>+{mods.startWaterBonus} water</span>}
+        {mods.startOxygenBonus > 0 && <span>+{mods.startOxygenBonus} O₂</span>}
+        {setup > 0 && <span style={{ color: "#f9e2af" }}>setup −{setup} metals</span>}
       </div>
     </div>
   );
@@ -328,11 +315,6 @@ function TileInfo({
 const zoomBtn: CSSProperties = {
   width: 34, height: 34, fontSize: 16, fontFamily: "inherit", cursor: "pointer",
   background: "rgba(5,6,10,0.85)", color: "#cdd6f4", border: "1px solid #2a2c3f", borderRadius: 4,
-};
-
-const settleBtn: CSSProperties = {
-  marginLeft: "auto", padding: "4px 12px", fontSize: 11, fontFamily: "inherit", cursor: "pointer",
-  background: "#1e3a5f", color: "#89b4fa", border: "1px solid #2a4a7f", borderRadius: 4, letterSpacing: 0.5,
 };
 
 const infoStyle: CSSProperties = {

@@ -37,6 +37,7 @@ export function foundColony(
   bodyId: number,
   actorId: OwnerId = world.localOwnerId,
   tile?: TileCoord,
+  name?: string,
 ): CommandResult {
   const tick = world.tick;
   const ctrl = world.components.shipControl.get(world.shipId);
@@ -120,6 +121,8 @@ export function foundColony(
     buildingStatuses: {},
   };
   if (chosenTile) colony.tile = chosenTile; // the claimed placement (owner-scoped via ownerId)
+  const trimmed = name?.trim();
+  if (trimmed) colony.name = trimmed; // player-given colony name (display only)
   world.components.colony.set(bodyId, colony);
 
   return { ok: true, events: [{ kind: "ColonyFounded", bodyId, tick }] };

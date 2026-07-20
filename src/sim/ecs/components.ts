@@ -246,6 +246,12 @@ export interface Colony {
   ownerId: string;
   foundedTick: number;
   /**
+   * Player-given name for this colony/site (the named founding flow, docs/17
+   * Slice 1). Additive-optional — legacy colonies have none (the UI falls back
+   * to the body name). Display only; persists via the stash (no version bump).
+   */
+  name?: string;
+  /**
    * Index of the landing site chosen at founding (the landing arc, docs/14).
    * The site itself is regenerated deterministically from the body seed +
    * this index (gen/sites.ts) for display; its derived founding modifiers are

@@ -11,20 +11,21 @@ The deterministic space-4X sim runs end-to-end: a seeded content engine generate
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
 found colonies (owner-scoped), run the resource economy, and terraform (Phases 2–3A);
 the exploration leg is closed (Polish A–C); local persistence + offline progression
-work (Session 26); the tile SURFACE LAYER Phase 1 (Session 27) is in. **Now building the
-SURFACE UI REDESIGN (Session 28, Slice 1)** — a presentation + founding-UX slice on the
-working surface sim (**no economy/determinism/sim changes**): a full-screen zoomable/
-scrollable Civ-style surface *mode* with top-bar toggle menus (TERRAFORMING / ECONOMY /
-TECH-stub / CIVIC-stub) and a named landing/founding flow (select→name→confirm; the
-"found another" path built but gated behind `canFoundAnother` until the Slice-2 multi-colony
-economy). **Commit 0 done (roadmap refresh + decisions):** `docs/05` records Slice 1 / Slice 2
-(per-body colony list, separate pools, planet-aggregated totals, terraforming from the
-aggregate, save migrator) / the layers they set up (interstellar economy → tech tree that
-retires god-mode warp → 3B) / Deferred (hard-start, rivals/AI, multiplayer, monetization);
-`docs/09` logs the three decisions (full-screen mode; separate-pools-aggregated-per-planet
-Slice 2 model; terraforming from the planetary aggregate). **369 tests green** (unchanged;
-docs-only commit). **SURFACE LAYER Phase 1 (Session 27)** — a deliberate pillar change
-(`docs/09` 2026-07-20, `docs/17`) that
+work (Session 26); the tile SURFACE LAYER Phase 1 (Session 27) is in. **SURFACE UI REDESIGN
+(Session 28, Slice 1) is CODE-COMPLETE** (in-browser confirmation pending) — a presentation +
+founding-UX slice on the working surface sim (**no economy/determinism/sim changes**). When
+landed, the planet is now a full-screen Civ-style surface *mode*: the flight overlays are
+hidden (`App` gates them on `!landed`), the 96×48 tile map fills the screen with pan (drag)
++ zoom (wheel/±/fit, toward the cursor) driven by pure `ui/surface/viewport.ts`, a top bar
+holds one-at-a-time toggle panels (TERRAFORMING / ECONOMY / TECH-stub / CIVIC-stub), and a
+**named founding flow** (click a tile → FOUND COLONY HERE → name dialog → founded + marked;
+re-select → ENTER; another tile → "found another" **built but gated** behind
+`canFoundAnother` with the command-layer rejection as backstop). `Colony.name?` +
+`FoundColony{name}` (additive-optional, no version bump). Shipped in four commits (roadmap/
+docs → full-screen mode + pan/zoom → top-bar panels → named founding). **391 tests green**
+(369 baseline + 22 new pure-fn: 13 viewport, 9 founding-flow/name-round-trip); typecheck +
+build clean; determinism/economy/terraforming untouched. **SURFACE LAYER Phase 1 (Session
+27)** — a deliberate pillar change (`docs/09` 2026-07-20, `docs/17`) that
 **reverses `docs/14`'s "no tile layer, ever"**: the planet now has a real 2D tile surface
 you land on and place your first colony on (the front of the fun loop). **Load-bearing
 boundary held:** tiles are terrain + placement + site-modifiers; the colony ECONOMY stays
@@ -44,19 +45,19 @@ determinism untouched.
 
 ## Active next step
 
-**SURFACE UI REDESIGN (Session 28, Slice 1) — commits 0–2 done; next: commit 3 (named
-founding flow).** Done: (0) roadmap/docs; (1) full-screen surface mode + pan/zoom (pure
-`ui/surface/viewport.ts` +13 tests; `App` gates flight overlays on `!landed` → `SurfaceMode`;
-reworked `SurfaceMap.tsx` full-container canvas with drag-pan + wheel/±/fit zoom-to-cursor,
-imperative viewport ref, rAF-coalesced culled repaint); (2) top-bar toggle panels — single
-`activePanel` (TERRAFORMING / ECONOMY / TECH-stub / CIVIC-stub, one at a time, default
-map-only); temp COLONY drawer removed; `TerraformingPanel` split out of `ColonyPanel`;
-`SurfacePanelStubs.tsx`. **382 tests green.** **Next: commit 3 — named founding flow:**
-`Colony.name?` (additive-optional, no version bump) + `FoundColony{name}` + pure
-`ui/surface/founding.ts` (select-existing vs found-new; the "found another" path built but
-gated behind `canFoundAnother`, command-layer rejection as backstop) + a colony-name save
-round-trip test. Determinism/sim untouched (UI/view slice). Reference: `docs/17`, `docs/05`
-Slice 1; rationale: `docs/planning/session-28.md`.
+**SURFACE UI REDESIGN (Session 28, Slice 1) is CODE-COMPLETE — next: user in-browser
+confirmation, then Slice 2 (multi-colony economy).** Confirm in-browser (no display here):
+land → full-screen surface, no flight HUD; drag/scroll/±/fit pan+zoom the 96×48 map smoothly;
+top-bar TERRAFORMING/ECONOMY open one panel at a time (TECH/CIVIC = stubs); click a tile →
+FOUND COLONY HERE → name dialog → colony founded + marked distinctly; re-select its tile →
+ENTER (opens ECONOMY); select another tile → "FOUND ANOTHER" gated with the Slice-2 note;
+TAKE OFF returns to flight (overlays back); refresh keeps the named colony + tile. Tuning
+knobs: `TILE_PX`/`zoomBounds` (`ui/surface/viewport.ts`), `CLICK_MOVE_THRESHOLD`
+(`SurfaceMap.tsx`), `CAN_FOUND_ANOTHER` (`SurfaceMode.tsx` — Slice 2 flips it). **391 tests
+green.** **Slice 2 next (a SIM slice):** colonies → per-body LIST, separate resource pools
+per colony, planet-aggregated totals, terraforming funded by the planetary aggregate (more
+colonies → faster terraforming), the gated "found another" turns on, save-format change +
+migrator. Reference: `docs/17`, `docs/05` Slice 2; rationale: `docs/planning/session-28.md`.
 
 **Prior — SURFACE LAYER Phase 1 (Session 27) is CODE-COMPLETE, in-browser confirmation still
 open** (not blocking): land → 96×48 map; hostile bare / habitable alive; sparse resource
