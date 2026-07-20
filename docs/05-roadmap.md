@@ -68,14 +68,37 @@ A focused, no-new-features pass triggered by playtest verdict: the exploration l
 - **C — unified multi-scale clickable map *(active — Session 22; absorbs D)*.** Promote the M-view into THE strategic map: one continuous zoom across `intra` (body+moons) → `system` → `sector` → `galactic` (LOCKED scaffold) → `intergalactic` (LOCKED scaffold), subsuming the separate SectorView into one continuum (deepest zoom-in resolves back into the flyable **active** system). Every node **labeled + clickable**; a click opens a **detail popup** (reuses the inspector fields — the old **D** folds in here) showing only the **context actions** valid for that body + state (SET COURSE / AUTOPILOT / ENTER ORBIT / LAND / WARP / SCAN / GET DETAILS, all wiring existing commands). **Ego-centric**: centered on the active system, the full reachable catalog set within `WARP_RANGE_LY` populates around it (capped at `MAX_MAP_NODES`; both tunable; reachability shown **ungated** in god mode). **Scan-gated drill-down**: unscanned systems show only the coarse scan preview + SCAN; **interactive interior fly-through is the active system only** (remote scanned interiors = Scope B, deferred — `docs/09` 2026-07-07). **Distance-proportional travel** (ETA + warp transit duration scale with distance; fuel/cost deferred). Fixes the **return-home** UI gate. Bundled with it (flight-feel + visuals): a **primitive-built stylized ship** replacing the cone + a **closer third-person camera** (camera-distance + near-plane knob, honest scale unchanged — 4a); a **deepened cockpit canopy** (dashboard/coaming silhouette) + **gradual manual acceleration** (4b). Map stays off the `C` camera cycle (reached by `M`).
 - **D — body detail UI.** *(Absorbed into C: the body-inspection / detail panel is the map's click popup.)*
 
-### The surface layer — a real gridded planet you land on *(active — Phase 1)*
-**Pillar change (`docs/09` 2026-07-20, `docs/17`):** the landing arc's "aggregate globe, no tile layer" (`docs/14`) is reversed — the planet now has a **2D tile surface** you land on and place your first colony on (the front of the fun loop: land → build/expand → terraform → explore). **Boundary held:** tiles are terrain + placement + site-modifiers; the colony ECONOMY stays aggregate; tiles are NOT a per-tile economy sim. Reference: `docs/17-surface-layer.md`. Phase 1 pieces, built in order:
+### The surface layer — a real gridded planet you land on
+**Pillar change (`docs/09` 2026-07-20, `docs/17`):** the landing arc's "aggregate globe, no tile layer" (`docs/14`) is reversed — the planet now has a **2D tile surface** you land on and place colonies on (the front of the fun loop: land → build/expand → terraform → explore). **Boundary held:** tiles are terrain + placement + site-modifiers; the colony ECONOMY stays aggregate; tiles are NOT a per-tile economy sim. Reference: `docs/17-surface-layer.md`.
+
+#### Phase 1 — the tile surface + first-colony placement *(complete — Session 27)*
 - **Deterministic surface generator** (`gen/surface.ts`, pure) — from the body seed, a 96×48 tile grid: per-tile immutable altitude (coherent value-noise, archetype-biased) + sparse/clustered resources (low absolute count, veins not sprinkles; Fissiles iff the body hosts them) + base terrain. Same seed → identical grid; stored nowhere.
-- **2D canvas map** — on LAND, a full-screen canvas grid: altitude shading + base terrain + resource icons; click to select. Cheap (static repaint, sub-ms).
-- **Tile placement + founding** — `FoundColony{tile}` replaces `FoundColony{siteIndex}`; the tile feeds the existing pure `siteModifiers()` (altitude/latitude/resources/hazard → the same founding modifiers). `colony.tile` persists (additive-optional, owner-scoped, no version bump). The candidate-site card flow is replaced.
+- **2D canvas map** — on LAND, a canvas grid: altitude shading + base terrain + resource icons; click to select. Cheap (static repaint, sub-ms).
+- **Tile placement + founding** — `FoundColony{tile}` replaces `FoundColony{siteIndex}`; the tile feeds the existing pure `siteModifiers()`. `colony.tile` persists (additive-optional, owner-scoped, no version bump).
 - **Habitable climate skin** — a pure `tileAppearance(tile, latitude, planetClimate)` derives water (low tiles, waterline rises with hydrosphere) / vegetation / snow from *current* planet state; habitable worlds render alive, hostile worlds bare. Immutable terrain vs. derived skin = altitude-driven water with no per-tile save state.
 
-**Out of scope / deferred (later surface phases):** surface movement/rovers; building structures on tiles beyond first-colony placement; landing-success probability; the gradual water-FILLING animation over time; multiple colonies per planet; tile contests; the economy/trade layer. The aggregate colony economy is unchanged.
+#### Slice 1 — the full-screen surface UI *(active — Session 28)*
+A presentation + founding-UX slice on the working surface sim — **no economy/determinism/sim changes**. Turns the boxed panel into a proper Civ-style surface *mode*:
+- **Full-screen surface mode** — when landed, the surface is the whole screen (flight overlays hidden; not a boxed panel + permanent sidebar). `TAKE OFF` leaves it back to orbit/flight.
+- **Zoomable + scrollable map** — the canvas fills the screen with pan (drag / edge-scroll) + zoom (wheel / +–); pure viewport math (`ui/surface/viewport.ts`, unit-tested), repaint on interaction only (rAF-coalesced, visible-tile culling — cheap). Tile hover-inspect preserved.
+- **Top-bar toggle menus** (replace the always-open sidebar; one panel at a time, default map-only): **TERRAFORMING** (existing panel), **ECONOMY/RESOURCES** (existing aggregate `ColonyPanel`, per-colony framing ready for Slice 2), **TECH** (stub — "coming with the progression layer"), **CIVIC** (stub).
+- **Named landing/founding flow** — clicking a tile: if no colony → select → **NAME** → found (`FoundColony{tile, name}`, `Colony.name?` additive-optional); if a colony exists → **ENTER** it, or select a new tile to **found another** — the found-another path is built (select→name→confirm) but **gated** behind `canFoundAnother` (false while a colony exists; command-layer rejection is the backstop). Slice 2 flips it on by removing the gate + the per-body list backend — no UI rebuild.
+
+#### Slice 2 — multi-colony economy *(next)*
+Turns the gated "found another" path on, and makes the economy per-colony. **This is a SIM slice (save-format change + migrator).**
+- Colonies become a **per-body LIST** (multiple colonies per planet), not one-per-body.
+- **Separate resource pools per colony** — each colony manages its own stockpiles/buildings/population (the Slice-1 ECONOMY panel becomes per-colony).
+- **Planet-aggregated totals** per planet — a derived sum across the planet's colonies for shared utilization/readouts.
+- **Terraforming draws on the aggregated planetary total** — so founding more colonies on a world *accelerates* its terraforming (the incentive to expand on-planet).
+- The Slice-1 founding flow (select→name→confirm) then actually **creates multiple colonies** (remove the `canFoundAnother` gate). **Save-format change + migrator** (single colony → a one-entry list; per-body keying).
+
+**Out of scope / deferred (later surface phases):** surface movement/rovers; building structures on tiles beyond colony placement; landing-success probability; the gradual water-FILLING animation over time; tile contests; the economy/trade layer.
+
+#### After the surface slices — the layers they set up *(roadmap, not built)*
+In rough order once the surface + multi-colony economy are in:
+- **Interstellar economy / trade + interdependence** — the two-tier local-bulk vs strategic split, virtual trade routes, the anti-snowball dependency trio (`docs/16`). The Slice-2 per-colony pools + planetary aggregates are the local foundation this networks together.
+- **The tech tree that retires god-mode warp** — `docs/15` §5's colony-output → reach-unlock seed grown into a real progression gate; warp stops being ungated.
+- **3B terraforming depth** — magnetosphere / toxicity / biosphere levers + cross-lever feedback (see the Deferred list below).
 
 ### The landing arc — making landing a meaningful choice *(complete; site→modifier mapping now fed by tiles per `docs/17`)*
 The first slice of the fun loop proper (`docs/15` §1: EXPLORE → **LAND** → COLONISE → …). Landing stops being a bare "you are now on the surface" transition and becomes *a choice that shapes the colony you found*. Reference: `docs/14-landing-and-surface.md` (site science → scalar modifiers; its no-tile stance superseded by `docs/17`). Pieces, built in order:
@@ -97,7 +120,9 @@ Explicitly held back during the exploration-first interlude, to be picked up in 
 - **Trade, diplomacy & governance** — rival AI, trade routes/prices, policy/factions/stability (original Phase 6).
 - **Conflict & conquest** — fleets, defenses, tick/statistical resolution, governing taken worlds (original Phase 7).
 - **Universe tier + wormholes** — galaxy/"universe" grand-strategy scale and any FTL topology beyond warp (frontier scale, `docs/04`).
-- **Victory / balancing / monetization** — victory conditions across dominion paths, balancing pass, save hardening, desktop wrapper & monetization question (original Phase 8).
+- **Rivals / AI opponents** — the multi-agent seam (`docs/15` §6) is already built owner-scoped + command-total, so AI owners slot in with no retrofit; the actual opponents (goals, decision-making, competing over strategic resources) are a later slice, after the economy gives them something to want.
+- **Online multiplayer** — the endgame rung of the online ladder (`docs/15` §6): distribution (done) → save-sync across devices (the swappable `SaveStore` seam) → multiplayer. No netcode now; the deterministic, command-total, serialisable sim keeps a future lockstep model possible.
+- **Victory / balancing / monetization** — victory conditions across dominion paths, balancing pass, save hardening, desktop wrapper & monetization question (original Phase 8). Monetization model stays OPEN (no model-blocking decisions); decided with the sync/multiplayer identity layer, later.
 
 ## Phase 4 — A full star system *(folded into the interlude / revisit after 1B)*
 - Multiple bodies in play (planets, moons, asteroids, a gas giant).

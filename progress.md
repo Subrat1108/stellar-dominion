@@ -11,8 +11,20 @@ The deterministic space-4X sim runs end-to-end: a seeded content engine generate
 the Tau Ceti neighborhood (Step 1A), you can warp between systems (Step 1B), land,
 found colonies (owner-scoped), run the resource economy, and terraform (Phases 2–3A);
 the exploration leg is closed (Polish A–C); local persistence + offline progression
-work (Session 26). **SURFACE LAYER Phase 1 (Session 27) is CODE-COMPLETE** (in-browser
-confirmation pending) — a deliberate pillar change (`docs/09` 2026-07-20, `docs/17`) that
+work (Session 26); the tile SURFACE LAYER Phase 1 (Session 27) is in. **Now building the
+SURFACE UI REDESIGN (Session 28, Slice 1)** — a presentation + founding-UX slice on the
+working surface sim (**no economy/determinism/sim changes**): a full-screen zoomable/
+scrollable Civ-style surface *mode* with top-bar toggle menus (TERRAFORMING / ECONOMY /
+TECH-stub / CIVIC-stub) and a named landing/founding flow (select→name→confirm; the
+"found another" path built but gated behind `canFoundAnother` until the Slice-2 multi-colony
+economy). **Commit 0 done (roadmap refresh + decisions):** `docs/05` records Slice 1 / Slice 2
+(per-body colony list, separate pools, planet-aggregated totals, terraforming from the
+aggregate, save migrator) / the layers they set up (interstellar economy → tech tree that
+retires god-mode warp → 3B) / Deferred (hard-start, rivals/AI, multiplayer, monetization);
+`docs/09` logs the three decisions (full-screen mode; separate-pools-aggregated-per-planet
+Slice 2 model; terraforming from the planetary aggregate). **369 tests green** (unchanged;
+docs-only commit). **SURFACE LAYER Phase 1 (Session 27)** — a deliberate pillar change
+(`docs/09` 2026-07-20, `docs/17`) that
 **reverses `docs/14`'s "no tile layer, ever"**: the planet now has a real 2D tile surface
 you land on and place your first colony on (the front of the fun loop). **Load-bearing
 boundary held:** tiles are terrain + placement + site-modifiers; the colony ECONOMY stays
@@ -32,19 +44,26 @@ determinism untouched.
 
 ## Active next step
 
-**SURFACE LAYER Phase 1 (Session 27) is CODE-COMPLETE — next: user in-browser confirmation,**
-then the next surface phase or another slice. Confirm in-browser (no display/headless
-browser here): land a rocky world → the 96×48 surface map opens; a hostile world reads bare
-(rock/regolith/ice/sand by archetype), a habitable world shows oceans in basins + vegetation
-+ polar/peak snow; resources are sparse veins (not sprinkled); hover shows tile info, click
-selects → SETTLE HERE founds the colony there (marked distinctly); refresh keeps the founded
-tile; terraforming a world (raise temp/hydrosphere) visibly floods/greens the surface over
-time. Tuning knobs: `SURFACE_WIDTH`/`SURFACE_HEIGHT`, `MIN_DEPOSITS`/`MAX_DEPOSITS`,
-`ALTITUDE_OCTAVES` (`gen/surface.ts`), the palette + climate thresholds
-(`render/surface-appearance.ts`), `CELL` (`SurfaceMap.tsx`). Deferred to later surface
-phases (`docs/17` §6): multiple colonies per planet, structures-on-tiles, the water-FILL
-animation over time, surface movement, tile contests. Reference: `docs/17`; rationale:
-`docs/planning/session-27.md`.
+**SURFACE UI REDESIGN (Session 28, Slice 1) — commit 0 (roadmap/docs) done; next: commit 1
+(full-screen surface mode + pan/zoom).** Remaining commits: (1) `App` gates flight overlays
+on `!landed`; `SurfaceView` → a full-screen `SurfaceMode` shell (top bar: name + compact stats
++ TAKE OFF) + a pan/zoom canvas map (pure `ui/surface/viewport.ts` + tests; drag-pan, wheel/
++– zoom-to-cursor, visible-tile culling, rAF-coalesced repaint) + preserved hover-inspect +
+a temporary COLONY drawer so economy/terraforming stay reachable; (2) top-bar toggle panels
+(TERRAFORMING / ECONOMY / TECH-stub / CIVIC-stub, single `activePanel`, default map-only) —
+**removes the temp COLONY drawer**; (3) named founding flow — `Colony.name?` + `FoundColony
+{name}` + pure `ui/surface/founding.ts` (select-existing vs found-new, second colony gated) +
+name round-trip test. Determinism/sim untouched (UI/view slice). New pure tests: viewport
+math (screen↔tile round-trips under zoom+pan), founding-flow actions incl. the gated case,
+colony-name persistence. Reference: `docs/17`, `docs/05` Slice 1; rationale:
+`docs/planning/session-28.md`.
+
+**Prior — SURFACE LAYER Phase 1 (Session 27) is CODE-COMPLETE, in-browser confirmation still
+open** (not blocking): land → 96×48 map; hostile bare / habitable alive; sparse resource
+veins; click a tile → SETTLE HERE founds there; refresh keeps the tile; terraforming visibly
+changes the surface. Tuning knobs: `SURFACE_WIDTH`/`SURFACE_HEIGHT`, `MIN_DEPOSITS`/
+`MAX_DEPOSITS`, `ALTITUDE_OCTAVES` (`gen/surface.ts`), palette + climate thresholds
+(`render/surface-appearance.ts`). Rationale: `docs/planning/session-27.md`.
 
 **Prior slice — Local persistence + offline progression (Session 26) is CODE-COMPLETE,
 still needs in-browser confirmation** (not blocking): refresh resumes; land→refresh→TAKE
