@@ -14,6 +14,7 @@ import type { CelestialBody } from "../sim/ecs/components.ts";
 import { dispatch } from "../app/command-bus.ts";
 import { useLandingState } from "./hooks/useLandingState.ts";
 import ColonyPanel from "./ColonyPanel.tsx";
+import SurfaceMap from "./SurfaceMap.tsx";
 import { surfaceGravityG } from "../sim/math/physics.ts";
 import { habitabilityLabel, habitabilityColor, esiTierLabel } from "../sim/math/habitability.ts";
 import {
@@ -62,74 +63,91 @@ export default function SurfaceView({ world, bus }: SurfaceViewProps) {
         inset: 0,
         // Eased fade + zoom in/out — surface "deck" over the space view.
         opacity: visible ? 1 : 0,
-        transform: visible ? "scale(1)" : "scale(1.08)",
+        transform: visible ? "scale(1)" : "scale(1.02)",
         transition: "opacity 600ms ease, transform 600ms ease",
         pointerEvents: visible ? "auto" : "none",
         display: "flex",
-        alignItems: "center",
+        alignItems: "stretch",
         justifyContent: "center",
-        // A simple horizon gradient stands in for the surface render.
+        gap: 16,
+        padding: 16,
+        boxSizing: "border-box",
+        // A simple horizon gradient stands in behind the surface map.
         background:
-          "linear-gradient(180deg, #0a0d18 0%, #11121f 55%, #1b1410 75%, #2a1c12 100%)",
+          "linear-gradient(180deg, #060810 0%, #0a0d16 60%, #12101a 100%)",
         zIndex: 50,
       }}
     >
       {body && (
-        <div
-          className="interactive"
-          style={{
-            width: 420,
-            maxWidth: "90vw",
-            padding: "20px 24px",
-            background: "rgba(5,6,10,0.9)",
-            border: "1px solid #2a2c3f",
-            borderRadius: 8,
-            color: "#cdd6f4",
-            font: "13px/1.6 ui-monospace, monospace",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
-          }}
-        >
-          <div style={{ fontSize: 10, letterSpacing: 2, color: "#585b70", marginBottom: 4 }}>
-            SURFACE — LANDED
-          </div>
-          <div style={{ fontSize: 20, fontWeight: "bold", color: "#89b4fa" }}>{body.name}</div>
-          <div style={{ fontSize: 11, color: "#585b70", marginBottom: 14 }}>
-            {KIND_LABEL[body.kind] ?? body.kind}
+        <>
+          {/* The 2D tile surface map — the centerpiece (docs/17). */}
+          <div
+            className="interactive"
+            style={{ display: "flex", flexDirection: "column", justifyContent: "center", flex: "1 1 auto", minWidth: 0 }}
+          >
+            {displayId !== null && displayId !== undefined && body.kind === "planet" && (
+              <SurfaceMap world={world} bodyId={displayId} />
+            )}
           </div>
 
-          <StatRow label="Surface gravity" value={`${gravityG.toFixed(2)} g`} />
-          {body.surfaceTempK !== undefined && (
-            <StatRow
-              label="Surface temp"
-              value={`${body.surfaceTempK} K (${(body.surfaceTempK - 273).toFixed(0)} °C)`}
-            />
-          )}
-          {body.habitability !== undefined && (
-            <StatRow
-              label="Habitability"
-              value={`${habitabilityLabel(body.habitability)} (${Math.round(body.habitability * 100)}%)`}
-              valueColor={habColor}
-            />
-          )}
-          {body.habitability !== undefined && (
-            <StatRow label="ESI tier" value={esiTierLabel(body.habitability)} />
-          )}
+          {/* Side panel — body stats, colony/founding controls, take off. */}
+          <div
+            className="interactive"
+            style={{
+              width: 340,
+              flex: "0 0 340px",
+              maxWidth: "40vw",
+              padding: "18px 20px",
+              overflowY: "auto",
+              background: "rgba(5,6,10,0.92)",
+              border: "1px solid #2a2c3f",
+              borderRadius: 8,
+              color: "#cdd6f4",
+              font: "13px/1.6 ui-monospace, monospace",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div style={{ fontSize: 10, letterSpacing: 2, color: "#585b70", marginBottom: 4 }}>
+              SURFACE — LANDED
+            </div>
+            <div style={{ fontSize: 20, fontWeight: "bold", color: "#89b4fa" }}>{body.name}</div>
+            <div style={{ fontSize: 11, color: "#585b70", marginBottom: 14 }}>
+              {KIND_LABEL[body.kind] ?? body.kind}
+            </div>
 
-          {/* Local strategic resources — the interdependence seed (docs/14 §5, docs/16).
-              Presence/absence only; an absent world will depend on imports later. */}
-          {body.kind === "planet" && <StrategicRow world={world} body={body} />}
+            <StatRow label="Surface gravity" value={`${gravityG.toFixed(2)} g`} />
+            {body.surfaceTempK !== undefined && (
+              <StatRow
+                label="Surface temp"
+                value={`${body.surfaceTempK} K (${(body.surfaceTempK - 273).toFixed(0)} °C)`}
+              />
+            )}
+            {body.habitability !== undefined && (
+              <StatRow
+                label="Habitability"
+                value={`${habitabilityLabel(body.habitability)} (${Math.round(body.habitability * 100)}%)`}
+                valueColor={habColor}
+              />
+            )}
+            {body.habitability !== undefined && (
+              <StatRow label="ESI tier" value={esiTierLabel(body.habitability)} />
+            )}
 
-          {/* Colony economy — found, manage resources, build structures. */}
-          {displayId !== null && displayId !== undefined && (
-            <ColonyPanel world={world} bus={bus} bodyId={displayId} />
-          )}
+            {/* Local strategic resources — the interdependence seed (docs/14 §5, docs/16). */}
+            {body.kind === "planet" && <StrategicRow world={world} body={body} />}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            <button onClick={takeOff} style={secondaryBtn}>
-              ▲ TAKE OFF
-            </button>
+            {/* Colony economy — found, manage resources, build structures. */}
+            {displayId !== null && displayId !== undefined && (
+              <ColonyPanel world={world} bus={bus} bodyId={displayId} />
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button onClick={takeOff} style={secondaryBtn}>
+                ▲ TAKE OFF
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
